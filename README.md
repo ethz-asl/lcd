@@ -1,3 +1,3 @@
-# 3d_line_toolbox
+# Line Tools
 
-Toolbox containing packages for 3d line detection, clustering and description.
+Toolbox containing packages for line detection, clustering and description.
