@@ -26,11 +26,7 @@ class LineDetectionTest : public ::testing::Test {
   // TODO: Why virtual?
   virtual void SetUp() {
     // Load the kitchen.png image and compute a grayscale version of it.
-    // TODO: What is the path of this function call? Defining a global path
-    // obviously does kind of defeat the purpose of such a test.
-    std::string testimage_path(
-        "/home/dominik/catkin_ws/src/3d_line_toolbox/line_detection/test/"
-        "test_data/kitchen.png");
+    std::string testimage_path("test_data/kitchen.png");
     test_image = cv::imread(testimage_path, CV_LOAD_IMAGE_COLOR);
     cv::cvtColor(test_image, test_img_gray, CV_BGR2GRAY);
 
