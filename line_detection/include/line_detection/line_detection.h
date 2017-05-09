@@ -27,8 +27,8 @@ const int FAST_DETECTOR = 2;
 const int HOUGH_DETECTOR = 3;
 
 // NOT YET TESTED
-void displayPointCloud(const cv::Mat& image, const cv::Mat& depth,
-                       const cv::Mat& K);
+// void displayPointCloud(const cv::Mat& image, const cv::Mat& depth,
+//                       const cv::Mat& K);
 
 class LineDetector {
  private:
@@ -51,7 +51,7 @@ class LineDetector {
   void detectLines(const cv::Mat& image, std::vector<cv::Vec4f>& lines,
                    int detector = LSD_DETECTOR);
 
-  void paintLines(cv::Mat& image, const std::vector<cv::Vec4f>& lines,
+  // void paintLines(cv::Mat& image, const std::vector<cv::Vec4f>& lines,
                   cv::Vec3b color = {255, 0, 0});
 };
 

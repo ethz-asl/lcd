@@ -4,8 +4,8 @@
 
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
+#include <line_detection/RequestLineDetection.h>
 #include <line_detection/line_detection.h>
-#include <line_detection/request_line_detection.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
 #include <opencv2/highgui/highgui.hpp>
@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
 
   ros::NodeHandle node_handle;
   ros::ServiceClient client =
-      node_handle.serviceClient<line_detection::request_line_detection>(
+      node_handle.serviceClient<line_detection::RequestLineDetection>(
           "detect_lines");
 
   // define path for test image
@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
   // load the test image
   cv::Mat test_image = cv::imread(argv[1], CV_LOAD_IMAGE_COLOR);  // argv[1]);
   // create service
-  line_detection::request_line_detection service;
+  line_detection::RequestLineDetection service;
   // write additional information
   std_msgs::Header header;
   header.seq = 1;

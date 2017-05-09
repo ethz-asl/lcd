@@ -47,50 +47,50 @@ void LineDetector::detectLines(const cv::Mat& image,
   }
 }
 
-void LineDetector::paintLines(cv::Mat& image,
-                              const std::vector<cv::Vec4f>& lines,
-                              cv::Vec3b color) {
-  cv::Point2i p1, p2;
-
-  for (int i = 0; i < lines.size(); i++) {
-    p1.x = lines[i][0];
-    p1.y = lines[i][1];
-    p2.x = lines[i][2];
-    p2.y = lines[i][3];
-
-    cv::line(image, p1, p2, color, 2);
-  }
-}
+// void LineDetector::paintLines(cv::Mat& image,
+//                               const std::vector<cv::Vec4f>& lines,
+//                               cv::Vec3b color) {
+//   cv::Point2i p1, p2;
+//
+//   for (int i = 0; i < lines.size(); i++) {
+//     p1.x = lines[i][0];
+//     p1.y = lines[i][1];
+//     p2.x = lines[i][2];
+//     p2.y = lines[i][3];
+//
+//     cv::line(image, p1, p2, color, 2);
+//   }
+// }
 
 // NOT YET TESTED
-void displayPointCloud(const cv::Mat& image, const cv::Mat& depth,
-                       const cv::Mat& K) {
-  std::vector<cv::Point3d> points3d;
-  cv::rgbd::depthTo3d(depth, K, points3d);
-
-  pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(
-      new pcl::PointCloud<pcl::PointXYZRGB>);
-
-  cloud->width = depth.cols * depth.rows;
-  cloud->height = 1;
-  cloud->is_dense = false;
-  cloud->resize(cloud->width);
-
-  for (int i = 0; i < depth.rows; i++) {
-    for (int j = 0; j < depth.cols; j++) {
-      cloud->points[i].x = points3d[i].x;
-      cloud->points[i].y = points3d[i].y;
-      cloud->points[i].z = points3d[i].z;
-      cloud->points[i].r = image.at<cv::Vec3i>(j, i)[0];
-      cloud->points[i].g = image.at<cv::Vec3i>(j, i)[1];
-      cloud->points[i].b = image.at<cv::Vec3i>(j, i)[2];
-    }
-  }
-
-  pcl::visualization::CloudViewer viewer("Simple Cloud Viewer");
-  viewer.showCloud(cloud);
-  while (!viewer.wasStopped()) {
-  }
+// void displayPointCloud(const cv::Mat& image, const cv::Mat& depth,
+//                        const cv::Mat& K) {
+//   std::vector<cv::Point3d> points3d;
+//   cv::rgbd::depthTo3d(depth, K, points3d);
+//
+//   pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(
+//       new pcl::PointCloud<pcl::PointXYZRGB>);
+//
+//   cloud->width = depth.cols * depth.rows;
+//   cloud->height = 1;
+//   cloud->is_dense = false;
+//   cloud->resize(cloud->width);
+//
+//   for (int i = 0; i < depth.rows; i++) {
+//     for (int j = 0; j < depth.cols; j++) {
+//       cloud->points[i].x = points3d[i].x;
+//       cloud->points[i].y = points3d[i].y;
+//       cloud->points[i].z = points3d[i].z;
+//       cloud->points[i].r = image.at<cv::Vec3i>(j, i)[0];
+//       cloud->points[i].g = image.at<cv::Vec3i>(j, i)[1];
+//       cloud->points[i].b = image.at<cv::Vec3i>(j, i)[2];
+//     }
+//   }
+//
+//   pcl::visualization::CloudViewer viewer("Simple Cloud Viewer");
+//   viewer.showCloud(cloud);
+//   while (!viewer.wasStopped()) {
+//   }
 }
 
 }  // namespace line_detection

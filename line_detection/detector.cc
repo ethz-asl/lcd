@@ -18,8 +18,8 @@
 
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
+#include <line_detection/RequestLineDetection.h>
 #include <line_detection/line_detection.h>
-#include <line_detection/request_line_detection.h>
 #include <opencv2/highgui/highgui.hpp>
 
 // Construct the line detector
@@ -29,8 +29,8 @@ std::vector<cv::Vec4f> lines;
 // To store the image
 cv_bridge::CvImagePtr image_cv_ptr;
 
-bool detectLineCallback(line_detection::request_line_detection::Request& req,
-                        line_detection::request_line_detection::Response& res) {
+bool detectLineCallback(line_detection::RequestLineDetection::Request& req,
+                        line_detection::RequestLineDetection::Response& res) {
   // Convert to cv_ptr (which has a member ->image (cv::Mat))
   image_cv_ptr = cv_bridge::toCvCopy(req.image, "mono8");
   // detect lines
