@@ -10,6 +10,13 @@ cs_add_library(${PROJECT_NAME}
   src/line_detection.cc
 )
 
+add_executable(detector detector.cc)
+target_link_libraries(detector ${PROJECT_NAME} pthread)
+
+add_executable(send_to_detector send_to_detector.cc)
+target_link_libraries(send_to_detector ${catkin_LIBRARIES})
+
+
 add_custom_target(test_data)
 add_custom_command(TARGET test_data
                    COMMAND rm -rf test_data
@@ -20,6 +27,7 @@ add_custom_command(TARGET test_data
 catkin_add_gtest(test_line_detection test/test_line_detection.cc)
 target_link_libraries(test_line_detection ${PROJECT_NAME} pthread)
 add_dependencies(test_line_detection test_data)
+
 
 cs_install()
 cs_export()

@@ -47,6 +47,22 @@ void LineDetector::detectLines(const cv::Mat& image,
   }
 }
 
+void LineDetector::paintLines(cv::Mat& image,
+                              const std::vector<cv::Vec4f>& lines,
+                              cv::Vec3b color) {
+  cv::Point2i p1, p2;
+
+  for (int i = 0; i < lines.size(); i++) {
+    p1.x = lines[i][0];
+    p1.y = lines[i][1];
+    p2.x = lines[i][2];
+    p2.y = lines[i][3];
+
+    cv::line(image, p1, p2, color, 2);
+  }
+}
+
+// NOT YET TESTED
 void displayPointCloud(const cv::Mat& image, const cv::Mat& depth,
                        const cv::Mat& K) {
   std::vector<cv::Point3d> points3d;

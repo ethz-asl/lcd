@@ -26,6 +26,7 @@ const int EDL_DETECTOR = 1;
 const int FAST_DETECTOR = 2;
 const int HOUGH_DETECTOR = 3;
 
+// NOT YET TESTED
 void displayPointCloud(const cv::Mat& image, const cv::Mat& depth,
                        const cv::Mat& K);
 
@@ -49,6 +50,9 @@ class LineDetector {
   //                  given
   void detectLines(const cv::Mat& image, std::vector<cv::Vec4f>& lines,
                    int detector = LSD_DETECTOR);
+
+  void paintLines(cv::Mat& image, const std::vector<cv::Vec4f>& lines,
+                  cv::Vec3b color = {255, 0, 0});
 };
 
 }  // namespace line_detection

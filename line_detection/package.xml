@@ -17,11 +17,13 @@
   <buildtool_depend>catkin</buildtool_depend>
   <buildtool_depend>catkin_simple</buildtool_depend>
 
-<!--  <depend>roscpp</depend>-->
-<!--  <depend>image_transport</depend>-->
-<!--  <depend>cv_bridge</depend>-->
-<!--  <depend>std_msgs</depend>-->
-<!--  <dpeend>sensor_msgs</depend>q-->
+  <depend>roscpp</depend>
+  <depend>image_transport</depend>
+  <depend>cv_bridge</depend>
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>message_generation</depend>
+  
 
   <depend>eigen_catkin</depend>
   <depend>eigen_checks</depend>
