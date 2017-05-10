@@ -26,10 +26,6 @@ const int EDL_DETECTOR = 1;
 const int FAST_DETECTOR = 2;
 const int HOUGH_DETECTOR = 3;
 
-// NOT YET TESTED
-// void displayPointCloud(const cv::Mat& image, const cv::Mat& depth,
-//                       const cv::Mat& K);
-
 class LineDetector {
  private:
   cv::Ptr<cv::LineSegmentDetector> lsd_detector_;
@@ -42,17 +38,33 @@ class LineDetector {
   // detectLines:
   // Input: image:    The image on which the lines should be detected.
   //
-  //        lines:    The lines are stored in the following format:
-  //                  {start.x, start.y, end.x, end.y}
-  //
   //        detector: 0-> LSD, 1->EDL, 2->FAST, 3-> HOUGH
   //                  Default is LSD. It is chosen even if an invalid number is
   //                  given
+  //
+  // Output: lines:   The lines are stored in the following format:
+  //                  {start.x, start.y, end.x, end.y}
   void detectLines(const cv::Mat& image, std::vector<cv::Vec4f>& lines,
                    int detector = LSD_DETECTOR);
 
+  // computePointCloud:
+  // Input: image:    This is used to assign color values to the point cloud.
+  //
+  //        depth:    The actuall depth values. Is used to compute the point
+  //                  cloud.
+  //
+  //        K:        Calibration matrix of the camera.
+  //
+  //        point_coud: The points found are stored in there. The cloud is
+  //                    ordered. This means that for every pixel in depth/image
+  //                    there is a point. Therefore some points will have NaN
+  //                    values for coordinates (wherever the depth image
+  //                    contains NaN/zeros).
+  void computePointCloud(const cv::Mat image, const cv::Mat& depth,
+                         const cv::Mat& K,
+                         pcl::PointCloud<pcl::PointXYZRGB>& point_cloud);
   // void paintLines(cv::Mat& image, const std::vector<cv::Vec4f>& lines,
-                  cv::Vec3b color = {255, 0, 0});
+  //                cv::Vec3b color = {255, 0, 0});
 };
 
 }  // namespace line_detection
