@@ -23,7 +23,8 @@
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>message_generation</depend>
-  
+  <depend>tf</depend>
+
 
   <depend>eigen_catkin</depend>
   <depend>eigen_checks</depend>

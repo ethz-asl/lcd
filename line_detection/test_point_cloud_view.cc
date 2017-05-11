@@ -1,3 +1,6 @@
+// A test node that computes a point cloud form RGB-D data with the
+// line_detection library
+
 #include <ros/console.h>
 #include <ros/ros.h>
 
@@ -6,7 +9,9 @@
 #include <pcl/visualization/cloud_viewer.h>
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl_ros/point_cloud.h>
+#include <pcl_ros/publisher.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <tf/transform_broadcaster.h>
 
 int main(int argc, char** argv) {
   // This lets DEBUG messages display on console
@@ -20,20 +25,37 @@ int main(int argc, char** argv) {
   // Load both depth and color image.
   cv::Mat depth;
   cv::Mat image;
+  std::string img_path;
+  std::string depth_path;
+  if (argc == 3) {
+    img_path = argv[1];
+    depth_path = argv[2];
+  } else {
+    img_path = "hall.jpg";
+    depth_path = "hall_depth.png";
+  }
   image = cv::imread("hall.jpg", CV_LOAD_IMAGE_COLOR);
   depth = cv::imread("hall_depth.png", CV_LOAD_IMAGE_UNCHANGED);
   if (!image.data) {
     ROS_INFO_STREAM(
         "Image could not be loaded. Please make shure to run the node in a "
         "directory that contains the image hall.jpg and the corresponding "
-        "depth image hall_depth.png");
+        "depth image hall_depth.png."
+        << endl
+        << "Alternatively give the path of the RGB image as the first argument "
+           "and the path of the depth image as the second argument to the "
+           "function.");
     return -1;
   }
   if (!depth.data) {
     ROS_INFO_STREAM(
-        "Image could not be loaded. Please make shure to run the node in a "
+        "Image could not be loaded. Please make sure to run the node in a "
         "directory that contains the image hall.jpg and the corresponding "
-        "depth image hall_depth.png");
+        "depth image hall_depth.png"
+        << endl
+        << "Alternatively give the path of the RGB image as the first argument "
+           "and the path of the depth image as the second argument to the "
+           "function.");
     return -1;
   }
 
@@ -61,7 +83,7 @@ int main(int argc, char** argv) {
   line_detector.computePointCloud(image, depth, K, cloud);
 
   // These mean values are used in the unit tests (copied there by hand). So to
-  // make changes there later, this code should stay here
+  // make changes there later, this code should stay here.
   double x_mean = 0;
   double y_mean = 0;
   double z_mean = 0;
@@ -91,11 +113,36 @@ int main(int argc, char** argv) {
                    << "g_mean = " << g_mean << endl
                    << "b_mean = " << b_mean << endl);
 
-  // Visualize it.
-  pcl::visualization::PCLVisualizer viewer("3D Viewer");
-  viewer.setBackgroundColor(1, 1, 1);
-  viewer.addCoordinateSystem(1.0f, "global");
-  viewer.addPointCloud(cloud_ptr, "original point cloud");
-  viewer.spin();
+  // Sparsify the point cloud for better visualization performance
+  pcl::PointCloud<pcl::PointXYZRGB> sparse_cloud;
+  for (int i = 0; i < cloud.size(); i += 4) {
+    sparse_cloud.push_back(cloud.points[i]);
+  }
+
+  // // Visualize it with PCLVisualizer,
+  // pcl::visualization::PCLVisualizer viewer("3D Viewer");
+  // viewer.setBackgroundColor(1, 1, 1);
+  // viewer.addCoordinateSystem(1.0f, "global");
+  // viewer.addPointCloud(cloud_ptr, "original point cloud");
+  // viewer.spin();
+
+  // Visualize it with RVIZ
+  tf::TransformBroadcaster broad_caster;
+  tf::Transform transform;
+  transform.setOrigin(tf::Vector3(0, 0, 0));
+  tf::Quaternion quat;
+  quat.setRPY(-3.1415 / 2, 0, 0);
+  transform.setRotation(quat);
+  ros::Publisher pcl_pub =
+      node_handle.advertise<pcl::PointCloud<pcl::PointXYZRGB> >(
+          "vis_pointcloud", 1);
+  sparse_cloud.header.frame_id = "my_frame";
+  ros::Rate rate(0.2);
+  while (ros::ok()) {
+    broad_caster.sendTransform(
+        tf::StampedTransform(transform, ros::Time::now(), "map", "my_frame"));
+    pcl_pub.publish(sparse_cloud);
+    rate.sleep();
+  }
   return 0;
 }

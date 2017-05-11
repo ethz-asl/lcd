@@ -11,30 +11,38 @@
 #include <opencv2/highgui/highgui.hpp>
 
 int main(int argc, char** argv) {
-  ros::init(argc, argv, "send_image");
+  // Do not accept to may arguments.
   if (argc > 3) {
     ROS_INFO(
         "usage: send_image <imagepath> <algorithm> \n"
         "Both arguments may be omitted.");
-    return 1;
+    return -1;
   }
-
-  ros::NodeHandle node_handle;
-  ros::ServiceClient client =
-      node_handle.serviceClient<line_detection::RequestLineDetection>(
-          "detect_lines");
-
   // define path for test image
   std::string path;
-  if (argc > 1) {
+  if (argc < 2) {
     path =
         "/home/dominik/mydata/polybox/Dokumente/SemesterProject/Code/"
         "kitchen.png";
   } else {
     path = argv[1];
   }
+  // Initialie the node.
+  ros::init(argc, argv, "send_image");
+  ros::NodeHandle node_handle;
+  ros::ServiceClient client =
+      node_handle.serviceClient<line_detection::RequestLineDetection>(
+          "detect_lines");
+
   // load the test image
-  cv::Mat test_image = cv::imread(argv[1], CV_LOAD_IMAGE_COLOR);  // argv[1]);
+  cv::Mat test_image = cv::imread(path, CV_LOAD_IMAGE_COLOR);
+  if (!test_image.data) {
+    ROS_INFO(
+        "The path \"%s\" is not a valid image. Please pass a valid path as "
+        "an argument to the function.",
+        path.c_str());
+    return -1;
+  }
   // create service
   line_detection::RequestLineDetection service;
   // write additional information
@@ -44,7 +52,7 @@ int main(int argc, char** argv) {
   // Create CvImage
   cv_bridge::CvImage cv_image = cv_bridge::CvImage(
       header, sensor_msgs::image_encodings::RGB8, test_image);
-  // Set the service image to the test_image.
+  // Set the service image to the test_image (which is stored in cv_image).
   cv_image.toImageMsg(service.request.image);
   // Set algorithm. Default is LSD.
   if (argc > 2) {
