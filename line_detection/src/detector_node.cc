@@ -1,4 +1,4 @@
-// This node acts as a Server that detects lines. It advertises a service
+// This node advertises a service that extracts lines from input images.
 // "detect_lines":
 //
 // uint8 detector
