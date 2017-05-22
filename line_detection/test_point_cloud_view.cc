@@ -12,6 +12,7 @@
 #include <pcl_ros/publisher.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <tf/transform_broadcaster.h>
+#include <visualization_msgs/Marker.h>
 
 int main(int argc, char** argv) {
   // This lets DEBUG messages display on console
@@ -82,36 +83,37 @@ int main(int argc, char** argv) {
   line_detection::LineDetector line_detector;
   line_detector.computePointCloud(image, depth, K, cloud);
 
-  // These mean values are used in the unit tests (copied there by hand). So to
-  // make changes there later, this code should stay here.
-  double x_mean = 0;
-  double y_mean = 0;
-  double z_mean = 0;
-  double r_mean = 0;
-  double g_mean = 0;
-  double b_mean = 0;
-  for (int i = 0; i < cloud.size(); i++) {
-    if (std::isnan(cloud.points[i].x)) continue;
-    x_mean += cloud.points[i].x;
-    y_mean += cloud.points[i].y;
-    z_mean += cloud.points[i].z;
-    r_mean += cloud.points[i].r;
-    g_mean += cloud.points[i].g;
-    b_mean += cloud.points[i].b;
-  }
-  x_mean = x_mean / cloud.size();
-  y_mean = y_mean / cloud.size();
-  z_mean = z_mean / cloud.size();
-  r_mean = r_mean / cloud.size();
-  g_mean = g_mean / cloud.size();
-  b_mean = b_mean / cloud.size();
-  ROS_DEBUG_STREAM("\n"
-                   << "x_mean = " << x_mean << endl
-                   << "y_mean = " << y_mean << endl
-                   << "z_mean = " << z_mean << endl
-                   << "r_mean = " << r_mean << endl
-                   << "g_mean = " << g_mean << endl
-                   << "b_mean = " << b_mean << endl);
+  // // These mean values are used in the unit tests (copied there by hand). So
+  // to
+  // // make changes there later, this code should stay here.
+  // double x_mean = 0;
+  // double y_mean = 0;
+  // double z_mean = 0;
+  // double r_mean = 0;
+  // double g_mean = 0;
+  // double b_mean = 0;
+  // for (int i = 0; i < cloud.size(); i++) {
+  //   if (std::isnan(cloud.points[i].x)) continue;
+  //   x_mean += cloud.points[i].x;
+  //   y_mean += cloud.points[i].y;
+  //   z_mean += cloud.points[i].z;
+  //   r_mean += cloud.points[i].r;
+  //   g_mean += cloud.points[i].g;
+  //   b_mean += cloud.points[i].b;
+  // }
+  // x_mean = x_mean / cloud.size();
+  // y_mean = y_mean / cloud.size();
+  // z_mean = z_mean / cloud.size();
+  // r_mean = r_mean / cloud.size();
+  // g_mean = g_mean / cloud.size();
+  // b_mean = b_mean / cloud.size();
+  // ROS_DEBUG_STREAM("\n"
+  //                  << "x_mean = " << x_mean << endl
+  //                  << "y_mean = " << y_mean << endl
+  //                  << "z_mean = " << z_mean << endl
+  //                  << "r_mean = " << r_mean << endl
+  //                  << "g_mean = " << g_mean << endl
+  //                  << "b_mean = " << b_mean << endl);
 
   // Sparsify the point cloud for better visualization performance
   pcl::PointCloud<pcl::PointXYZRGB> sparse_cloud;
@@ -119,6 +121,15 @@ int main(int argc, char** argv) {
     sparse_cloud.push_back(cloud.points[i]);
   }
 
+  // Not to compute the 3D lines, we use a diffetent type of point cloud.
+  cv::Mat pc_mat;
+  cv::Mat img_gray;
+  cvtColor(image, img_gray, CV_BGR2GRAY);
+  cv::rgbd::depthTo3d(depth, K, pc_mat);
+  std::vector<cv::Vec4f> lines2D;
+  std::vector<cv::Vec<float, 6> > lines3D;
+  line_detector.detectLines(img_gray, lines2D);
+  line_detector.projectLines2Dto3D(lines2D, pc_mat, lines3D);
   // // Visualize it with PCLVisualizer,
   // pcl::visualization::PCLVisualizer viewer("3D Viewer");
   // viewer.setBackgroundColor(1, 1, 1);
@@ -135,13 +146,42 @@ int main(int argc, char** argv) {
   transform.setRotation(quat);
   ros::Publisher pcl_pub =
       node_handle.advertise<pcl::PointCloud<pcl::PointXYZRGB> >(
-          "vis_pointcloud", 1);
+          "vis_pointcloud", 2);
   sparse_cloud.header.frame_id = "my_frame";
-  ros::Rate rate(0.2);
+
+  ros::Publisher marker_pub = node_handle.advertise<visualization_msgs::Marker>(
+      "visualization_marker", 1000);
+  visualization_msgs::Marker disp_lines;
+  disp_lines.header.frame_id = "my_frame";
+  disp_lines.action = visualization_msgs::Marker::ADD;
+  disp_lines.type = visualization_msgs::Marker::LINE_LIST;
+  disp_lines.scale.x = 0.1;
+  disp_lines.color.a = 1;
+  disp_lines.color.r = 1;
+  disp_lines.color.g = 0;
+  disp_lines.color.b = 0;
+
+  geometry_msgs::Point p;
+  disp_lines.points.resize(2);
+
+  ros::Rate rate(0.1);
   while (ros::ok()) {
     broad_caster.sendTransform(
         tf::StampedTransform(transform, ros::Time::now(), "map", "my_frame"));
     pcl_pub.publish(sparse_cloud);
+
+    for (size_t i = 0; i < lines3D.size(); ++i) {
+      p.x = lines3D[i][0];
+      p.y = lines3D[i][1];
+      p.z = lines3D[i][2];
+      disp_lines.points[0] = p;
+      p.x = lines3D[i][3];
+      p.y = lines3D[i][4];
+      p.z = lines3D[i][5];
+      disp_lines.points[1] = p;
+      disp_lines.id = i;
+      marker_pub.publish(disp_lines);
+    }
     rate.sleep();
   }
   return 0;

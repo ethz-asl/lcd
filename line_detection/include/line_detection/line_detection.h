@@ -26,6 +26,8 @@ const int EDL_DETECTOR = 1;
 const int FAST_DETECTOR = 2;
 const int HOUGH_DETECTOR = 3;
 
+bool areLinesEqual2D(const cv::Vec4f line1, const cv::Vec4f line2);
+
 class LineDetector {
  private:
   cv::Ptr<cv::LineSegmentDetector> lsd_detector_;
@@ -65,6 +67,18 @@ class LineDetector {
                          pcl::PointCloud<pcl::PointXYZRGB>& point_cloud);
   // void paintLines(cv::Mat& image, const std::vector<cv::Vec4f>& lines,
   //                cv::Vec3b color = {255, 0, 0});
+
+  void projectLines2Dto3D(const std::vector<cv::Vec4f>& lines2D,
+                          const cv::Mat& point_cloud,
+                          std::vector<cv::Vec<float, 6> >& lines3D);
+
+  void fuseLines2D(const std::vector<cv::Vec4f>& lines_in,
+                   std::vector<cv::Vec4f>& lines_out);
+
+  void paintLines(cv::Mat& image, const std::vector<cv::Vec4f>& lines,
+                  cv::Vec3b color = {255, 0, 0});
+  // bool search3DLine(const cv::Mat& image, const cv::Point2i& line, const
+  // cv::Point2i& start, cv::Point2i& end)
 };
 
 }  // namespace line_detection

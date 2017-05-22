@@ -118,6 +118,14 @@ TEST_F(LineDetectionTest, testComputePointCloud) {
   EXPECT_NEAR(b_mean, 116.337, 1e-2);
 }
 
+TEST_F(LineDetectionTest, testAreLinesEqual2D) {
+  EXPECT_TRUE(line_detection::areLinesEqual2D(cv::Vec4f(0, 0, 10, 10),
+                                              cv::Vec4f(0, 0, 10, 10)));
+  EXPECT_TRUE(line_detection::areLinesEqual2D(cv::Vec4f(0, 0, 10, 10),
+                                              cv::Vec4f(10, 10, 30, 30)));
+  EXPECT_FALSE(line_detection::areLinesEqual2D(cv::Vec4f(0, 0, 10, 10),
+                                               cv::Vec4f(0, 0, 0, 10)));
+}
 }  // namespace line_detection
 
 LINE_DETECTION_TESTING_ENTRYPOINT

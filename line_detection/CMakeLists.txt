@@ -13,11 +13,14 @@ cs_add_library(${PROJECT_NAME}
 add_executable(detector detector.cc)
 target_link_libraries(detector ${PROJECT_NAME} pthread)
 
+add_executable(general_test general_tests.cc)
+target_link_libraries(general_test ${PROJECT_NAME})
+
 add_executable(send_to_detector send_to_detector.cc)
 target_link_libraries(send_to_detector ${catkin_LIBRARIES})
 
 add_executable(test_point_cloud_view test_point_cloud_view.cc)
-target_link_libraries(test_point_cloud_view ${PROJECT_NAME} pthread)
+target_link_libraries(test_point_cloud_view ${PROJECT_NAME})
 
 
 add_custom_target(test_data)
