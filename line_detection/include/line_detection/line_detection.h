@@ -21,19 +21,14 @@
 
 namespace line_detection {
 
-const int LSD_DETECTOR = 0;
-const int EDL_DETECTOR = 1;
-const int FAST_DETECTOR = 2;
-const int HOUGH_DETECTOR = 3;
+const int kLsdDetector = 0;
+const int kEdlDetector = 1;
+const int kFastDetector = 2;
+const int kHoughDetector = 3;
 
 bool areLinesEqual2D(const cv::Vec4f line1, const cv::Vec4f line2);
 
 class LineDetector {
- private:
-  cv::Ptr<cv::LineSegmentDetector> lsd_detector_;
-  cv::Ptr<cv::line_descriptor::BinaryDescriptor> edl_detector_;
-  cv::Ptr<cv::ximgproc::FastLineDetector> fast_detector_;
-
  public:
   LineDetector();
 
@@ -47,7 +42,7 @@ class LineDetector {
   // Output: lines:   The lines are stored in the following format:
   //                  {start.x, start.y, end.x, end.y}
   void detectLines(const cv::Mat& image, std::vector<cv::Vec4f>& lines,
-                   int detector = LSD_DETECTOR);
+                   int detector = kLsdDetector);
 
   // computePointCloud:
   // Input: image:    This is used to assign color values to the point cloud.
@@ -65,8 +60,6 @@ class LineDetector {
   void computePointCloud(const cv::Mat image, const cv::Mat& depth,
                          const cv::Mat& K,
                          pcl::PointCloud<pcl::PointXYZRGB>& point_cloud);
-  // void paintLines(cv::Mat& image, const std::vector<cv::Vec4f>& lines,
-  //                cv::Vec3b color = {255, 0, 0});
 
   void projectLines2Dto3D(const std::vector<cv::Vec4f>& lines2D,
                           const cv::Mat& point_cloud,
@@ -77,8 +70,13 @@ class LineDetector {
 
   void paintLines(cv::Mat& image, const std::vector<cv::Vec4f>& lines,
                   cv::Vec3b color = {255, 0, 0});
+
+ private:
   // bool search3DLine(const cv::Mat& image, const cv::Point2i& line, const
   // cv::Point2i& start, cv::Point2i& end)
+  cv::Ptr<cv::LineSegmentDetector> lsd_detector_;
+  cv::Ptr<cv::line_descriptor::BinaryDescriptor> edl_detector_;
+  cv::Ptr<cv::ximgproc::FastLineDetector> fast_detector_;
 };
 
 }  // namespace line_detection

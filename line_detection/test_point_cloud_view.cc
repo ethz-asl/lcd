@@ -1,10 +1,10 @@
 // A test node that computes a point cloud form RGB-D data with the
 // line_detection library
+#include <line_detection/line_detection.h>
 
 #include <ros/console.h>
 #include <ros/ros.h>
 
-#include <line_detection/line_detection.h>
 #include <pcl/conversions.h>
 #include <pcl/visualization/cloud_viewer.h>
 #include <pcl/visualization/pcl_visualizer.h>

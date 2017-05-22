@@ -9,7 +9,7 @@
 // float32[] end_x
 // float32[] end_y
 //
-//  @param detector:  directly handeld to
+//  @param detector:  directly handled to
 //                    line_detection::LineDetector::detectLines
 //  @param image:     Input for the line search.
 //  @param start/end: Coordinates in pixels of start resp. end point of lines.
@@ -22,18 +22,18 @@
 #include <line_detection/line_detection.h>
 #include <opencv2/highgui/highgui.hpp>
 
-// Construct the line detector
+// Construct the line_detector and a vector to store the lines.
 line_detection::LineDetector line_detector;
-// To store the lines
 std::vector<cv::Vec4f> lines;
-// To store the image
+// cv_bridge allows an easy conversion from opencv to the ros standard image
+// messages.
 cv_bridge::CvImagePtr image_cv_ptr;
 
 bool detectLineCallback(line_detection::RequestLineDetection::Request& req,
                         line_detection::RequestLineDetection::Response& res) {
   // Convert to cv_ptr (which has a member ->image (cv::Mat))
   image_cv_ptr = cv_bridge::toCvCopy(req.image, "mono8");
-  // detect lines
+  // The actuall line detection process.
   lines.clear();
   line_detector.detectLines(image_cv_ptr->image, lines, req.detector);
 
@@ -42,7 +42,7 @@ bool detectLineCallback(line_detection::RequestLineDetection::Request& req,
   res.start_y.reserve(lines.size());
   res.end_x.reserve(lines.size());
   res.end_y.reserve(lines.size());
-  for (int i = 0; i < lines.size(); i++) {
+  for (size_t i = 0u; i < lines.size(); ++i) {
     res.start_x.push_back(lines[i][0]);
     res.start_y.push_back(lines[i][1]);
     res.end_x.push_back(lines[i][2]);

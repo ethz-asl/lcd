@@ -1,10 +1,13 @@
 #include "line_detection/line_detection.h"
-#include <assert.h>
+
+#include <glog/logging.h>
 #include <ros/ros.h>
-#include <iostream>
 #include <opencv2/rgbd.hpp>
 
+#include <assert.h>
 #include <cmath>
+#include <iostream>
+
 namespace line_detection {
 
 bool areLinesEqual2D(const cv::Vec4f line1, const cv::Vec4f line2) {
@@ -37,11 +40,6 @@ bool areLinesEqual2D(const cv::Vec4f line1, const cv::Vec4f line2) {
 }
 
 LineDetector::LineDetector() {
-  // TODO: Can I assign some kind of a NULL pointer to these (normal NULL does
-  // not work)? That would make it possible to only initialize the ones I need
-  // (without a workaround with additional variables that store if a detector
-  // already has been initialized).
-
   lsd_detector_ = cv::createLineSegmentDetector(cv::LSD_REFINE_STD);
   edl_detector_ =
       cv::line_descriptor::BinaryDescriptor::createBinaryDescriptor();
@@ -50,6 +48,7 @@ LineDetector::LineDetector() {
 
 void LineDetector::detectLines(const cv::Mat& image,
                                std::vector<cv::Vec4f>& lines, int detector) {
+  lines.clear();
   // Check which detector is chosen by user. If an invalid number is given the
   // default (LSD) is chosen without a warning.
   if (detector == 1) {  // EDL_DETECTOR
@@ -57,16 +56,15 @@ void LineDetector::detectLines(const cv::Mat& image,
     // The conversion is done later.
     std::vector<cv::line_descriptor::KeyLine> edl_lines;
     edl_detector_->detect(image, edl_lines);
-    lines.clear();
+
     // Write lines to standard format
-    for (int i = 0; i < edl_lines.size(); i++) {
+    for (size_t i = 0u; i < edl_lines.size(); ++i) {
       lines.push_back(cv::Vec4i(
           edl_lines[i].getStartPoint().x, edl_lines[i].getStartPoint().y,
           edl_lines[i].getEndPoint().x, edl_lines[i].getEndPoint().y));
     }
 
   } else if (detector == 2) {  // FAST_DETECTOR
-    lines.clear();
     fast_detector_->detect(image, lines);
   } else if (detector == 3) {  // HOUGH_DETECTOR
     cv::Mat output;
@@ -76,7 +74,6 @@ void LineDetector::detectLines(const cv::Mat& image,
     // Here parameter changes might improve the result.
     cv::HoughLinesP(output, lines, 1, CV_PI / 180, 50, 30, 10);
   } else {  // LSD_DETECTOR
-    lines.clear();
     lsd_detector_->detect(image, lines);
   }
 }
@@ -111,20 +108,6 @@ void LineDetector::computePointCloud(
     }
   }
 }
-// void LineDetector::paintLines(cv::Mat& image,
-//                               const std::vector<cv::Vec4f>& lines,
-//                               cv::Vec3b color) {
-//   cv::Point2i p1, p2;
-//
-//   for (int i = 0; i < lines.size(); i++) {
-//     p1.x = lines[i][0];
-//     p1.y = lines[i][1];
-//     p2.x = lines[i][2];
-//     p2.y = lines[i][3];
-//
-//     cv::line(image, p1, p2, color, 2);
-//   }
-// }
 
 void LineDetector::projectLines2Dto3D(
     const std::vector<cv::Vec4f>& lines2D, const cv::Mat& point_cloud,

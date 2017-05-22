@@ -1,14 +1,15 @@
 // A test function to ask for the detect_line service of the
 // line_detection::detector node
-#include <ros/ros.h>
+#include <line_detection/line_detection.h>
 
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
-#include <line_detection/RequestLineDetection.h>
-#include <line_detection/line_detection.h>
+#include <ros/ros.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
 #include <opencv2/highgui/highgui.hpp>
+
+#include <line_detection/RequestLineDetection.h>
 
 int main(int argc, char** argv) {
   // Do not accept to may arguments.

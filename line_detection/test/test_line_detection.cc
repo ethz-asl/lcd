@@ -17,49 +17,57 @@ class LineDetectionTest : public ::testing::Test {
 
   virtual ~LineDetectionTest() {}
 
-  cv::Mat test_image;
-  cv::Mat test_img_gray;
-  cv::Mat test_depth_load;
-  cv::Mat test_depth;
-  line_detection::LineDetector line_detector;
-  std::vector<cv::Vec4f> lines;
+  cv::Mat test_image_;
+  cv::Mat test_img_gray_;
+  cv::Mat test_depth_load_;
+  cv::Mat test_depth_;
+  line_detection::LineDetector line_detector_;
+  std::vector<cv::Vec4f> lines_;
 
-  // TODO: Why virtual?
   virtual void SetUp() {
     // Load the test image and compute a grayscale version of it.
     std::string testimage_path("test_data/hall.jpg");
-    test_image = cv::imread(testimage_path, CV_LOAD_IMAGE_COLOR);
-    cv::cvtColor(test_image, test_img_gray, CV_BGR2GRAY);
+    test_image_ = cv::imread(testimage_path, CV_LOAD_IMAGE_COLOR);
+    cv::cvtColor(test_image_, test_img_gray_, CV_BGR2GRAY);
     // Load the depth data corresponding to the test image.
     std::string testdepth_path("test_data/hall_depth.png");
-    test_depth_load = cv::imread(testdepth_path, CV_LOAD_IMAGE_UNCHANGED);
-    if (test_depth_load.type() != CV_16UC1)
-      test_depth_load.convertTo(test_depth, CV_16UC1);
+    test_depth_load_ = cv::imread(testdepth_path, CV_LOAD_IMAGE_UNCHANGED);
+    if (test_depth_load_.type() != CV_16UC1)
+      test_depth_load_.convertTo(test_depth_, CV_16UC1);
     else
-      test_depth = test_depth_load;
+      test_depth_ = test_depth_load_;
   }
 };
 
-TEST_F(LineDetectionTest, testLineDetection) {
-  int n_lines;
+TEST_F(LineDetectionTest, testLSDLineDetection) {
+  size_t n_lines;
   // Calling the detector with LSD.
-  line_detector.detectLines(test_img_gray, lines, 0);
-  n_lines = lines.size();
+  line_detector_.detectLines(test_img_gray_, lines_, 0);
+  n_lines = lines_.size();
   EXPECT_EQ(n_lines, 716)
       << "LSD detection: Expected 84 lines to be found. Found " << n_lines;
+}
+TEST_F(LineDetectionTest, testEDLLineDetection) {
+  size_t n_lines;
   // Calling the detector with EDL.
-  line_detector.detectLines(test_img_gray, lines, 1);
-  n_lines = lines.size();
+  line_detector_.detectLines(test_img_gray_, lines_, 1);
+  n_lines = lines_.size();
   EXPECT_EQ(n_lines, 172)
       << "EDL detection: Expected 18 lines to be found. Found " << n_lines;
+}
+TEST_F(LineDetectionTest, testFASTLineDetection) {
+  size_t n_lines;
   // Calling the detector with FAST.
-  line_detector.detectLines(test_img_gray, lines, 2);
-  n_lines = lines.size();
+  line_detector_.detectLines(test_img_gray_, lines_, 2);
+  n_lines = lines_.size();
   EXPECT_EQ(n_lines, 598)
       << "Fast detection: Expected 70 lines to be found. Found " << n_lines;
+}
+TEST_F(LineDetectionTest, testHoughLineDetection) {
+  size_t n_lines;
   // Calling the detector with HOUGH.
-  line_detector.detectLines(test_img_gray, lines, 3);
-  n_lines = lines.size();
+  line_detector_.detectLines(test_img_gray_, lines_, 3);
+  n_lines = lines_.size();
   EXPECT_EQ(n_lines, 165)
       << "HOUGH detection: Expected 16 lines to be found. Found " << n_lines;
 }
@@ -79,7 +87,7 @@ TEST_F(LineDetectionTest, testComputePointCloud) {
   // Point_cloud to be filled.
   pcl::PointCloud<pcl::PointXYZRGB> point_cloud;
   // Fill the point cloud (this is the functioned that is tested here)
-  line_detector.computePointCloud(test_image, test_depth, K, point_cloud);
+  line_detector_.computePointCloud(test_image_, test_depth_, K, point_cloud);
   // Compue the mean of all entries of the point cloud
   double x_mean = 0;
   double y_mean = 0;
