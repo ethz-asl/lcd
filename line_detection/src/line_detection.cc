@@ -1,6 +1,7 @@
 #include "line_detection/line_detection.h"
 
 #include <glog/logging.h>
+#include <gtest/gtest.h>
 #include <ros/ros.h>
 #include <opencv2/rgbd.hpp>
 
@@ -46,12 +47,31 @@ LineDetector::LineDetector() {
   fast_detector_ = cv::ximgproc::createFastLineDetector();
 }
 
-void LineDetector::detectLines(const cv::Mat& image,
-                               std::vector<cv::Vec4f>& lines, int detector) {
+void LineDetector::detectLines(const cv::Mat& image, int detector,
+                               std::vector<cv::Vec4f>& lines) {
+  if (detector == 0)
+    detectLines(image, Detector::LSD, lines);
+  else if (detector == 1)
+    detectLines(image, Detector::EDL, lines);
+  else if (detector == 2)
+    detectLines(image, Detector::FAST, lines);
+  else if (detector == 3)
+    detectLines(image, Detector::HOUGH, lines);
+  else {
+    ROS_ERROR(
+        "LineDetetor::detectLines: Detector choice not valid, LSD was "
+        "chosen as default.");
+    detectLines(image, Detector::LSD, lines);
+  }
+}
+void LineDetector::detectLines(const cv::Mat& image, Detector detector,
+                               std::vector<cv::Vec4f>& lines) {
   lines.clear();
   // Check which detector is chosen by user. If an invalid number is given the
   // default (LSD) is chosen without a warning.
-  if (detector == 1) {  // EDL_DETECTOR
+  if (detector == Detector::LSD) {
+    lsd_detector_->detect(image, lines);
+  } else if (detector == Detector::EDL) {  // EDL_DETECTOR
     // The edl detector uses a different kind of vector to store the lines in.
     // The conversion is done later.
     std::vector<cv::line_descriptor::KeyLine> edl_lines;
@@ -64,18 +84,20 @@ void LineDetector::detectLines(const cv::Mat& image,
           edl_lines[i].getEndPoint().x, edl_lines[i].getEndPoint().y));
     }
 
-  } else if (detector == 2) {  // FAST_DETECTOR
+  } else if (detector == Detector::FAST) {  // FAST_DETECTOR
     fast_detector_->detect(image, lines);
-  } else if (detector == 3) {  // HOUGH_DETECTOR
+  } else if (detector == Detector::HOUGH) {  // HOUGH_DETECTOR
     cv::Mat output;
     // Parameters of the Canny should not be changed (or better: the result is
     // very likely to get worse);
     cv::Canny(image, output, 50, 200, 3);
     // Here parameter changes might improve the result.
     cv::HoughLinesP(output, lines, 1, CV_PI / 180, 50, 30, 10);
-  } else {  // LSD_DETECTOR
-    lsd_detector_->detect(image, lines);
   }
+}
+void LineDetector::detectLines(const cv::Mat& image,
+                               std::vector<cv::Vec4f>& lines) {
+  detectLines(image, Detector::LSD, lines);
 }
 
 void LineDetector::computePointCloud(
@@ -113,44 +135,74 @@ void LineDetector::projectLines2Dto3D(
     const std::vector<cv::Vec4f>& lines2D, const cv::Mat& point_cloud,
     std::vector<cv::Vec<float, 6> >& lines3D) {
   // First check if the point_cloud mat has the right format.
-  if (point_cloud.type() != CV_32FC3) {
-    ROS_INFO("The input matrix point_cloud must be of type CV_32FC3.");
-    return;
-  }
+  CHECK_EQ(point_cloud.type(), CV_32FC3)
+      << "The input matrix point_cloud must be of type CV_32FC3.";
   int rows = point_cloud.rows;
   int cols = point_cloud.cols;
   lines3D.clear();
   cv::Point2f start, end, line;
-  // cv::Point2i position;
+  cv::Vec<float, 6> line3D, lower_line3D, upper_line3D;
+  cv::Vec4f upper_line2D, lower_line2D;
+  double rate_mid, rate_up, rate_low;
   for (size_t i = 0; i < lines2D.size(); ++i) {
+    // **************** VARIANT 1 ****************** //
     start.x = floor(lines2D[i][0]);
     start.y = floor(lines2D[i][1]);
     end.x = floor(lines2D[i][2]);
     end.y = floor(lines2D[i][3]);
-    // position = start;
-    while (std::isnan(point_cloud.at<cv::Vec3f>(start)[0])) {
-      line = end - start;
-      start.x += floor(line.x / sqrt(line.x * line.x + line.y * line.y) + 0.5);
-      start.y += floor(line.y / sqrt(line.x * line.x + line.y * line.y) + 0.5);
-      // position = start;
-      if (start.x == end.x && start.y == end.y) break;
+    if (!std::isnan(point_cloud.at<cv::Vec3f>(start)[0]) &&
+        !std::isnan(point_cloud.at<cv::Vec3f>(end)[0])) {
+      lines3D.push_back(cv::Vec<float, 6>(point_cloud.at<cv::Vec3f>(start)[0],
+                                          point_cloud.at<cv::Vec3f>(start)[1],
+                                          point_cloud.at<cv::Vec3f>(start)[2],
+                                          point_cloud.at<cv::Vec3f>(end)[0],
+                                          point_cloud.at<cv::Vec3f>(end)[1],
+                                          point_cloud.at<cv::Vec3f>(end)[2]));
     }
-    if (start.x == end.x && start.y == end.y) continue;
-    while (std::isnan(point_cloud.at<cv::Vec3f>(end)[0])) {
-      line = start - end;
-      end.x += floor(line.x / sqrt(line.x * line.x + line.y * line.y) + 0.5);
-      end.y += floor(line.y / sqrt(line.x * line.x + line.y * line.y) + 0.5);
-      // position = end;
-      if (start.x == end.x && start.y == end.y) break;
-    }
-    if (start.x == end.x && start.y == end.y) continue;
-    lines3D.push_back(cv::Vec<float, 6>(
-        point_cloud.at<cv::Vec3f>(start)[0],
-        point_cloud.at<cv::Vec3f>(start)[1],
-        point_cloud.at<cv::Vec3f>(start)[2], point_cloud.at<cv::Vec3f>(end)[0],
-        point_cloud.at<cv::Vec3f>(end)[1], point_cloud.at<cv::Vec3f>(end)[2]));
+
+    // *************** VARIANT 2 ***************** //
+    // if (find3DLineStartAndEnd(point_cloud, lines2D[i], line3D))
+    //   lines3D.push_back(line3D);
+
+    //*********** VARIANT 3 ****************//
+    // line.x = lines2D[i][2] - lines2D[i][0];
+    // line.y = lines2D[i][3] - lines2D[i][1];
+    // double line_normalizer = sqrt(line.x * line.x + line.y * line.y);
+    // upper_line2D[0] = checkInBoundary(
+    //     floor(lines2D[i][0]) + floor(line.y / line_normalizer + 0.5), 0.0,
+    //     cols);
+    // upper_line2D[1] = checkInBoundary(
+    //     floor(lines2D[i][1]) + floor(-line.x / line_normalizer + 0.5), 0.0,
+    //     rows);
+    // upper_line2D[2] = checkInBoundary(
+    //     floor(lines2D[i][2]) + floor(line.y / line_normalizer + 0.5), 0.0,
+    //     cols);
+    // upper_line2D[3] = checkInBoundary(
+    //     floor(lines2D[i][3]) + floor(-line.x / line_normalizer + 0.5), 0.0,
+    //     rows);
+    // lower_line2D[0] = checkInBoundary(
+    //     floor(lines2D[i][0]) + floor(-line.y / line_normalizer + 0.5), 0.0,
+    //     cols);
+    // lower_line2D[1] = checkInBoundary(
+    //     floor(lines2D[i][1]) + floor(line.x / line_normalizer + 0.5), 0.0,
+    //     rows);
+    // lower_line2D[2] = checkInBoundary(
+    //     floor(lines2D[i][2]) + floor(-line.y / line_normalizer + 0.5), 0.0,
+    //     cols);
+    // lower_line2D[3] = checkInBoundary(
+    //     floor(lines2D[i][3]) + floor(line.x / line_normalizer + 0.5), 0.0,
+    //     rows);
+    // rate_low = findAndRate3DLine(point_cloud, lower_line2D, lower_line3D);
+    // rate_mid = findAndRate3DLine(point_cloud, lines2D[i], line3D);
+    // rate_up = findAndRate3DLine(point_cloud, upper_line2D, upper_line3D);
+    // if (rate_up == 0 && rate_low == 0 && rate_mid == 0) continue;
+    // if (rate_up > rate_mid && rate_up > rate_low)
+    //   lines3D.push_back(upper_line3D);
+    // else if (rate_mid > rate_low)
+    //   lines3D.push_back(line3D);
+    // else
+    //   lines3D.push_back(lower_line3D);
   }
-  ROS_INFO("found vs given: %d, %d", lines3D.size(), lines2D.size());
 }
 
 void LineDetector::fuseLines2D(const std::vector<cv::Vec4f>& lines_in,
@@ -204,7 +256,7 @@ void LineDetector::fuseLines2D(const std::vector<cv::Vec4f>& lines_in,
       if (line[2] > x_max) x_max = line[2];
       if (line[3] < y_min) y_min = line[3];
       if (line[3] > y_max) y_max = line[3];
-      slope += (line[1] - line[3]) / (line[0] - line[3]);
+      slope += computeSlopeOfLine(line);
     }
     if (slope > 0)
       lines_out.push_back(cv::Vec4f(x_min, y_min, x_max, y_max));
@@ -227,4 +279,103 @@ void LineDetector::paintLines(cv::Mat& image,
     cv::line(image, p1, p2, color, 2);
   }
 }
+
+bool LineDetector::find3DLineStartAndEnd(const cv::Mat& point_cloud,
+                                         const cv::Vec4f& line2D,
+                                         cv::Vec<float, 6>& line3D) {
+  CHECK_EQ(point_cloud.type(), CV_32FC3)
+      << "The input matrix point_cloud must be of type CV_32FC3.";
+  cv::Point2f start, end, line;
+  // A floating point value that decribes a position in an image is always
+  // within the pixel described through the floor operation.
+  start.x = floor(line2D[0]);
+  start.y = floor(line2D[1]);
+  end.x = floor(line2D[2]);
+  end.y = floor(line2D[3]);
+  // Search for a non NaN value on the line. Effectivly these two while loops
+  // just make unit steps (one pixel) from start to end (first loop) and then
+  // from end to start (second loop) until a non NaN point is found.
+  while (std::isnan(point_cloud.at<cv::Vec3f>(start)[0])) {
+    line = end - start;
+    start.x += floor(line.x / sqrt(line.x * line.x + line.y * line.y) + 0.5);
+    start.y += floor(line.y / sqrt(line.x * line.x + line.y * line.y) + 0.5);
+    if (start.x == end.x && start.y == end.y) break;
+  }
+  if (start.x == end.x && start.y == end.y) return false;
+  while (std::isnan(point_cloud.at<cv::Vec3f>(end)[0])) {
+    line = start - end;
+    end.x += floor(line.x / sqrt(line.x * line.x + line.y * line.y) + 0.5);
+    end.y += floor(line.y / sqrt(line.x * line.x + line.y * line.y) + 0.5);
+    if (start.x == end.x && start.y == end.y) break;
+  }
+  if (start.x == end.x && start.y == end.y) return false;
+  // If a non NaN point was found before end was reached, the line is stored.
+  line3D = cv::Vec<float, 6>(
+      point_cloud.at<cv::Vec3f>(start)[0], point_cloud.at<cv::Vec3f>(start)[1],
+      point_cloud.at<cv::Vec3f>(start)[2], point_cloud.at<cv::Vec3f>(end)[0],
+      point_cloud.at<cv::Vec3f>(end)[1], point_cloud.at<cv::Vec3f>(end)[2]);
+  return true;
+}
+
+float LineDetector::findAndRate3DLine(const cv::Mat& point_cloud,
+                                      const cv::Vec4f& line2D,
+                                      cv::Vec<float, 6>& line3D) {
+  CHECK_EQ(point_cloud.type(), CV_32FC3)
+      << "The input matrix point_cloud must be of type CV_32FC3.";
+  cv::Point2f start, end, line, rate_it;
+  // A floating point value that decribes a position in an image is always
+  // within the pixel described through the floor operation.
+  start.x = floor(line2D[0]);
+  start.y = floor(line2D[1]);
+  end.x = floor(line2D[2]);
+  end.y = floor(line2D[3]);
+  // Search for a non NaN value on the line.
+  while (std::isnan(point_cloud.at<cv::Vec3f>(start)[0])) {
+    line = end - start;
+    start.x += floor(line.x / sqrt(line.x * line.x + line.y * line.y) + 0.5);
+    start.y += floor(line.y / sqrt(line.x * line.x + line.y * line.y) + 0.5);
+    if (start.x == end.x && start.y == end.y) break;
+  }
+  if (start.x == end.x && start.y == end.y) return 0.0;
+  while (std::isnan(point_cloud.at<cv::Vec3f>(end)[0])) {
+    line = start - end;
+    end.x += floor(line.x / sqrt(line.x * line.x + line.y * line.y) + 0.5);
+    end.y += floor(line.y / sqrt(line.x * line.x + line.y * line.y) + 0.5);
+    if (start.x == end.x && start.y == end.y) break;
+  }
+  if (start.x == end.x && start.y == end.y) return 0.0;
+  line3D = cv::Vec<float, 6>(
+      point_cloud.at<cv::Vec3f>(start)[0], point_cloud.at<cv::Vec3f>(start)[1],
+      point_cloud.at<cv::Vec3f>(start)[2], point_cloud.at<cv::Vec3f>(end)[0],
+      point_cloud.at<cv::Vec3f>(end)[1], point_cloud.at<cv::Vec3f>(end)[2]);
+
+  // In addition to find3DLineStartAndEnd, this function also rates the line.
+  // This is done here, but it does not work very well.
+  double rating = 0.0;
+  int num_points_rated = 0;
+  rate_it = start;
+  while (!(rate_it.x == end.x && rate_it.y == end.y)) {
+    line = end - rate_it;
+    rate_it.x += floor(line.x / sqrt(line.x * line.x + line.y * line.y) + 0.5);
+    rate_it.y += floor(line.y / sqrt(line.x * line.x + line.y * line.y) + 0.5);
+    if (std::isnan(point_cloud.at<cv::Vec3f>(rate_it)[0])) continue;
+    rating += computeDistPointToLine3D(point_cloud.at<cv::Vec3f>(start),
+                                       point_cloud.at<cv::Vec3f>(end),
+                                       point_cloud.at<cv::Vec3f>(rate_it));
+    ++num_points_rated;
+  }
+  if (num_points_rated > 5)
+    rating = rating / double(num_points_rated);
+  else
+    rating = 0;
+  return (1.0 - exp(-rating));
+}
+
+double LineDetector::computeDistPointToLine3D(const cv::Vec3f& start,
+                                              const cv::Vec3f& end,
+                                              const cv::Vec3f& point) {
+  return normOfVector3D(crossProduct(point - start, point - end)) /
+         normOfVector3D(start - end);
+}
+
 }  // namespace line_detection

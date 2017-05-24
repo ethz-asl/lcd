@@ -1,10 +1,10 @@
 // A test node that computes a point cloud form RGB-D data with the
 // line_detection library
-#include <line_detection/line_detection.h>
 
 #include <ros/console.h>
 #include <ros/ros.h>
 
+#include <line_detection/line_detection.h>
 #include <pcl/conversions.h>
 #include <pcl/visualization/cloud_viewer.h>
 #include <pcl/visualization/pcl_visualizer.h>
@@ -130,58 +130,68 @@ int main(int argc, char** argv) {
   std::vector<cv::Vec<float, 6> > lines3D;
   line_detector.detectLines(img_gray, lines2D);
   line_detector.projectLines2Dto3D(lines2D, pc_mat, lines3D);
-  // // Visualize it with PCLVisualizer,
+  // // -------- Visualize it with PCLVisualizer -------- //
   // pcl::visualization::PCLVisualizer viewer("3D Viewer");
   // viewer.setBackgroundColor(1, 1, 1);
   // viewer.addCoordinateSystem(1.0f, "global");
   // viewer.addPointCloud(cloud_ptr, "original point cloud");
   // viewer.spin();
 
-  // Visualize it with RVIZ
+  // -----  Visualize it with RVIZ ---------- //
+
+  // Create a tf transform. The transform defines a fixed global frame and a
+  // rotated frame with it. The rotation is 90 deg around x-axis (this goes from
+  // a camera frame to a normal world frame).
   tf::TransformBroadcaster broad_caster;
   tf::Transform transform;
   transform.setOrigin(tf::Vector3(0, 0, 0));
   tf::Quaternion quat;
   quat.setRPY(-3.1415 / 2, 0, 0);
   transform.setRotation(quat);
+  // Create the publisher for the point cloud. The topic vis_pointcloud was set
+  // manually in rviz.
   ros::Publisher pcl_pub =
       node_handle.advertise<pcl::PointCloud<pcl::PointXYZRGB> >(
           "vis_pointcloud", 2);
   sparse_cloud.header.frame_id = "my_frame";
 
+  // Create the publisher for the lines.
   ros::Publisher marker_pub = node_handle.advertise<visualization_msgs::Marker>(
       "visualization_marker", 1000);
   visualization_msgs::Marker disp_lines;
   disp_lines.header.frame_id = "my_frame";
   disp_lines.action = visualization_msgs::Marker::ADD;
   disp_lines.type = visualization_msgs::Marker::LINE_LIST;
-  disp_lines.scale.x = 0.1;
+  disp_lines.scale.x = 0.03;
+  disp_lines.scale.y = 0.03;
   disp_lines.color.a = 1;
   disp_lines.color.r = 1;
   disp_lines.color.g = 0;
   disp_lines.color.b = 0;
-
+  disp_lines.id = 1;
+  // Fill in the line information. LINE_LIST is an array where the first point
+  // is the start and the second is the end of the line. The third is then again
+  // the start, and so on.
   geometry_msgs::Point p;
-  disp_lines.points.resize(2);
-
+  for (size_t i = 0; i < lines3D.size(); ++i) {
+    p.x = lines3D[i][0];
+    p.y = lines3D[i][1];
+    p.z = lines3D[i][2];
+    disp_lines.points.push_back(p);
+    p.x = lines3D[i][3];
+    p.y = lines3D[i][4];
+    p.z = lines3D[i][5];
+    disp_lines.points.push_back(p);
+  }
+  // Publish the messages. Once every 10 seconds, the transform, the cloud and
+  // all the lines are published. This is because rviz often fails to read all
+  // the messages in one go.
   ros::Rate rate(0.1);
   while (ros::ok()) {
     broad_caster.sendTransform(
         tf::StampedTransform(transform, ros::Time::now(), "map", "my_frame"));
     pcl_pub.publish(sparse_cloud);
-
-    for (size_t i = 0; i < lines3D.size(); ++i) {
-      p.x = lines3D[i][0];
-      p.y = lines3D[i][1];
-      p.z = lines3D[i][2];
-      disp_lines.points[0] = p;
-      p.x = lines3D[i][3];
-      p.y = lines3D[i][4];
-      p.z = lines3D[i][5];
-      disp_lines.points[1] = p;
-      disp_lines.id = i;
-      marker_pub.publish(disp_lines);
-    }
+    marker_pub.publish(disp_lines);
     rate.sleep();
   }
   return 0;

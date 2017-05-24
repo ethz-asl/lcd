@@ -42,7 +42,8 @@ class LineDetectionTest : public ::testing::Test {
 TEST_F(LineDetectionTest, testLSDLineDetection) {
   size_t n_lines;
   // Calling the detector with LSD.
-  line_detector_.detectLines(test_img_gray_, lines_, 0);
+  line_detector_.detectLines(test_img_gray_, line_detection::Detector::LSD,
+                             lines_);
   n_lines = lines_.size();
   EXPECT_EQ(n_lines, 716)
       << "LSD detection: Expected 84 lines to be found. Found " << n_lines;
@@ -50,7 +51,8 @@ TEST_F(LineDetectionTest, testLSDLineDetection) {
 TEST_F(LineDetectionTest, testEDLLineDetection) {
   size_t n_lines;
   // Calling the detector with EDL.
-  line_detector_.detectLines(test_img_gray_, lines_, 1);
+  line_detector_.detectLines(test_img_gray_, line_detection::Detector::EDL,
+                             lines_);
   n_lines = lines_.size();
   EXPECT_EQ(n_lines, 172)
       << "EDL detection: Expected 18 lines to be found. Found " << n_lines;
@@ -58,7 +60,8 @@ TEST_F(LineDetectionTest, testEDLLineDetection) {
 TEST_F(LineDetectionTest, testFASTLineDetection) {
   size_t n_lines;
   // Calling the detector with FAST.
-  line_detector_.detectLines(test_img_gray_, lines_, 2);
+  line_detector_.detectLines(test_img_gray_, line_detection::Detector::FAST,
+                             lines_);
   n_lines = lines_.size();
   EXPECT_EQ(n_lines, 598)
       << "Fast detection: Expected 70 lines to be found. Found " << n_lines;
@@ -66,7 +69,8 @@ TEST_F(LineDetectionTest, testFASTLineDetection) {
 TEST_F(LineDetectionTest, testHoughLineDetection) {
   size_t n_lines;
   // Calling the detector with HOUGH.
-  line_detector_.detectLines(test_img_gray_, lines_, 3);
+  line_detector_.detectLines(test_img_gray_, line_detection::Detector::HOUGH,
+                             lines_);
   n_lines = lines_.size();
   EXPECT_EQ(n_lines, 165)
       << "HOUGH detection: Expected 16 lines to be found. Found " << n_lines;
@@ -133,6 +137,24 @@ TEST_F(LineDetectionTest, testAreLinesEqual2D) {
                                               cv::Vec4f(10, 10, 30, 30)));
   EXPECT_FALSE(line_detection::areLinesEqual2D(cv::Vec4f(0, 0, 10, 10),
                                                cv::Vec4f(0, 0, 0, 10)));
+}
+
+TEST_F(LineDetectionTest, testCheckInBoundary) {
+  EXPECT_EQ(line_detection::checkInBoundary(1, 0, 3), 1);
+  EXPECT_EQ(line_detection::checkInBoundary(-1, 0, 3), 0);
+  EXPECT_EQ(line_detection::checkInBoundary(10, 0, 3), 3);
+}
+
+TEST_F(LineDetectionTest, testCrossProdcut) {
+  EXPECT_EQ(
+      line_detection::crossProduct(cv::Vec3f(1, 0, 0), cv::Vec3f(0, 1, 0)),
+      cv::Vec3f(0, 0, 1));
+}
+
+TEST_F(LineDetectionTest, testComputeDistPointToLine3D) {
+  EXPECT_EQ(line_detector_.computeDistPointToLine3D(
+                cv::Vec3f(0, 0, 0), cv::Vec3f(1, 0, 0), cv::Vec3f(0, 1, 0)),
+            1);
 }
 }  // namespace line_detection
 
