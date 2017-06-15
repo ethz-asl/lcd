@@ -3,6 +3,12 @@
 
 #include "line_detection/common.h"
 
+#include <chrono>
+#include <cmath>
+#include <iostream>
+#include <random>
+#include <vector>
+
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgcodecs.hpp>
@@ -14,12 +20,18 @@
 #include <pcl/point_types.h>
 #include <pcl/visualization/cloud_viewer.h>
 
-#include <chrono>
-#include <cmath>
-#include <iostream>
-#include <vector>
+#include <visualization_msgs/Marker.h>
+
+#include <glog/logging.h>
+#include <gtest/gtest.h>
+
+#include <ros/ros.h>
+
+#include <assert.h>
 
 namespace line_detection {
+
+const double kPi = 3.141592653589793;
 
 enum class Detector : unsigned int { LSD = 0, EDL = 1, FAST = 2, HOUGH = 3 };
 
@@ -27,8 +39,11 @@ enum class Detector : unsigned int { LSD = 0, EDL = 1, FAST = 2, HOUGH = 3 };
 // and start or end point).
 bool areLinesEqual2D(const cv::Vec4f line1, const cv::Vec4f line2);
 
-double checkInBoundary(const double value, const double lower,
-                       const double upper) {
+// Returns value if: lower < value < upper
+// Returns lower if: value < lower
+// Returns upper if: upper < value
+inline double checkInBoundary(const double value, const double lower,
+                              const double upper) {
   if (value < lower)
     return lower;
   else if (value > upper)
@@ -42,9 +57,89 @@ inline cv::Vec3f crossProduct(const cv::Vec3f a, const cv::Vec3f b) {
                    a[0] * b[1] - a[1] * b[0]);
 }
 
+// Compute the slope depending on start and end point of a line.
+inline double computeSlopeOfLine(const cv::Vec4f line) {
+  return (line[1] - line[3]) / (line[0] - line[3]);
+}
+
 inline double normOfVector3D(const cv::Vec3f vector) {
   return sqrt(pow(vector[0], 2) + pow(vector[1], 2) + pow(vector[2], 2));
 }
+
+inline void normalizeVec3D(cv::Vec3f vector) {
+  vector = vector / normOfVector3D(vector);
+}
+
+inline double degToRad(const double in_deg) { return in_deg / 180.0 * kPi; }
+
+inline double scalarProduct(const cv::Vec3f& a, const cv::Vec3f& b) {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+// Computes d from the plane equation a*x+b*y+c*z+d=0 given the plane normal and
+// a point on the plane.
+inline double computeDfromPlaneNormal(const cv::Vec3f& normal,
+                                      const cv::Vec3f& anchor) {
+  return -scalarProduct(normal, anchor);
+}
+
+// Computes the orthogonal distance from a point to a plane (given by normal and
+// point on plane);
+inline double errorPointToPlane(const cv::Vec3f& normal,
+                                const cv::Vec3f& point_on_plane,
+                                const cv::Vec3f& point) {
+  return abs(scalarProduct(point_on_plane - point, normal));
+}
+
+// This function stores lines in visualization msgs, such that they can be
+// handled by rviz.
+void storeLines3DinMarkerMsg(const std::vector<cv::Vec<float, 6> >& lines3D,
+                             visualization_msgs::Marker& disp_lines);
+
+// Writes the pcl_cloud into a cv::Mat. It is speciallyzed for the point clouds
+// that are published by the point_cloud publisher of scenenet_ros_tools.
+void pclFromSceneNetToMat(const pcl::PointCloud<pcl::PointXYZRGB>& pcl_cloud,
+                          int width, int height, cv::Mat& mat_cloud);
+
+// Finds the y-coordinates of a line between two points.
+// Input: start:      Starting point of line.
+//        end:        End point of line. Note that start.x < end.x must hold.
+//        left_side:  For the special case for a near to horizontal line. If
+//                    true, it gives back the most left y value of the line,
+//                    otherwise the most right.
+//
+// Output: y_coord    The y coordinates ordered from top to bottom. Example: If
+//                    the line spans 3 rows of pixel (so 2 < |end.x - start.x| <
+//                    3), 3 values are stored in y_coord, where the first
+//                    corresponds to the lowest x (most upper in image
+//                    coordinates).
+void findYCoordOfPixelsOnVector(const cv::Point2f& start,
+                                const cv::Point2f& end, bool left_side,
+                                std::vector<int>& y_coord);
+
+// This function computes the Hessian Normal Form of a plane given points on
+// that plane.
+// Input: points:   Must contain at least have 3 points that do not
+//                  lie on a line. If 3 points are given, the plane normal is
+//                  computed as the cross product. The solution is then exact.
+//                  If more than 3 points are given the function solves a
+//                  minimization problem (min sum (orthogonal dist)^2) through
+//                  SVD.
+//
+// Output: hessian_normal_form: The first 3 entries are the normal vector n, the
+//                  last one is the parameter p
+bool hessianNormalFormOfPlane(const std::vector<cv::Vec3f>& points,
+                              cv::Vec4f& hessian_normal_form);
+
+// Returns all pixels that are within or on the border of a rectangle.
+// Input: corners:  These corners define the rectangle. It must contain
+//                  only 4 points.The points must be the cornerpoints of an
+//                  parallelogram. If that is not given, the outcome of the
+//                  function depends on the ordering of the corner point and
+//                  might be wrong.
+// Output: points:  A vector of pixel coordinates.
+void findPointsInRectangle(const std::vector<cv::Point2f> corners,
+                           std::vector<cv::Point2i>& points);
 
 class LineDetector {
  public:
@@ -99,15 +194,14 @@ class LineDetector {
   double computeDistPointToLine3D(const cv::Vec3f& start, const cv::Vec3f& end,
                                   const cv::Vec3f& point);
 
+  // Fits a plane to the points using RANSAC.
+  bool planeRANSAC(const std::vector<cv::Vec3f>& points,
+                   cv::Vec4f& hessian_normal_form);
+
  private:
   cv::Ptr<cv::LineSegmentDetector> lsd_detector_;
   cv::Ptr<cv::line_descriptor::BinaryDescriptor> edl_detector_;
   cv::Ptr<cv::ximgproc::FastLineDetector> fast_detector_;
-
-  // Compute the slope depending on start and end point of a line.
-  inline double computeSlopeOfLine(const cv::Vec4f line) {
-    return (line[1] - line[3]) / (line[0] - line[3]);
-  }
 
   // find3DLineStartAndEnd:
   // Input: point_cloud:    Mat of type CV_32FC3, that stores the 3D points. A
@@ -130,7 +224,7 @@ class LineDetector {
   // true if a line was found and false otherwise.
   bool find3DLineStartAndEnd(const cv::Mat& point_cloud,
                              const cv::Vec4f& line2D,
-                             cv::Vec<float, 6>& lines3D);
+                             cv::Vec<float, 6>& line3D);
 
   // findAndRate3DLine:
   // This function does exactly the same as the above, but in addition it tries

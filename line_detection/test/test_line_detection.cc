@@ -156,6 +156,125 @@ TEST_F(LineDetectionTest, testComputeDistPointToLine3D) {
                 cv::Vec3f(0, 0, 0), cv::Vec3f(1, 0, 0), cv::Vec3f(0, 1, 0)),
             1);
 }
+
+TEST_F(LineDetectionTest, testScalarProduct) {
+  EXPECT_EQ(
+      line_detection::scalarProduct(cv::Vec3f(1, 0, 0), cv::Vec3f(0, 1, 0)), 0);
+}
+
+TEST_F(LineDetectionTest, testComputeDFromPlaneNormal) {
+  cv::Vec3f normal(1, 2, 3);
+  cv::Vec3f anchor(5, 6, 7);
+  double d = line_detection::computeDfromPlaneNormal(normal, anchor);
+  EXPECT_FLOAT_EQ(scalarProduct(normal, anchor) + d, 0);
+}
+
+TEST_F(LineDetectionTest, testErrorPointToPlane) {
+  cv::Vec3f normal(1, 0, 0);
+  cv::Vec3f anchor(0, 0, 0);
+  cv::Vec3f point(1, 0, 0);
+  EXPECT_EQ(errorPointToPlane(normal, anchor, point), 1);
+}
+
+TEST_F(LineDetectionTest, testHessianNormalFormOfPlane) {
+  // Three points on the x-y-plane.
+  std::vector<cv::Vec3f> points;
+  points.push_back(cv::Vec3f(3, 5, 0));
+  points.push_back(cv::Vec3f(5, 17, 0));
+  points.push_back(cv::Vec3f(190, 3, 0));
+  cv::Vec4f hessian_normal_form;
+  hessianNormalFormOfPlane(points, hessian_normal_form);
+  EXPECT_EQ(hessian_normal_form[0], 0);
+  EXPECT_EQ(hessian_normal_form[1], 0);
+  EXPECT_EQ(hessian_normal_form[2], -1);
+  EXPECT_EQ(hessian_normal_form[3], 0);
+
+  // More points one the x-y-plane
+  points.push_back(cv::Vec3f(1.1, 2.3, 0));
+  points.push_back(cv::Vec3f(5, 9.4, 0));
+  points.push_back(cv::Vec3f(17.9, 15, 0));
+  points.push_back(cv::Vec3f(150, 23, 0));
+  points.push_back(cv::Vec3f(1, 1, 0));
+  points.push_back(cv::Vec3f(510, 189, 0));
+  hessianNormalFormOfPlane(points, hessian_normal_form);
+  EXPECT_FLOAT_EQ(hessian_normal_form[0], 0);
+  EXPECT_FLOAT_EQ(hessian_normal_form[1], 0);
+  EXPECT_FLOAT_EQ(hessian_normal_form[2], 1);
+  EXPECT_FLOAT_EQ(hessian_normal_form[3], 0);
+}
+
+TEST_F(LineDetectionTest, testPlaneRANSAC) {
+  std::vector<cv::Vec3f> points;
+  cv::Vec4f hessian_normal_form;
+  // Points on the x-y-plane
+  points.push_back(cv::Vec3f(3, 5, 0));
+  points.push_back(cv::Vec3f(5, 17, 0));
+  points.push_back(cv::Vec3f(190, 3, 0));
+  points.push_back(cv::Vec3f(1.1, 2.3, 0));
+  points.push_back(cv::Vec3f(5, 9.4, 0));
+  points.push_back(cv::Vec3f(17.9, 15, 0));
+  points.push_back(cv::Vec3f(150, 23, 0));
+  points.push_back(cv::Vec3f(1, 1, 0));
+  points.push_back(cv::Vec3f(510, 189, 0));
+  points.push_back(cv::Vec3f(1, 5, 0));
+  points.push_back(cv::Vec3f(5, 1, 0));
+  points.push_back(cv::Vec3f(19, 3, 0));
+  points.push_back(cv::Vec3f(1, 5.3, 0));
+  points.push_back(cv::Vec3f(5, 12.4, 0));
+  points.push_back(cv::Vec3f(1.9, 15, 0));
+  points.push_back(cv::Vec3f(14.5, 3, 0));
+  points.push_back(cv::Vec3f(1, 0, 0));
+  points.push_back(cv::Vec3f(510, 19, 0));
+  // And outliers:
+  points.push_back(cv::Vec3f(1, 2, 23));
+  points.push_back(cv::Vec3f(5, 7, 19));
+  points.push_back(cv::Vec3f(510, 189, 3));
+
+  EXPECT_TRUE(line_detector_.planeRANSAC(points, hessian_normal_form));
+  EXPECT_FLOAT_EQ(hessian_normal_form[0], 0);
+  EXPECT_FLOAT_EQ(hessian_normal_form[1], 0);
+  EXPECT_FLOAT_EQ(hessian_normal_form[2], 1);
+  EXPECT_FLOAT_EQ(hessian_normal_form[3], 0);
+}
+
+TEST_F(LineDetectionTest, testFindYCoordOfPixelsOnVector) {
+  cv::Point2f start(0.3, 2.5);
+  cv::Point2f end(3.9, 2.1);
+  std::vector<int> y_coords;
+  findYCoordOfPixelsOnVector(start, end, true, y_coords);
+  EXPECT_EQ(y_coords.size(), 4);
+  for (int i = 0; i < 4; ++i) EXPECT_EQ(y_coords[i], 2);
+
+  end.x = 0.7;
+  end.y = 7.3;
+  findYCoordOfPixelsOnVector(start, end, true, y_coords);
+  ASSERT_EQ(y_coords.size(), 4 + 1);
+  EXPECT_EQ(y_coords[4], 2);
+  findYCoordOfPixelsOnVector(start, end, false, y_coords);
+  ASSERT_EQ(y_coords.size(), 4 + 1 + 1);
+  EXPECT_EQ(y_coords[5], 8);
+}
+
+TEST_F(LineDetectionTest, testFindPointsInRectangle) {
+  std::vector<cv::Point2f> corners;
+  std::vector<cv::Point2i> points;
+  corners.push_back(cv::Point2f(0.1, 1.9));
+  corners.push_back(cv::Point2f(0.1, 0.1));
+  corners.push_back(cv::Point2f(1.9, 1.9));
+  corners.push_back(cv::Point2f(1.9, 0.1));
+  findPointsInRectangle(corners, points);
+  ASSERT_EQ(points.size(), 4);
+  for (int i = 0; i < 2; ++i) {
+    for (int j = 0; j < 2; ++j) {
+      bool contains_element = false;
+      cv::Point2i p(i, j);
+      for (int k = 0; k < 4; ++k)
+        if (points[k] == p) contains_element = true;
+      EXPECT_TRUE(contains_element);
+    }
+  }
+}
+
 }  // namespace line_detection
 
 LINE_DETECTION_TESTING_ENTRYPOINT

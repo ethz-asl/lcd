@@ -5,6 +5,7 @@
 #include <ros/ros.h>
 
 #include <line_detection/line_detection.h>
+
 #include <pcl/conversions.h>
 #include <pcl/visualization/cloud_viewer.h>
 #include <pcl/visualization/pcl_visualizer.h>
@@ -12,6 +13,7 @@
 #include <pcl_ros/publisher.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <tf/transform_broadcaster.h>
+
 #include <visualization_msgs/Marker.h>
 
 int main(int argc, char** argv) {
@@ -35,8 +37,8 @@ int main(int argc, char** argv) {
     img_path = "hall.jpg";
     depth_path = "hall_depth.png";
   }
-  image = cv::imread("hall.jpg", CV_LOAD_IMAGE_COLOR);
-  depth = cv::imread("hall_depth.png", CV_LOAD_IMAGE_UNCHANGED);
+  image = cv::imread(img_path, CV_LOAD_IMAGE_COLOR);
+  depth = cv::imread(depth_path, CV_LOAD_IMAGE_UNCHANGED);
   if (!image.data) {
     ROS_INFO_STREAM(
         "Image could not be loaded. Please make shure to run the node in a "
@@ -69,11 +71,11 @@ int main(int argc, char** argv) {
 
   // Create the calibration matrix. The values are more or less arbitrary.
   cv::Mat K(3, 3, CV_32FC1);
-  K.at<float>(0, 0) = 570.3f;
+  K.at<float>(0, 0) = 277.128f;
   K.at<float>(0, 1) = 0.0f;
   K.at<float>(0, 2) = 960.0f;
   K.at<float>(1, 0) = 0.0f;
-  K.at<float>(1, 1) = 570.3f;
+  K.at<float>(1, 1) = 289.706f;
   K.at<float>(1, 2) = 540.0f;
   K.at<float>(2, 0) = 0.0f;
   K.at<float>(2, 1) = 0.0f;
@@ -83,42 +85,14 @@ int main(int argc, char** argv) {
   line_detection::LineDetector line_detector;
   line_detector.computePointCloud(image, depth, K, cloud);
 
-  // // These mean values are used in the unit tests (copied there by hand). So
-  // to
-  // // make changes there later, this code should stay here.
-  // double x_mean = 0;
-  // double y_mean = 0;
-  // double z_mean = 0;
-  // double r_mean = 0;
-  // double g_mean = 0;
-  // double b_mean = 0;
-  // for (int i = 0; i < cloud.size(); i++) {
-  //   if (std::isnan(cloud.points[i].x)) continue;
-  //   x_mean += cloud.points[i].x;
-  //   y_mean += cloud.points[i].y;
-  //   z_mean += cloud.points[i].z;
-  //   r_mean += cloud.points[i].r;
-  //   g_mean += cloud.points[i].g;
-  //   b_mean += cloud.points[i].b;
-  // }
-  // x_mean = x_mean / cloud.size();
-  // y_mean = y_mean / cloud.size();
-  // z_mean = z_mean / cloud.size();
-  // r_mean = r_mean / cloud.size();
-  // g_mean = g_mean / cloud.size();
-  // b_mean = b_mean / cloud.size();
-  // ROS_DEBUG_STREAM("\n"
-  //                  << "x_mean = " << x_mean << endl
-  //                  << "y_mean = " << y_mean << endl
-  //                  << "z_mean = " << z_mean << endl
-  //                  << "r_mean = " << r_mean << endl
-  //                  << "g_mean = " << g_mean << endl
-  //                  << "b_mean = " << b_mean << endl);
-
-  // Sparsify the point cloud for better visualization performance
+  // Sparsify the point cloud for better visualization performance.
   pcl::PointCloud<pcl::PointXYZRGB> sparse_cloud;
-  for (int i = 0; i < cloud.size(); i += 4) {
-    sparse_cloud.push_back(cloud.points[i]);
+  if (cloud.size() > 5e5) {
+    for (int i = 0; i < cloud.size(); i += 4) {
+      sparse_cloud.push_back(cloud.points[i]);
+    }
+  } else {
+    sparse_cloud = cloud;
   }
 
   // Not to compute the 3D lines, we use a diffetent type of point cloud.
@@ -160,32 +134,10 @@ int main(int argc, char** argv) {
       "visualization_marker", 1000);
   visualization_msgs::Marker disp_lines;
   disp_lines.header.frame_id = "my_frame";
-  disp_lines.action = visualization_msgs::Marker::ADD;
-  disp_lines.type = visualization_msgs::Marker::LINE_LIST;
-  disp_lines.scale.x = 0.03;
-  disp_lines.scale.y = 0.03;
-  disp_lines.color.a = 1;
-  disp_lines.color.r = 1;
-  disp_lines.color.g = 0;
-  disp_lines.color.b = 0;
-  disp_lines.id = 1;
-  // Fill in the line information. LINE_LIST is an array where the first point
-  // is the start and the second is the end of the line. The third is then again
-  // the start, and so on.
-  geometry_msgs::Point p;
-  for (size_t i = 0; i < lines3D.size(); ++i) {
-    p.x = lines3D[i][0];
-    p.y = lines3D[i][1];
-    p.z = lines3D[i][2];
-    disp_lines.points.push_back(p);
-    p.x = lines3D[i][3];
-    p.y = lines3D[i][4];
-    p.z = lines3D[i][5];
-    disp_lines.points.push_back(p);
-  }
-  // Publish the messages. Once every 10 seconds, the transform, the cloud and
-  // all the lines are published. This is because rviz often fails to read all
-  // the messages in one go.
+  line_detection::storeLines3DinMarkerMsg(lines3D, disp_lines);
+  // Publish the messages. Once every 10 seconds, the transform, the cloud
+  // and all the lines are published. This is because rviz often fails to
+  // read all the messages in one go.
   ros::Rate rate(0.1);
   while (ros::ok()) {
     broad_caster.sendTransform(
