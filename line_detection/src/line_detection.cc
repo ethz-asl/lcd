@@ -586,8 +586,8 @@ bool LineDetector::planeRANSAC(const std::vector<cv::Vec3f>& points,
   // Start RANSAC.
   for (int iter = 0; iter < max_it; ++iter) {
     // Get number_of_model_params unique elements from poitns.
-    getNUniqueRandomElements(points, number_of_model_params, random_points,
-                             generator);
+    getNUniqueRandomElements(points, number_of_model_params, generator,
+                             random_points);
     // It might happen that the randomly chosen points lie on a line. In this
     // case, hessianNormalFormOfPlane would return false.
     if (!hessianNormalFormOfPlane(random_points, hessian_normal_form)) continue;
