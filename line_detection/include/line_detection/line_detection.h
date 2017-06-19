@@ -62,11 +62,11 @@ inline double computeSlopeOfLine(const cv::Vec4f line) {
   return (line[1] - line[3]) / (line[0] - line[3]);
 }
 
-inline double normOfVector3D(const cv::Vec3f vector) {
+inline double normOfVector3D(const cv::Vec3f& vector) {
   return sqrt(pow(vector[0], 2) + pow(vector[1], 2) + pow(vector[2], 2));
 }
 
-inline void normalizeVec3D(cv::Vec3f vector) {
+inline void normalizeVec3D(cv::Vec3f& vector) {
   vector = vector / normOfVector3D(vector);
 }
 
@@ -83,14 +83,22 @@ inline double computeDfromPlaneNormal(const cv::Vec3f& normal,
   return -scalarProduct(normal, anchor);
 }
 
-// Computes the orthogonal distance from a point to a plane (given by normal and
-// point on plane);
+// Computes the orthogonal square distance from a point to a plane (given by
+// normal and point on plane). The distance has only a real meaning if the
+// normal is a unit vector.
 inline double errorPointToPlane(const cv::Vec3f& normal,
                                 const cv::Vec3f& point_on_plane,
                                 const cv::Vec3f& point) {
-  return abs(scalarProduct(point_on_plane - point, normal));
+  return fabs(scalarProduct(point_on_plane - point, normal));
 }
 
+inline double errorPointToPlane(const cv::Vec4f& hessian_n_f,
+                                const cv::Vec3f& point) {
+  return fabs(
+      scalarProduct(cv::Vec3f(hessian_n_f[0], hessian_n_f[1], hessian_n_f[2]),
+                    point) +
+      hessian_n_f[3]);
+}
 // This function stores lines in visualization msgs, such that they can be
 // handled by rviz.
 void storeLines3DinMarkerMsg(const std::vector<cv::Vec<float, 6> >& lines3D,

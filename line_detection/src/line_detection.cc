@@ -82,10 +82,10 @@ bool hessianNormalFormOfPlane(const std::vector<cv::Vec3f>& points,
     cv::Vec3f vec2 = points[2] - points[0];
     // This checks first if the points were too close.
     double norms = normOfVector3D(vec1) * normOfVector3D(vec2);
-    if (norms < 1e-9) return false;
+    if (norms < 1e-6) return false;
     // Then if they lie on a line. The angle between the vectors must at least
     // be 2 degrees.
-    double cos_theta = abs(scalarProduct(vec1, vec2)) / norms;
+    double cos_theta = fabs(scalarProduct(vec1, vec2)) / norms;
     if (cos_theta > 0.994) return false;
     // The normal already defines the orientation of the plane (it is
     // perpendicular to both vectors, since they must lie within the plane).
@@ -124,24 +124,25 @@ bool hessianNormalFormOfPlane(const std::vector<cv::Vec3f>& points,
 
 void findYCoordOfPixelsOnVector(const cv::Point2f& start,
                                 const cv::Point2f& end, bool left_side,
-                                std::vector<int>& y_coord) {
-  int top = floor(start.x);
-  int bottom = ceil(end.x);
+                                std::vector<int>& x_coord) {
+  int top = floor(start.y);
+  int bottom = ceil(end.y);
   int height = bottom - top;
-  float y_start, width;
-  y_start = floor(start.y) + 0.5;
-  width = floor(end.y) - floor(start.y);
-  CHECK(height > 0) << "Important: the following statement must hold: start.x "
-                       "< end.x.";
+  float x_start, width;
+  x_start = floor(start.x) + 0.5;
+  width = floor(end.x) - floor(start.x);
+  CHECK(height > 0) << "Important: the following statement must hold: start.y "
+                       "< end.y. "
+                    << height;
   if (height == 1) {
     if (left_side)
-      y_coord.push_back(floor(start.y));
+      x_coord.push_back(floor(start.x));
     else
-      y_coord.push_back(ceil(end.y));
+      x_coord.push_back(ceil(end.x));
     return;
   }
   for (int i = 0; i < height; ++i) {
-    y_coord.push_back(int(y_start + i * width / (height - 1)));
+    x_coord.push_back(int(x_start + i * width / (height - 1)));
   }
 }
 
@@ -150,7 +151,7 @@ void findPointsInRectangle(std::vector<cv::Point2f> corners,
   CHECK_EQ(corners.size(), 4)
       << "The rectangle must be defined by exactly 4 corner points.";
   // Find the relative positions of the points.
-  int upper, lower, left, right, store_i;
+  // int upper, lower, left, right, store_i;
   std::vector<int> idx{0, 1, 2, 3};
   // This part finds out if two of the points have equal x values. This may not
   // be very likely for some data, but if it happens it can produce
@@ -161,12 +162,12 @@ void findPointsInRectangle(std::vector<cv::Point2f> corners,
   bool some_points_have_equal_height = false;
   // Check all x values against all others.
   for (int i = 1; i < 4; ++i) {
-    if (corners[0].x == corners[i].x) some_points_have_equal_height = true;
+    if (corners[0].y == corners[i].y) some_points_have_equal_height = true;
   }
   for (int i = 2; i < 4; ++i) {
-    if (corners[1].x == corners[i].x) some_points_have_equal_height = true;
+    if (corners[1].y == corners[i].y) some_points_have_equal_height = true;
   }
-  if (corners[2].x == corners[3].x) some_points_have_equal_height = true;
+  if (corners[2].y == corners[3].y) some_points_have_equal_height = true;
   // Do the rotation.
   if (some_points_have_equal_height) {
     for (int i = 0; i < 4; ++i)
@@ -177,54 +178,52 @@ void findPointsInRectangle(std::vector<cv::Point2f> corners,
   // The points are set to lowest, highest, most right and most left in this
   // order. It does work because the preprocessing done guarantees that no two
   // points have the same x coordinate.
-  lower = idx[0];
+
+  cv::Point2f upper, lower, left, right;
+  upper = corners[0];
+  int j;
   for (int i = 1; i < 4; ++i) {
-    if (corners[i].x > corners[lower].x) lower = i;
+    if (upper.y > corners[i].y) upper = corners[i];
   }
-  idx.erase(idx.begin() + lower);
-
-  upper = idx[0];
-  store_i = 0;
-  for (int i = 0; i < 3; ++i) {
-    if (corners[idx[i]].x < corners[upper].x) store_i = i;
+  lower.y = -1e6;
+  for (int i = 0; i < 4; ++i) {
+    if (lower.y < corners[i].y && corners[i] != upper) lower = corners[i];
   }
-  upper = idx[store_i];
-  idx.erase(idx.begin() + store_i);
-
-  right = idx[0];
-  store_i = 0;
-  for (int i = 0; i < 2; ++i) {
-    if (corners[idx[i]].y > corners[right].y) store_i = i;
+  left.x = 1e6;
+  for (int i = 0; i < 4; ++i) {
+    if (left.x > corners[i].x && corners[i] != upper && corners[i] != lower)
+      left = corners[i];
   }
-  right = idx[store_i];
-  idx.erase(idx.begin() + store_i);
 
-  left = idx[0];
+  for (int i = 0; i < 4; ++i) {
+    if (corners[i] != left && corners[i] != upper && corners[i] != lower)
+      right = corners[i];
+  }
+
   // With the ordering given, the border pixels can be found as pixels, that lie
   // on the border vectors.
   std::vector<int> left_border;
   std::vector<int> right_border;
-  findYCoordOfPixelsOnVector(corners[upper], corners[left], true, left_border);
-  findYCoordOfPixelsOnVector(corners[upper], corners[right], false,
-                             right_border);
+  findYCoordOfPixelsOnVector(upper, left, true, left_border);
+  findYCoordOfPixelsOnVector(upper, right, false, right_border);
   // Pop_back is used because otherwise the corners[left/right] pixels would be
   // counted twice.
   left_border.pop_back();
   right_border.pop_back();
-  findYCoordOfPixelsOnVector(corners[left], corners[lower], true, left_border);
-  findYCoordOfPixelsOnVector(corners[right], corners[lower], false,
-                             right_border);
+  findYCoordOfPixelsOnVector(left, lower, true, left_border);
+  findYCoordOfPixelsOnVector(right, lower, false, right_border);
   CHECK_EQ(left_border.size(), right_border.size()) << "Something went wrong.";
   // Iterate over all pixels in the rectangle.
   points.clear();
   int x, y;
   for (int i = 0; i < left_border.size(); ++i) {
-    x = floor(corners[upper].x) + i;
-    y = left_border[i];
+    y = floor(upper.y) + i;
     do {
       points.push_back(cv::Point2i(x, y));
-      ++y;
-    } while (y <= right_border[i]);
+      ++x;
+    } while (x <= right_border[i]);
+  }
+}
   }
 }
 
@@ -572,13 +571,14 @@ bool LineDetector::planeRANSAC(const std::vector<cv::Vec3f>& points,
   const int N = points.size();
   const int max_it = 50;
   const int number_of_model_params = 3;
-  double max_deviation = 0.05;
-  double inlier_fraction_max = 0.8;
+  double max_deviation = 0.005;
+  double inlier_fraction_max = 0.95;
   double inlier_fraction_min = 0.5;
   CHECK(N > number_of_model_params) << "Not enough points to use RANSAC.";
   // Declare variables that are used for the RANSAC.
   std::vector<cv::Vec3f> random_points, inliers, inlier_candidates;
   cv::Vec3f normal;
+  cv::Vec4f hessian_best_guess;
   // Set a random seed.
   unsigned seed =
       std::chrono::high_resolution_clock::now().time_since_epoch().count();
@@ -596,26 +596,31 @@ bool LineDetector::planeRANSAC(const std::vector<cv::Vec3f>& points,
     // Check which of the points are inlier with the current plane model.
     inlier_candidates.clear();
     for (int j = 0; j < N; ++j) {
-      if (errorPointToPlane(normal, random_points[0], points[j]) <
-          max_deviation) {
+      if (errorPointToPlane(hessian_normal_form, points[j]) < max_deviation) {
         inlier_candidates.push_back(points[j]);
       }
     }
-    // If we found more inliers than in any previous run, we store them as
-    // global inliers.
-    if (inlier_candidates.size() > inliers.size()) inliers = inlier_candidates;
-    // Usual not part of RANSAC: stop early if we have enough inliers. This
-    // feature is here because it might be that we have a very high inlier
-    // percentage. In this case RANSAC finds the right model within the first
-    // few iterations and all later iterations are just wasted run time.
+    // If we found more inliers than in any previous run, we store them
+    // as global inliers.
+    if (inlier_candidates.size() > inliers.size()) {
+      inliers = inlier_candidates;
+      hessian_best_guess = hessian_normal_form;
+    }
+    // Usual not part of RANSAC: stop early if we have enough inliers.
+    // This feature is here because it might be that we have a very
+    // high inlier percentage. In this case RANSAC finds the right
+    // model within the first few iterations and all later iterations
+    // are just wasted run time.
     if (inliers.size() > inlier_fraction_max * N) break;
   }
   // If we found not enough inlier, return false. This is important because
   // there might not be a solution (and we dont want to propose one if there is
   // none).
   if (inliers.size() < inlier_fraction_min * N) return false;
+  hessian_normal_form = hessian_best_guess;
+  return true;
   // Now we compute the final model parameters with all the inliers.
-  return hessianNormalFormOfPlane(inliers, hessian_normal_form);
+}
 }
 
 }  // namespace line_detection
