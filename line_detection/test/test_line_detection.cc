@@ -46,7 +46,7 @@ TEST_F(LineDetectionTest, testLSDLineDetection) {
                              lines_);
   n_lines = lines_.size();
   EXPECT_EQ(n_lines, 716)
-      << "LSD detection: Expected 84 lines to be found. Found " << n_lines;
+      << "LSD detection: Expected 716 lines to be found. Found " << n_lines;
 }
 TEST_F(LineDetectionTest, testEDLLineDetection) {
   size_t n_lines;
@@ -55,7 +55,7 @@ TEST_F(LineDetectionTest, testEDLLineDetection) {
                              lines_);
   n_lines = lines_.size();
   EXPECT_EQ(n_lines, 172)
-      << "EDL detection: Expected 18 lines to be found. Found " << n_lines;
+      << "EDL detection: Expected 172 lines to be found. Found " << n_lines;
 }
 TEST_F(LineDetectionTest, testFASTLineDetection) {
   size_t n_lines;
@@ -64,7 +64,7 @@ TEST_F(LineDetectionTest, testFASTLineDetection) {
                              lines_);
   n_lines = lines_.size();
   EXPECT_EQ(n_lines, 598)
-      << "Fast detection: Expected 70 lines to be found. Found " << n_lines;
+      << "Fast detection: Expected 598 lines to be found. Found " << n_lines;
 }
 TEST_F(LineDetectionTest, testHoughLineDetection) {
   size_t n_lines;
@@ -73,7 +73,7 @@ TEST_F(LineDetectionTest, testHoughLineDetection) {
                              lines_);
   n_lines = lines_.size();
   EXPECT_EQ(n_lines, 165)
-      << "HOUGH detection: Expected 16 lines to be found. Found " << n_lines;
+      << "HOUGH detection: Expected 165 lines to be found. Found " << n_lines;
 }
 
 TEST_F(LineDetectionTest, testComputePointCloud) {

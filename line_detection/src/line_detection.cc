@@ -567,18 +567,31 @@ double LineDetector::computeDistPointToLine3D(const cv::Vec3f& start,
 
 bool LineDetector::planeRANSAC(const std::vector<cv::Vec3f>& points,
                                cv::Vec4f& hessian_normal_form) {
+  const size_t N = points.size();
+  double inlier_fraction_min = 0.5;
+  std::vector<cv::Vec3f> inliers;
+  planeRANSAC(points, inliers);
+  // If we found not enough inlier, return false. This is important because
+  // there might not be a solution (and we dont want to propose one if there
+  // is none).
+  if (inliers.size() < inlier_fraction_min * N) return false;
+  // Now we compute the final model parameters with all the inliers.
+  return hessianNormalFormOfPlane(inliers, hessian_normal_form);
+}
+
+void LineDetector::planeRANSAC(const std::vector<cv::Vec3f>& points,
+                               std::vector<cv::Vec3f>& inliers) {
   // Set parameters and do a sanity check.
   const int N = points.size();
   const int max_it = 50;
   const int number_of_model_params = 3;
   double max_deviation = 0.005;
   double inlier_fraction_max = 0.95;
-  double inlier_fraction_min = 0.5;
   CHECK(N > number_of_model_params) << "Not enough points to use RANSAC.";
   // Declare variables that are used for the RANSAC.
-  std::vector<cv::Vec3f> random_points, inliers, inlier_candidates;
+  std::vector<cv::Vec3f> random_points, inlier_candidates;
   cv::Vec3f normal;
-  cv::Vec4f hessian_best_guess;
+  cv::Vec4f hessian_normal_form;
   // Set a random seed.
   unsigned seed =
       std::chrono::high_resolution_clock::now().time_since_epoch().count();
@@ -602,10 +615,6 @@ bool LineDetector::planeRANSAC(const std::vector<cv::Vec3f>& points,
     }
     // If we found more inliers than in any previous run, we store them
     // as global inliers.
-    if (inlier_candidates.size() > inliers.size()) {
-      inliers = inlier_candidates;
-      hessian_best_guess = hessian_normal_form;
-    }
     // Usual not part of RANSAC: stop early if we have enough inliers.
     // This feature is here because it might be that we have a very
     // high inlier percentage. In this case RANSAC finds the right
@@ -613,13 +622,6 @@ bool LineDetector::planeRANSAC(const std::vector<cv::Vec3f>& points,
     // are just wasted run time.
     if (inliers.size() > inlier_fraction_max * N) break;
   }
-  // If we found not enough inlier, return false. This is important because
-  // there might not be a solution (and we dont want to propose one if there is
-  // none).
-  if (inliers.size() < inlier_fraction_min * N) return false;
-  hessian_normal_form = hessian_best_guess;
-  return true;
-  // Now we compute the final model parameters with all the inliers.
 }
 }
 
