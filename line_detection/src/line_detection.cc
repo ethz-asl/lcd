@@ -307,6 +307,7 @@ bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                         cv::Vec<float, 6>& line) {
   size_t N1 = points1.size();
   size_t N2 = points2.size();
+  if (N1 < 3 || N2 < 3) return false;
   cv::Vec3f mean1, mean2, normal1, normal2;
   cv::Vec4f hessian1, hessian2;
   // Fit a plane model to the two sets of points individually.
@@ -669,7 +670,7 @@ bool LineDetector::planeRANSAC(const std::vector<cv::Vec3f>& points,
   // If we found not enough inlier, return false. This is important because
   // there might not be a solution (and we dont want to propose one if there
   // is none).
-  if (inliers.size() < inlier_fraction_min * N) return false;
+  if (inliers.size() <= inlier_fraction_min * N) return false;
   // Now we compute the final model parameters with all the inliers.
   return hessianNormalFormOfPlane(inliers, hessian_normal_form);
 }
