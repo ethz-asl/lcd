@@ -52,6 +52,16 @@ inline double checkInBoundary(const double value, const double lower,
     return value;
 }
 
+inline int checkInBoundaryInt(const int value, const int lower,
+                              const int upper) {
+  if (value < lower)
+    return lower;
+  else if (value > upper)
+    return upper;
+  else
+    return value;
+}
+
 inline cv::Vec3f crossProduct(const cv::Vec3f a, const cv::Vec3f b) {
   return cv::Vec3f(a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2],
                    a[0] * b[1] - a[1] * b[0]);
@@ -91,7 +101,6 @@ inline double errorPointToPlane(const cv::Vec3f& normal,
                                 const cv::Vec3f& point) {
   return fabs(scalarProduct(point_on_plane - point, normal));
 }
-
 inline double errorPointToPlane(const cv::Vec4f& hessian_n_f,
                                 const cv::Vec3f& point) {
   return fabs(
@@ -99,6 +108,22 @@ inline double errorPointToPlane(const cv::Vec4f& hessian_n_f,
                     point) +
       hessian_n_f[3]);
 }
+
+inline cv::Vec3f projectPointOnLine(const cv::Vec3f& x_0,
+                                    const cv::Vec3f& direction,
+                                    const cv::Vec3f& point) {
+  return x_0 + direction / normOfVector3D(direction) *
+                   scalarProduct(direction, x_0 - point);
+}
+
+cv::Vec3f computeMean(const std::vector<cv::Vec3f>& points) {
+  int N = points.size();
+  CHECK(N > 0);
+  cv::Vec3f mean(0, 0, 0);
+  for (size_t i = 0; i < N; ++i) mean += (points[i] / float(N));
+  return mean;
+}
+
 // This function stores lines in visualization msgs, such that they can be
 // handled by rviz.
 void storeLines3DinMarkerMsg(const std::vector<cv::Vec<float, 6> >& lines3D,
@@ -148,6 +173,43 @@ bool hessianNormalFormOfPlane(const std::vector<cv::Vec3f>& points,
 // Output: points:  A vector of pixel coordinates.
 void findPointsInRectangle(const std::vector<cv::Point2f> corners,
                            std::vector<cv::Point2i>& points);
+
+// Finds two rectangles left and right of a line defined by 4 corner points.
+// Input:   line:   The 2D line defined as (start, end).
+//
+// Output:  rect_left: A rectangle defined by the 4 corner points.
+//          rect_right: Same as rect_left.
+bool getRectanglesFromLine(const cv::Vec4f& line,
+                           std::vector<cv::Point2f>& rect_left,
+                           std::vector<cv::Point2f>& rect_right);
+
+// Takes two planes and computes the intersection line. This function takes
+// already the direction of the line (which could be computed from the two
+// planes as well), because you can save computation time with it, if you
+// already have computed it beforehand.
+// Input: hessian1/2: Hessian normal forms of the two planes.
+//
+//        direction:  Direction of the line (must lie on both planes).
+//
+// Output: x_0:       A point on on both planes.
+bool getPointOnPlaneIntersectionLine(const cv::Vec4f& hessian1,
+                                     const cv::Vec4f& hessian2,
+                                     const cv::Vec3f& direction,
+                                     cv::Vec3f& x_0);
+
+// Uses two sets of points and fit a line, assuming that the two set of points
+// are from a plane left and right of the line.
+// Input: points1/2:  The two set of poitns.
+//
+//        line_guess: This is a guess of the line that is used if the two sets
+//                    belong to same plane. In this case a line cannot be
+//                    determined by the intersection of the planes.
+//
+// Output: line:      The fitted 3D line (start, end);
+bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
+                        const std::vector<cv::Vec3f>& points2,
+                        const cv::Vec<float, 6>& line_guess,
+                        cv::Vec<float, 6>& line);
 
 class LineDetector {
  public:
@@ -205,6 +267,36 @@ class LineDetector {
   // Fits a plane to the points using RANSAC.
   bool planeRANSAC(const std::vector<cv::Vec3f>& points,
                    cv::Vec4f& hessian_normal_form);
+  void planeRANSAC(const std::vector<cv::Vec3f>& points,
+                   std::vector<cv::Vec3f>& inliers);
+
+  // Projects 2D lines to 3D using a plane intersection method.
+  void project2Dto3DwithPlanes(const cv::Mat& cloud,
+                               const std::vector<cv::Vec4f>& lines2D,
+                               std::vector<cv::Vec<float, 6> >& lines3D);
+
+  // Projects 2D to 3D lines with a shortest is the best approach. Works in
+  // general better than naive approach, but lines that lie on surfaces tend to
+  // be drawn towards the camera.
+  // Input: cloud:    A point cloud of type CV_32FC3. Does not need to be dense.
+  //
+  //        lines2D:  A vector containing lines in 2D. A line:
+  //                  cv::Vec4f(start.x, start.y, end.x, end.y), where x,y are
+  //                  in pixel coordinates.
+  //
+  // Output: lines3D: A vector with the lines found in 3D.
+  //
+  //         correspondeces: The i-th element of this vector is the index of the
+  //                         element in lines2D that corresponds to the i-th
+  //                         element in lines3D.
+  void find3DlinesByShortest(const cv::Mat& cloud,
+                             const std::vector<cv::Vec4f>& lines2D,
+                             std::vector<cv::Vec<float, 6> >& lines3D,
+                             std::vector<int>& correspondeces);
+  // Overload: without correspondeces
+  void find3DlinesByShortest(const cv::Mat& cloud,
+                             const std::vector<cv::Vec4f>& lines2D,
+                             std::vector<cv::Vec<float, 6> >& lines3D);
 
  private:
   cv::Ptr<cv::LineSegmentDetector> lsd_detector_;

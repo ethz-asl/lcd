@@ -171,36 +171,46 @@ TEST_F(LineDetectionTest, testComputeDFromPlaneNormal) {
 
 TEST_F(LineDetectionTest, testErrorPointToPlane) {
   cv::Vec3f normal(1, 0, 0);
-  cv::Vec3f anchor(0, 0, 0);
-  cv::Vec3f point(1, 0, 0);
-  EXPECT_EQ(errorPointToPlane(normal, anchor, point), 1);
+  cv::Vec3f point_on_plane(-2, 4, 32);
+  cv::Vec3f point(4, 5, 2);
+  cv::Vec4f hessian(1, 0, 0, 2);
+  EXPECT_EQ(errorPointToPlane(hessian, point), 6);
+  EXPECT_EQ(errorPointToPlane(normal, point_on_plane, point), 6);
+  normal = {1, 1, 1};
+  point_on_plane = {1, 1, 1};
+  point = {0, 0, 0};
+  hessian = {1, 1, 1, -3};
+  hessian = hessian / normOfVector3D(normal);
+  normalizeVec3D(normal);
+  EXPECT_FLOAT_EQ(errorPointToPlane(hessian, point), sqrt(3));
+  EXPECT_FLOAT_EQ(errorPointToPlane(normal, point_on_plane, point), sqrt(3));
 }
 
 TEST_F(LineDetectionTest, testHessianNormalFormOfPlane) {
   // Three points on the x-y-plane.
   std::vector<cv::Vec3f> points;
-  points.push_back(cv::Vec3f(3, 5, 0));
-  points.push_back(cv::Vec3f(5, 17, 0));
-  points.push_back(cv::Vec3f(190, 3, 0));
+  points.push_back(cv::Vec3f(3, 5, 1));
+  points.push_back(cv::Vec3f(5, 17, 1));
+  points.push_back(cv::Vec3f(190, 3, 1));
   cv::Vec4f hessian_normal_form;
   hessianNormalFormOfPlane(points, hessian_normal_form);
   EXPECT_EQ(hessian_normal_form[0], 0);
   EXPECT_EQ(hessian_normal_form[1], 0);
   EXPECT_EQ(hessian_normal_form[2], -1);
-  EXPECT_EQ(hessian_normal_form[3], 0);
+  EXPECT_EQ(hessian_normal_form[3], 1);
 
   // More points one the x-y-plane
-  points.push_back(cv::Vec3f(1.1, 2.3, 0));
-  points.push_back(cv::Vec3f(5, 9.4, 0));
-  points.push_back(cv::Vec3f(17.9, 15, 0));
-  points.push_back(cv::Vec3f(150, 23, 0));
-  points.push_back(cv::Vec3f(1, 1, 0));
-  points.push_back(cv::Vec3f(510, 189, 0));
+  points.push_back(cv::Vec3f(1.1, 2.3, 1));
+  points.push_back(cv::Vec3f(5, 9.4, 1));
+  points.push_back(cv::Vec3f(17.9, 15, 1));
+  points.push_back(cv::Vec3f(150, 23, 1));
+  points.push_back(cv::Vec3f(1, 1, 1));
+  points.push_back(cv::Vec3f(510, 189, 1));
   hessianNormalFormOfPlane(points, hessian_normal_form);
   EXPECT_FLOAT_EQ(hessian_normal_form[0], 0);
   EXPECT_FLOAT_EQ(hessian_normal_form[1], 0);
   EXPECT_FLOAT_EQ(hessian_normal_form[2], 1);
-  EXPECT_FLOAT_EQ(hessian_normal_form[3], 0);
+  EXPECT_FLOAT_EQ(hessian_normal_form[3], -1);
 }
 
 TEST_F(LineDetectionTest, testPlaneRANSAC) {
@@ -233,20 +243,20 @@ TEST_F(LineDetectionTest, testPlaneRANSAC) {
   EXPECT_TRUE(line_detector_.planeRANSAC(points, hessian_normal_form));
   EXPECT_FLOAT_EQ(hessian_normal_form[0], 0);
   EXPECT_FLOAT_EQ(hessian_normal_form[1], 0);
-  EXPECT_FLOAT_EQ(hessian_normal_form[2], 1);
+  EXPECT_FLOAT_EQ(fabs(hessian_normal_form[2]), 1);
   EXPECT_FLOAT_EQ(hessian_normal_form[3], 0);
 }
 
 TEST_F(LineDetectionTest, testFindYCoordOfPixelsOnVector) {
-  cv::Point2f start(0.3, 2.5);
-  cv::Point2f end(3.9, 2.1);
+  cv::Point2f start(2.5, 0.3);
+  cv::Point2f end(2.1, 3.9);
   std::vector<int> y_coords;
   findYCoordOfPixelsOnVector(start, end, true, y_coords);
   EXPECT_EQ(y_coords.size(), 4);
   for (int i = 0; i < 4; ++i) EXPECT_EQ(y_coords[i], 2);
 
-  end.x = 0.7;
-  end.y = 7.3;
+  end.x = 7.3;
+  end.y = 0.7;
   findYCoordOfPixelsOnVector(start, end, true, y_coords);
   ASSERT_EQ(y_coords.size(), 4 + 1);
   EXPECT_EQ(y_coords[4], 2);
@@ -273,8 +283,75 @@ TEST_F(LineDetectionTest, testFindPointsInRectangle) {
       EXPECT_TRUE(contains_element);
     }
   }
+  corners.clear();
+  corners.push_back(cv::Point2f(0.1, 5.9));
+  corners.push_back(cv::Point2f(0.1, 0.1));
+  corners.push_back(cv::Point2f(5.9, 5.9));
+  corners.push_back(cv::Point2f(5.9, 0.1));
+  findPointsInRectangle(corners, points);
+  EXPECT_EQ(points.size(), 36);
 }
 
+TEST_F(LineDetectionTest, testGetPointOnPlaneIntersectionLine) {
+  cv::Vec4f hessian1(1, 0, 0, 1);
+  cv::Vec4f hessian2(0, 1, 0, 0);
+  cv::Vec3f direction(0, 0, 1);
+  cv::Vec3f x_0;
+  getPointOnPlaneIntersectionLine(hessian1, hessian2, direction, x_0);
+  EXPECT_EQ(x_0[0], -1);
+  EXPECT_EQ(x_0[1], 0);
+  EXPECT_EQ(x_0[2], 0);
+}
+
+TEST_F(LineDetectionTest, testFind3DlineOnPlanes) {
+  cv::Vec<float, 6> line;
+  cv::Vec<float, 6> line_guess(2, 2, 2);
+  std::vector<cv::Vec3f> points1, points2;
+  points1.push_back(cv::Vec3f(0, 0, 0));
+  points1.push_back(cv::Vec3f(0.1, 0, 0));
+  points1.push_back(cv::Vec3f(0.1, 0, 2));
+  points1.push_back(cv::Vec3f(0, 0, 2));
+  points2.push_back(cv::Vec3f(0, 0.1, 0));
+  points2.push_back(cv::Vec3f(0, 0, 0));
+  points2.push_back(cv::Vec3f(0, 0.1, 2));
+  points2.push_back(cv::Vec3f(0, 0, 2));
+  find3DlineOnPlanes(points1, points2, line_guess, line);
+  EXPECT_NEAR(line[0], 0, 1e-6);
+  EXPECT_NEAR(line[1], 0, 1e-6);
+  EXPECT_NEAR(line[2], 2, 1e-6);
+  EXPECT_NEAR(line[3], 0, 1e-6);
+  EXPECT_NEAR(line[4], 0, 1e-6);
+  EXPECT_NEAR(line[5], 0, 1e-6);
+}
+
+TEST_F(LineDetectionTest, testProject2Dto3DwithPlanes) {
+  int N = 240;
+  int M = 320;
+  double scale = 0.01;
+  cv::Mat cloud(N, M, CV_32FC3);
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < M; ++j) {
+      if (j <= (M / 2)) {
+        cloud.at<cv::Vec3f>(i, j) = cv::Vec3f(i * scale, j * scale, j * scale);
+      } else {
+        cloud.at<cv::Vec3f>(i, j) =
+            cv::Vec3f(i * scale, j * scale, (M - j) * scale);
+      }
+    }
+  }
+  std::vector<cv::Vec4f> lines2D;
+  cv::Vec4f vec1(160, 100, 160, 200);
+  lines2D.push_back(vec1);
+  std::vector<cv::Vec<float, 6> > lines3D;
+  line_detector_.project2Dto3DwithPlanes(cloud, lines2D, lines3D);
+  ASSERT_EQ(lines3D.size(), 1);
+  EXPECT_NEAR(lines3D[0][0], 200 * scale, 1e-6);
+  EXPECT_NEAR(lines3D[0][1], 160 * scale, 1e-6);
+  EXPECT_NEAR(lines3D[0][2], 160 * scale, 1e-6);
+  EXPECT_NEAR(lines3D[0][3], 100 * scale, 1e-6);
+  EXPECT_NEAR(lines3D[0][4], 160 * scale, 1e-6);
+  EXPECT_NEAR(lines3D[0][5], 160 * scale, 1e-6);
+}
 }  // namespace line_detection
 
 LINE_DETECTION_TESTING_ENTRYPOINT
