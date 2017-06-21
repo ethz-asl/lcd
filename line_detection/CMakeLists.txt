@@ -13,6 +13,9 @@ cs_add_library(${PROJECT_NAME}
 add_executable(detector src/detector_node.cc)
 target_link_libraries(detector ${PROJECT_NAME})
 
+add_executable(detect_and_show_3D src/detect_and_show_3D_node.cc)
+target_link_libraries(detect_and_show_3D ${PROJECT_NAME})
+
 add_executable(general_test general_tests.cc)
 target_link_libraries(general_test ${PROJECT_NAME})
 
