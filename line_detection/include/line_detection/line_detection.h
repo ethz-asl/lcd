@@ -124,6 +124,9 @@ cv::Vec3f computeMean(const std::vector<cv::Vec3f>& points) {
   return mean;
 }
 
+// Returns the projection of a point on the plane given defined by the hessian.
+cv::Vec3f projectPointOnPlane(const cv::Vec4f& hessian, const cv::Vec3f& point);
+
 // This function stores lines in visualization msgs, such that they can be
 // handled by rviz.
 void storeLines3DinMarkerMsg(const std::vector<cv::Vec<float, 6> >& lines3D,

@@ -3,6 +3,24 @@
 
 namespace line_detection {
 
+cv::Vec3f projectPointOnPlane(const cv::Vec4f& hessian,
+                              const cv::Vec3f& point) {
+  cv::Vec3f x_0, r, normal;
+  normal = {hessian[0], hessian[1], hessian[2]};
+  int non_zero;
+  for (non_zero = 0; non_zero < 3; ++non_zero) {
+    if (fabs(hessian[non_zero]) > 0.1) break;
+  }
+  for (int i = 0; i < 3; ++i) {
+    if (i == non_zero)
+      x_0[i] = -hessian[3] / hessian[non_zero];
+    else
+      x_0[i] = 0;
+  }
+  r = point - x_0;
+  return point - scalarProduct(r, normal) * normal;
+}
+
 bool areLinesEqual2D(const cv::Vec4f line1, const cv::Vec4f line2) {
   // First compute the difference in angle. For easier computation not the
   // actual difference in angle, but cos(theta)^2 is computed.
@@ -329,6 +347,7 @@ bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
   if (normOfVector3D(mean1 - mean2) < max_mean_dist) {
     // Checks if the planes ar parallel.
     if (fabs(scalarProduct(normal1, normal2)) > 0.995) {
+      line = line_guess;
       return true;
     } else {
       // The line lying on both planes must be perpendicular to both normals, so
@@ -362,7 +381,25 @@ bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       return true;
     }
   } else {
-    return false;
+    // If we reach this point, we have a discontinouty. In this case the
+    // line_guess is projected to both planes. Whichever is nearer to the mean
+    // of the corresponding point set is chosen.
+    cv::Vec4f hessian_new;
+    cv::Vec3f start, end;
+    cv::Vec<float, 6> line1, line2;
+    double dist1, dist2;
+    start = {line_guess[0], line_guess[1], line_guess[2]};
+    end = {line_guess[3], line_guess[4], line_guess[5]};
+    start = projectPointOnPlane(hessian1, start);
+    end = projectPointOnPlane(hessian1, end);
+    dist1 = normOfVector3D(start - mean1) + normOfVector3D(end - mean1);
+    line = {start[0], start[1], start[2], end[0], end[1], end[2]};
+    start = projectPointOnPlane(hessian2, start);
+    end = projectPointOnPlane(hessian2, end);
+    dist2 = normOfVector3D(start - mean2) + normOfVector3D(end - mean2);
+    if (dist1 > dist2)
+      line = {start[0], start[1], start[2], end[0], end[1], end[2]};
+    return true;
   }
 }
 

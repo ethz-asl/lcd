@@ -352,6 +352,22 @@ TEST_F(LineDetectionTest, testProject2Dto3DwithPlanes) {
   EXPECT_NEAR(lines3D[0][4], 160 * scale, 1e-6);
   EXPECT_NEAR(lines3D[0][5], 160 * scale, 1e-6);
 }
+
+TEST_F(LineDetectionTest, testProjectPointOnPlane) {
+  cv::Vec4f hessian(1, 0, 0, 0);
+  cv::Vec3f point(456, 3, 2);
+  cv::Vec3f projection = projectPointOnPlane(hessian, point);
+  EXPECT_NEAR(projection[0], 0, 1e-5);
+  EXPECT_NEAR(projection[1], 3, 1e-5);
+  EXPECT_NEAR(projection[2], 2, 1e-5);
+  hessian = {1, 1, 1, -3};
+  hessian = hessian / normOfVector3D(cv::Vec3f(1, 1, 1));
+  point = {33, 33, 33};
+  projection = projectPointOnPlane(hessian, point);
+  EXPECT_NEAR(projection[0], 1, 1e-5);
+  EXPECT_NEAR(projection[1], 1, 1e-5);
+  EXPECT_NEAR(projection[2], 1, 1e-5);
+}
 }  // namespace line_detection
 
 LINE_DETECTION_TESTING_ENTRYPOINT
