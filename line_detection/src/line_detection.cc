@@ -140,7 +140,7 @@ bool hessianNormalFormOfPlane(const std::vector<cv::Vec3f>& points,
   }
 }
 
-void findYCoordOfPixelsOnVector(const cv::Point2f& start,
+void findXCoordOfPixelsOnVector(const cv::Point2f& start,
                                 const cv::Point2f& end, bool left_side,
                                 std::vector<int>& x_coord) {
   int top = floor(start.y);
@@ -219,14 +219,14 @@ void findPointsInRectangle(std::vector<cv::Point2f> corners,
   // on the border vectors.
   std::vector<int> left_border;
   std::vector<int> right_border;
-  findYCoordOfPixelsOnVector(upper, left, true, left_border);
-  findYCoordOfPixelsOnVector(upper, right, false, right_border);
+  findXCoordOfPixelsOnVector(upper, left, true, left_border);
+  findXCoordOfPixelsOnVector(upper, right, false, right_border);
   // Pop_back is used because otherwise the corners[left/right] pixels would be
   // counted twice.
   left_border.pop_back();
   right_border.pop_back();
-  findYCoordOfPixelsOnVector(left, lower, true, left_border);
-  findYCoordOfPixelsOnVector(right, lower, false, right_border);
+  findXCoordOfPixelsOnVector(left, lower, true, left_border);
+  findXCoordOfPixelsOnVector(right, lower, false, right_border);
   if (left_border.size() > right_border.size())
     left_border.pop_back();
   else if (left_border.size() < right_border.size())

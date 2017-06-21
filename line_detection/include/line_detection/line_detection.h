@@ -149,7 +149,7 @@ void pclFromSceneNetToMat(const pcl::PointCloud<pcl::PointXYZRGB>& pcl_cloud,
 //                    3), 3 values are stored in y_coord, where the first
 //                    corresponds to the lowest x (most upper in image
 //                    coordinates).
-void findYCoordOfPixelsOnVector(const cv::Point2f& start,
+void findXCoordOfPixelsOnVector(const cv::Point2f& start,
                                 const cv::Point2f& end, bool left_side,
                                 std::vector<int>& y_coord);
 

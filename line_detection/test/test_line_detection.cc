@@ -247,20 +247,20 @@ TEST_F(LineDetectionTest, testPlaneRANSAC) {
   EXPECT_FLOAT_EQ(hessian_normal_form[3], 0);
 }
 
-TEST_F(LineDetectionTest, testFindYCoordOfPixelsOnVector) {
+TEST_F(LineDetectionTest, testFindXCoordOfPixelsOnVector) {
   cv::Point2f start(2.5, 0.3);
   cv::Point2f end(2.1, 3.9);
   std::vector<int> y_coords;
-  findYCoordOfPixelsOnVector(start, end, true, y_coords);
+  findXCoordOfPixelsOnVector(start, end, true, y_coords);
   EXPECT_EQ(y_coords.size(), 4);
   for (int i = 0; i < 4; ++i) EXPECT_EQ(y_coords[i], 2);
 
   end.x = 7.3;
   end.y = 0.7;
-  findYCoordOfPixelsOnVector(start, end, true, y_coords);
+  findXCoordOfPixelsOnVector(start, end, true, y_coords);
   ASSERT_EQ(y_coords.size(), 4 + 1);
   EXPECT_EQ(y_coords[4], 2);
-  findYCoordOfPixelsOnVector(start, end, false, y_coords);
+  findXCoordOfPixelsOnVector(start, end, false, y_coords);
   ASSERT_EQ(y_coords.size(), 4 + 1 + 1);
   EXPECT_EQ(y_coords[5], 8);
 }
