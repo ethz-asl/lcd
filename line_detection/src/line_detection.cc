@@ -679,9 +679,9 @@ float LineDetector::findAndRate3DLine(const cv::Mat& point_cloud,
     rate_it.x += floor(line.x / sqrt(line.x * line.x + line.y * line.y) + 0.5);
     rate_it.y += floor(line.y / sqrt(line.x * line.x + line.y * line.y) + 0.5);
     if (std::isnan(point_cloud.at<cv::Vec3f>(rate_it)[0])) continue;
-    rating += computeDistPointToLine3D(point_cloud.at<cv::Vec3f>(start),
-                                       point_cloud.at<cv::Vec3f>(end),
-                                       point_cloud.at<cv::Vec3f>(rate_it));
+    rating += distPointToLine(point_cloud.at<cv::Vec3f>(start),
+                              point_cloud.at<cv::Vec3f>(end),
+                              point_cloud.at<cv::Vec3f>(rate_it));
     ++num_points_rated;
   }
   if (num_points_rated > 5)
@@ -689,13 +689,6 @@ float LineDetector::findAndRate3DLine(const cv::Mat& point_cloud,
   else
     rating = 0;
   return (1.0 - exp(-rating));
-}
-
-double LineDetector::computeDistPointToLine3D(const cv::Vec3f& start,
-                                              const cv::Vec3f& end,
-                                              const cv::Vec3f& point) {
-  return normOfVector3D(crossProduct(point - start, point - end)) /
-         normOfVector3D(start - end);
 }
 
 bool LineDetector::planeRANSAC(const std::vector<cv::Vec3f>& points,
@@ -875,5 +868,115 @@ void LineDetector::find3DlinesByShortest(
                                         end[1], end[2]));
     correspondeces.push_back(i);
   }
+}
+
+void LineDetector::runCheckOn3DLines(
+    const cv::Mat& cloud, const std::vector<cv::Vec<float, 6> >& lines3D_in,
+    const int method, std::vector<cv::Vec<float, 6> >& lines3D_out) {
+  size_t N = lines3D_in.size();
+  lines3D_out.clear();
+  for (size_t i = 0; i < N; ++i) {
+    if (checkIfValidLineBruteForce(cloud, lines3D_in[i]))
+      lines3D_out.push_back(lines3D_in[i]);
+  }
+}
+
+void LineDetector::runCheckOn2DLines(const cv::Mat& cloud,
+                                     const std::vector<cv::Vec4f>& lines2D_in,
+                                     std::vector<cv::Vec4f> lines2D_out) {
+  size_t N = lines2D_in.size();
+  lines2D_out.clear();
+  for (size_t i = 0; i < N; ++i) {
+    if (checkIfValidLineDiscont(cloud, lines2D_in[i]))
+      lines2D_out.push_back(lines2D_in[i]);
+  }
+}
+
+bool LineDetector::checkIfValidLineBruteForce(const cv::Mat& cloud,
+                                              const cv::Vec<float, 6>& line) {
+  CHECK_EQ(cloud.type(), CV_32FC3);
+  int num_of_points_required = 10;
+  double max_deviation = 0.01;
+  int N = cloud.rows;
+  int M = cloud.cols;
+  cv::Vec3f start, end, point;
+  start = {line[0], line[1], line[2]};
+  end = {line[3], line[4], line[5]};
+  int count_inliers = 0;
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < M; ++j) {
+      point = cloud.at<cv::Vec3f>(i, j);
+      if (distPointToLine(start, end, point) < max_deviation) ++count_inliers;
+    }
+  }
+  if (count_inliers < num_of_points_required)
+    return false;
+  else
+    return true;
+}
+
+bool LineDetector::checkIfValidLineDiscont(const cv::Mat& cloud,
+                                           const cv::Vec4f& line) {
+  CHECK_EQ(cloud.type(), CV_32FC3);
+  cv::Point2i start, end, dir;
+  start = {floor(line[0]), floor(line[1])};
+  end = {floor(line[2]), floor(line[3])};
+  int patch_size = 1;
+  // The patch is restricted to be within the rectangle that is spawned by start
+  // and end. This has two positive effects: We never try to acces a pixel
+  // outside of the image and if a line starts at an discontinouty edge it
+  // prevents the algorithm from early stopping.
+  int x_max, y_max, x_min, y_min, x_from, x_to, y_from, y_to;
+  if (line[0] < line[2]) {
+    x_min = line[0];
+    x_max = line[2];
+  } else {
+    x_min = line[2];
+    x_max = line[0];
+  }
+  if (line[1] < line[3]) {
+    y_min = line[1];
+    y_max = line[3];
+  } else {
+    y_min = line[3];
+    y_max = line[1];
+  }
+  cv::Vec3f current_mean(0, 0, 0);
+  cv::Vec3f last_mean(0, 0, 0);
+  double max_mean_diff = 0.1;
+  int count;
+  bool first_time = true;
+  while (start != end) {
+    current_mean = {0, 0, 0};
+    // This procedure always makes a 1 pixel step towards the end point. It is
+    // guaranteed to land on the end point eventually, so the loop will
+    // terminate.
+    dir = end - start;
+    start.x += floor(dir.x / sqrt(dir.x * dir.x + dir.y * dir.y) + 0.5);
+    start.y += floor(dir.y / sqrt(dir.x * dir.x + dir.y * dir.y) + 0.5);
+    // We need to be within the boundaries defined previously.
+    x_from = checkInBoundary(start.x - patch_size, x_min, x_max);
+    x_to = checkInBoundary(start.x + patch_size, x_min, x_max);
+    y_from = checkInBoundary(start.y - patch_size, y_min, y_max);
+    y_to = checkInBoundary(start.y + patch_size, y_min, y_max);
+    // Count is used to count the number of pixels that were added to the mean
+    // so that we can effectively build the mean from the sum.
+    count = 0;
+    for (int i = x_from; i <= x_to; ++i) {
+      for (int j = y_from; j <= y_to; ++j) {
+        current_mean += cloud.at<cv::Vec3f>(j, i);
+        ++count;
+      }
+    }
+    current_mean = current_mean / count;
+    if (first_time) {
+      last_mean = current_mean;
+      first_time = false;
+      continue;
+    }
+    if (normOfVector3D(current_mean - last_mean) > max_mean_diff) return false;
+    last_mean = current_mean;
+  }
+  return true;
 }
 }  // namespace line_detection

@@ -109,6 +109,12 @@ inline double errorPointToPlane(const cv::Vec4f& hessian_n_f,
       hessian_n_f[3]);
 }
 
+inline double distPointToLine(const cv::Vec3f& start, const cv::Vec3f& end,
+                              const cv::Vec3f& point) {
+  return normOfVector3D(crossProduct(point - start, point - end)) /
+         normOfVector3D(start - end);
+}
+
 inline cv::Vec3f projectPointOnLine(const cv::Vec3f& x_0,
                                     const cv::Vec3f& direction,
                                     const cv::Vec3f& point) {
@@ -264,9 +270,6 @@ class LineDetector {
   void paintLines(cv::Mat& image, const std::vector<cv::Vec4f>& lines,
                   cv::Vec3b color = {255, 0, 0});
 
-  double computeDistPointToLine3D(const cv::Vec3f& start, const cv::Vec3f& end,
-                                  const cv::Vec3f& point);
-
   // Fits a plane to the points using RANSAC.
   bool planeRANSAC(const std::vector<cv::Vec3f>& points,
                    cv::Vec4f& hessian_normal_form);
@@ -300,6 +303,36 @@ class LineDetector {
   void find3DlinesByShortest(const cv::Mat& cloud,
                              const std::vector<cv::Vec4f>& lines2D,
                              std::vector<cv::Vec<float, 6> >& lines3D);
+
+  void runCheckOn3DLines(const cv::Mat& cloud,
+                         const std::vector<cv::Vec<float, 6> >& lines3D_in,
+                         const int method,
+                         std::vector<cv::Vec<float, 6> >& lines3D_out);
+
+  void runCheckOn2DLines(const cv::Mat& cloud,
+                         const std::vector<cv::Vec4f>& lines2D_in,
+                         std::vector<cv::Vec4f> lines2D_out);
+
+  // Checks if a line is valid by brute force approach: It computes the distance
+  // between every point in the point cloud and the line and returns true if a
+  // sufficiently large number of this distances are below a threshold.
+  // Input: cloud:    Point cloud as CV_32FC3
+  //
+  //        line:     Line in 3D defined by (start, end).
+  //
+  // Ouput: return:   True if it is a possible line, false otherwise.
+  bool checkIfValidLineBruteForce(const cv::Mat& cloud,
+                                  const cv::Vec<float, 6>& line);
+
+  // Checks if a line is valid by looking for discontinouties. It computes the
+  // mean of a patch around a pixel and looks for jumps when this mean is given
+  // with respect to the line.
+  // Input: cloud:    Point cloud as CV_32FC3
+  //
+  //        line:     Line in 2D defined by (start, end).
+  //
+  // Ouput: return:   True if it is a possible line, false otherwise.
+  bool checkIfValidLineDiscont(const cv::Mat& cloud, const cv::Vec4f& line);
 
  private:
   cv::Ptr<cv::LineSegmentDetector> lsd_detector_;

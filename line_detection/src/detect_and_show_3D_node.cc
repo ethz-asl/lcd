@@ -71,7 +71,14 @@ class listenAndPublish {
     line_detector_.detectLines(cv_img_gray_, line_detection::Detector::FAST,
                                lines2D_);
 
+    // std::vector<cv::Vec<float, 6> > lines3D_temp;
+    // line_detector_.projectLines2Dto3D(lines2D_, cv_cloud_, lines3D_temp);
+    // line_detector_.runCheckOn3DLines(cv_cloud_, lines3D_temp, 1, lines3D_);
+
+    // std::vector<cv::Vec4f> lines2D_temp;
+    // line_detector_.runCheckOn2DLines(cv_cloud_, lines2D_temp, lines2D_);
     // line_detector_.projectLines2Dto3D(lines2D_, cv_cloud_, lines3D_);
+
     line_detector_.project2Dto3DwithPlanes(cv_cloud_, lines2D_, lines3D_);
     // line_detector_.find3DlinesByShortest(cv_cloud_, lines2D_, lines3D_);
     marker_3Dlines_.header.frame_id = pcl_cloud_.header.frame_id;

@@ -151,9 +151,9 @@ TEST_F(LineDetectionTest, testCrossProdcut) {
       cv::Vec3f(0, 0, 1));
 }
 
-TEST_F(LineDetectionTest, testComputeDistPointToLine3D) {
-  EXPECT_EQ(line_detector_.computeDistPointToLine3D(
-                cv::Vec3f(0, 0, 0), cv::Vec3f(1, 0, 0), cv::Vec3f(0, 1, 0)),
+TEST_F(LineDetectionTest, testdistPointToLine) {
+  EXPECT_EQ(distPointToLine(cv::Vec3f(0, 0, 0), cv::Vec3f(1, 0, 0),
+                            cv::Vec3f(0, 1, 0)),
             1);
 }
 
@@ -367,6 +367,53 @@ TEST_F(LineDetectionTest, testProjectPointOnPlane) {
   EXPECT_NEAR(projection[0], 1, 1e-5);
   EXPECT_NEAR(projection[1], 1, 1e-5);
   EXPECT_NEAR(projection[2], 1, 1e-5);
+}
+
+TEST_F(LineDetectionTest, testCheckIfValidLineBruteForce) {
+  int N = 240;
+  int M = 320;
+  double scale = 0.1;
+  cv::Mat cloud(N, M, CV_32FC3);
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < M; ++j) {
+      if (j <= (M / 2)) {
+        cloud.at<cv::Vec3f>(i, j) = cv::Vec3f(i * scale, j * scale, j * scale);
+      } else {
+        cloud.at<cv::Vec3f>(i, j) =
+            cv::Vec3f(i * scale, j * scale, (M - j) * scale);
+      }
+    }
+  }
+  cv::Vec<float, 6> line3D(0, 0, 0, 10, 0, 0);
+  EXPECT_TRUE(line_detector_.checkIfValidLineBruteForce(cloud, line3D));
+  line3D = {5, 2, 2, 10, 7, 7};
+  EXPECT_TRUE(line_detector_.checkIfValidLineBruteForce(cloud, line3D));
+  line3D = {5, 2, 5, 5, 30, 5};
+  EXPECT_FALSE(line_detector_.checkIfValidLineBruteForce(cloud, line3D));
+}
+
+TEST_F(LineDetectionTest, testCheckIfValidLineDiscont) {
+  int N = 240;
+  int M = 320;
+  double scale = 0.01;
+  cv::Mat cloud(N, M, CV_32FC3);
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < M; ++j) {
+      if (j <= (M / 2)) {
+        cloud.at<cv::Vec3f>(i, j) = cv::Vec3f(i * scale, j * scale, j * scale);
+      } else {
+        cloud.at<cv::Vec3f>(i, j) =
+            cv::Vec3f(i * scale, j * scale, (M - j) * scale);
+      }
+    }
+  }
+  cv::Vec4f line2D(0, 0, 0, 10);
+  EXPECT_TRUE(line_detector_.checkIfValidLineDiscont(cloud, line2D))
+      << "test 1";
+  line2D = {20, 50, 70, 50};
+  EXPECT_TRUE(line_detector_.checkIfValidLineDiscont(cloud, line2D))
+      << "test 2";
+  line2D = {20, 50, 300, 50};
 }
 }  // namespace line_detection
 
