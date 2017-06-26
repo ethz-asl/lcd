@@ -277,6 +277,11 @@ class LineDetector {
                    std::vector<cv::Vec3f>& inliers);
 
   // Projects 2D lines to 3D using a plane intersection method.
+  // Input: cloud:    Point cloud of type CV_32FC3.
+  //
+  //        lines2D:  Lines in 2D in pixel coordenates of the cloud.
+  //
+  // Output: lines3D:  3D lines that were found.
   void project2Dto3DwithPlanes(const cv::Mat& cloud,
                                const std::vector<cv::Vec4f>& lines2D,
                                std::vector<cv::Vec<float, 6> >& lines3D);
@@ -304,11 +309,47 @@ class LineDetector {
                              const std::vector<cv::Vec4f>& lines2D,
                              std::vector<cv::Vec<float, 6> >& lines3D);
 
+  // Searches for best lines using a rating system. For every 2D line, it takes
+  // two additional lines (one on the left, on the right) and does the following
+  // procedure for every one: Compute inliers to line model given by start/end
+  // points by computing the distance to all points on the line. Use the mean
+  // distance of all inliers as the rating. Then the line with the lowest rating
+  // is chosen as the best.
+  // Input: cloud:    Point cloud in the format CV_32FC3.
+  //
+  //        lines2D:  2D lines defined in pixel coordinates.
+  //
+  // Output: lines3D: 3D lines defined in same coordinates as the cloud.
+  //
+  //         rating:  The rating for every 3D lines in the same order.
+  void find3DlinesRated(const cv::Mat& cloud,
+                        const std::vector<cv::Vec4f>& lines2D,
+                        std::vector<cv::Vec<float, 6> >& lines3D,
+                        std::vector<double>& rating);
+  // Overload: Does not give a rating as an output and gets rid off 3D lines for
+  // which no reasonable rating is given.
+  void find3DlinesRated(const cv::Mat& cloud,
+                        const std::vector<cv::Vec4f>& lines2D,
+                        std::vector<cv::Vec<float, 6> >& lines3D);
+
+  // Does a check by applying checkIfValidLineBruteForce to every line (see
+  // functon description for more information).
+  // Input: cloud:      Point cloud in the format CV_32FC3.
+  //
+  //        lines3D_in: 3D lines to be checked.
+  //
+  //        method:     Not implemented.
+  //
+  // Output: lines3D_out: All lines (or a changed version of them) that are
+  //                      found to be valid are stored here.
   void runCheckOn3DLines(const cv::Mat& cloud,
                          const std::vector<cv::Vec<float, 6> >& lines3D_in,
                          const int method,
                          std::vector<cv::Vec<float, 6> >& lines3D_out);
 
+  // Does a check by applying checkIfValidLineDiscont on every line. This check
+  // was mostly to try it out, it has shown that this way to check if a line is
+  // valid is prone to errors.
   void runCheckOn2DLines(const cv::Mat& cloud,
                          const std::vector<cv::Vec4f>& lines2D_in,
                          std::vector<cv::Vec4f> lines2D_out);
@@ -322,7 +363,7 @@ class LineDetector {
   //
   // Ouput: return:   True if it is a possible line, false otherwise.
   bool checkIfValidLineBruteForce(const cv::Mat& cloud,
-                                  const cv::Vec<float, 6>& line);
+                                  cv::Vec<float, 6>& line);
 
   // Checks if a line is valid by looking for discontinouties. It computes the
   // mean of a patch around a pixel and looks for jumps when this mean is given
@@ -333,6 +374,24 @@ class LineDetector {
   //
   // Ouput: return:   True if it is a possible line, false otherwise.
   bool checkIfValidLineDiscont(const cv::Mat& cloud, const cv::Vec4f& line);
+
+  // This function does a search for a line with non NaN start and end points in
+  // 3D given a line in 2D. It then computes a number of inliers to this line
+  // model returns the mean error of all inliers.
+  // Input: cloud:    Point cloud given as CV_32FC3.
+  //
+  //        line2D:   2D line in pixel coordinates.
+  //
+  // Output: line3D:  3D line in coordinates of the cloud.
+  //
+  //         num_inliers: Number of inliers found.
+  //
+  //         return:      Mean error of all inliers.
+  double findAndRate3DLine(const cv::Mat& point_cloud, const cv::Vec4f& line2D,
+                           cv::Vec<float, 6>& line3D, int& num_inliers);
+  // Overload: Same as above, just without number of inliers as output.
+  double findAndRate3DLine(const cv::Mat& point_cloud, const cv::Vec4f& line2D,
+                           cv::Vec<float, 6>& line3D);
 
  private:
   cv::Ptr<cv::LineSegmentDetector> lsd_detector_;
@@ -361,14 +420,6 @@ class LineDetector {
   bool find3DLineStartAndEnd(const cv::Mat& point_cloud,
                              const cv::Vec4f& line2D,
                              cv::Vec<float, 6>& line3D);
-
-  // findAndRate3DLine:
-  // This function does exactly the same as the above, but in addition it tries
-  // to rate the line. The idea is that a line which has a lot of 3D points near
-  // it gets a higher rating (near 1) than a line which goes through empty space
-  // (has less points near it). THIS DOES NOT WORK WELL YET.
-  float findAndRate3DLine(const cv::Mat& point_cloud, const cv::Vec4f& line2D,
-                          cv::Vec<float, 6>& line3D);
 };
 
 }  // namespace line_detection

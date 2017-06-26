@@ -255,7 +255,7 @@ bool getRectanglesFromLine(const cv::Vec4f& line,
   // Defines the length of the side perpendicular to the line.
   double relative_rect_size = 0.5;
   // Exactly as above, but defines a numerical maximum.
-  double max_rect_size = 10;
+  double max_rect_size = 5;
   double eff_rect_size = max_rect_size;
   cv::Point2f start(line[0], line[1]);
   cv::Point2f end(line[2], line[3]);
@@ -500,13 +500,8 @@ void LineDetector::projectLines2Dto3D(
   // First check if the point_cloud mat has the right format.
   CHECK_EQ(point_cloud.type(), CV_32FC3)
       << "The input matrix point_cloud must be of type CV_32FC3.";
-  int rows = point_cloud.rows;
-  int cols = point_cloud.cols;
   lines3D.clear();
-  cv::Point2f start, end, line;
-  cv::Vec<float, 6> line3D, lower_line3D, upper_line3D;
-  cv::Vec4f upper_line2D, lower_line2D;
-  double rate_mid, rate_up, rate_low;
+  cv::Point2i start, end;
   for (size_t i = 0; i < lines2D.size(); ++i) {
     // **************** VARIANT 1 ****************** //
     start.x = floor(lines2D[i][0]);
@@ -637,9 +632,10 @@ bool LineDetector::find3DLineStartAndEnd(const cv::Mat& point_cloud,
   return true;
 }
 
-float LineDetector::findAndRate3DLine(const cv::Mat& point_cloud,
-                                      const cv::Vec4f& line2D,
-                                      cv::Vec<float, 6>& line3D) {
+double LineDetector::findAndRate3DLine(const cv::Mat& point_cloud,
+                                       const cv::Vec4f& line2D,
+                                       cv::Vec<float, 6>& line3D,
+                                       int& num_inliers) {
   CHECK_EQ(point_cloud.type(), CV_32FC3)
       << "The input matrix point_cloud must be of type CV_32FC3.";
   cv::Point2f start, end, line, rate_it;
@@ -656,14 +652,14 @@ float LineDetector::findAndRate3DLine(const cv::Mat& point_cloud,
     start.y += floor(line.y / sqrt(line.x * line.x + line.y * line.y) + 0.5);
     if (start.x == end.x && start.y == end.y) break;
   }
-  if (start.x == end.x && start.y == end.y) return 0.0;
+  if (start.x == end.x && start.y == end.y) return 1e9;
   while (std::isnan(point_cloud.at<cv::Vec3f>(end)[0])) {
     line = start - end;
     end.x += floor(line.x / sqrt(line.x * line.x + line.y * line.y) + 0.5);
     end.y += floor(line.y / sqrt(line.x * line.x + line.y * line.y) + 0.5);
     if (start.x == end.x && start.y == end.y) break;
   }
-  if (start.x == end.x && start.y == end.y) return 0.0;
+  if (start.x == end.x && start.y == end.y) return 1e9;
   line3D = cv::Vec<float, 6>(
       point_cloud.at<cv::Vec3f>(start)[0], point_cloud.at<cv::Vec3f>(start)[1],
       point_cloud.at<cv::Vec3f>(start)[2], point_cloud.at<cv::Vec3f>(end)[0],
@@ -672,23 +668,34 @@ float LineDetector::findAndRate3DLine(const cv::Mat& point_cloud,
   // In addition to find3DLineStartAndEnd, this function also rates the line.
   // This is done here, but it does not work very well.
   double rating = 0.0;
-  int num_points_rated = 0;
+  double rating_temp;
+  double inlier_threshold = 0.01;
+  int min_inliers = 5;
+  num_inliers = 0;
   rate_it = start;
   while (!(rate_it.x == end.x && rate_it.y == end.y)) {
     line = end - rate_it;
     rate_it.x += floor(line.x / sqrt(line.x * line.x + line.y * line.y) + 0.5);
     rate_it.y += floor(line.y / sqrt(line.x * line.x + line.y * line.y) + 0.5);
     if (std::isnan(point_cloud.at<cv::Vec3f>(rate_it)[0])) continue;
-    rating += distPointToLine(point_cloud.at<cv::Vec3f>(start),
-                              point_cloud.at<cv::Vec3f>(end),
-                              point_cloud.at<cv::Vec3f>(rate_it));
-    ++num_points_rated;
+    rating_temp = distPointToLine(point_cloud.at<cv::Vec3f>(start),
+                                  point_cloud.at<cv::Vec3f>(end),
+                                  point_cloud.at<cv::Vec3f>(rate_it));
+    if (rating_temp < inlier_threshold) {
+      rating += rating_temp;
+      ++num_inliers;
+    }
   }
-  if (num_points_rated > 5)
-    rating = rating / double(num_points_rated);
+  if (num_inliers < min_inliers)
+    return 1e9;
   else
-    rating = 0;
-  return (1.0 - exp(-rating));
+    return rating / num_inliers;
+}
+double LineDetector::findAndRate3DLine(const cv::Mat& point_cloud,
+                                       const cv::Vec4f& line2D,
+                                       cv::Vec<float, 6>& line3D) {
+  int num_inliers;
+  return findAndRate3DLine(point_cloud, line2D, line3D, num_inliers);
 }
 
 bool LineDetector::planeRANSAC(const std::vector<cv::Vec3f>& points,
@@ -757,17 +764,28 @@ void LineDetector::project2Dto3DwithPlanes(
     const cv::Mat& cloud, const std::vector<cv::Vec4f>& lines2D,
     std::vector<cv::Vec<float, 6> >& lines3D) {
   CHECK_EQ(cloud.type(), CV_32FC3);
-  cv::Vec4f hessianNF_left, hessianNF_right;
+  // Declare all variables before the main loop.
   std::vector<cv::Point2f> rect_left, rect_right;
   std::vector<cv::Point2i> points_in_rect;
   std::vector<cv::Vec3f> plane_point_cand, inliers_left, inliers_right;
   std::vector<cv::Vec<float, 6> > lines3D_cand;
-  std::vector<int> idx;
+  std::vector<int> rating;
   cv::Point2i start, end;
   cv::Vec<float, 6> line3D_true;
-  // TODO implement version with correspondeces
-  projectLines2Dto3D(lines2D, cloud, lines3D_cand);
+  // Parameter: Fraction of inlier that must be found for the plane model to be
+  // valid.
+  double min_inliers = 0.5;
+  // This is a first guess of the 3D lines. They are used in some cases, where
+  // the lines cannot be found by intersecting planes.
+  find3DlinesRated(cloud, lines2D, lines3D_cand, rating);
+  // Loop over all 2D lines.
   for (size_t i = 0; i < lines2D.size(); ++i) {
+    // If the rating is so high, no valid 3d line was found by the
+    // find3DlinesRated function.
+    if (rating[i] > 1e6) continue;
+    // For both the left and the right side of the line: Find a rectangle
+    // defining a patch, find all points within the patch and try to fit a plane
+    // to these points.
     getRectanglesFromLine(lines2D[i], rect_left, rect_right);
     findPointsInRectangle(rect_left, points_in_rect);
     plane_point_cand.clear();
@@ -776,6 +794,7 @@ void LineDetector::project2Dto3DwithPlanes(
       plane_point_cand.push_back(cloud.at<cv::Vec3f>(points_in_rect[i]));
     }
     planeRANSAC(plane_point_cand, inliers_left);
+    if (inliers_left.size() < min_inliers * plane_point_cand.size()) continue;
     findPointsInRectangle(rect_right, points_in_rect);
     plane_point_cand.clear();
     for (size_t i = 0; i < points_in_rect.size(); ++i) {
@@ -783,8 +802,12 @@ void LineDetector::project2Dto3DwithPlanes(
       plane_point_cand.push_back(cloud.at<cv::Vec3f>(points_in_rect[i]));
     }
     planeRANSAC(plane_point_cand, inliers_right);
+    if (inliers_right.size() < min_inliers * plane_point_cand.size()) continue;
+    // If both planes were found, the inliers are handled to the
+    // find3DlineOnPlanes function, which takes care of different special cases.
     if (find3DlineOnPlanes(inliers_right, inliers_left, lines3D_cand[i],
                            line3D_true)) {
+      // Only push back the reliably found lines.
       lines3D.push_back(line3D_true);
     }
   }
@@ -870,14 +893,85 @@ void LineDetector::find3DlinesByShortest(
   }
 }
 
+void LineDetector::find3DlinesRated(const cv::Mat& cloud,
+                                    const std::vector<cv::Vec4f>& lines2D,
+                                    std::vector<cv::Vec<float, 6> >& lines3D,
+                                    std::vector<int>& rating) {
+  CHECK_EQ(cloud.type(), CV_32FC3);
+  int cols = cloud.cols;
+  int rows = cloud.rows;
+  cv::Vec4f upper_line2D, lower_line2D;
+  cv::Point2f line;
+  cv::Vec<float, 6> lower_line3D, line3D, upper_line3D;
+  double rate_low, rate_mid, rate_up;
+  lines3D.clear();
+  lines3D.reserve(lines2D.size());
+  rating.clear();
+  rating.reserve(lines2D.size());
+  for (size_t i = 0; i < lines2D.size(); ++i) {
+    line.x = lines2D[i][2] - lines2D[i][0];
+    line.y = lines2D[i][3] - lines2D[i][1];
+    double line_normalizer = sqrt(line.x * line.x + line.y * line.y);
+    upper_line2D[0] = checkInBoundary(
+        floor(lines2D[i][0]) + floor(line.y / line_normalizer + 0.5), 0.0,
+        cols);
+    upper_line2D[1] = checkInBoundary(
+        floor(lines2D[i][1]) + floor(-line.x / line_normalizer + 0.5), 0.0,
+        rows);
+    upper_line2D[2] = checkInBoundary(
+        floor(lines2D[i][2]) + floor(line.y / line_normalizer + 0.5), 0.0,
+        cols);
+    upper_line2D[3] = checkInBoundary(
+        floor(lines2D[i][3]) + floor(-line.x / line_normalizer + 0.5), 0.0,
+        rows);
+    lower_line2D[0] = checkInBoundary(
+        floor(lines2D[i][0]) + floor(-line.y / line_normalizer + 0.5), 0.0,
+        cols);
+    lower_line2D[1] = checkInBoundary(
+        floor(lines2D[i][1]) + floor(line.x / line_normalizer + 0.5), 0.0,
+        rows);
+    lower_line2D[2] = checkInBoundary(
+        floor(lines2D[i][2]) + floor(-line.y / line_normalizer + 0.5), 0.0,
+        cols);
+    lower_line2D[3] = checkInBoundary(
+        floor(lines2D[i][3]) + floor(line.x / line_normalizer + 0.5), 0.0,
+        rows);
+    rate_low = findAndRate3DLine(cloud, lower_line2D, lower_line3D);
+    rate_mid = findAndRate3DLine(cloud, lines2D[i], line3D);
+    rate_up = findAndRate3DLine(cloud, upper_line2D, upper_line3D);
+    if (rate_up < rate_mid && rate_up < rate_low) {
+      lines3D.push_back(upper_line3D);
+      rating.push_back(rate_up);
+    } else if (rate_low < rate_mid) {
+      lines3D.push_back(lower_line3D);
+      rating.push_back(rate_low);
+    } else {
+      lines3D.push_back(line3D);
+      rating.push_back(rate_mid);
+    }
+  }
+}
+void LineDetector::find3DlinesRated(const cv::Mat& cloud,
+                                    const std::vector<cv::Vec4f>& lines2D,
+                                    std::vector<cv::Vec<float, 6> >& lines3D) {
+  std::vector<double> rating;
+  std::vector<cv::Vec<float, 6> > lines3D_cand;
+  find3DlinesRated(cloud, lines2D, lines3D_cand, rating);
+  for (size_t i = 0; i < lines3D_cand.size(); ++i) {
+    if (rating[i] > 1e8) continue;
+    lines3D.push_back(lines3D_cand[i]);
+  }
+}
+
 void LineDetector::runCheckOn3DLines(
     const cv::Mat& cloud, const std::vector<cv::Vec<float, 6> >& lines3D_in,
     const int method, std::vector<cv::Vec<float, 6> >& lines3D_out) {
-  size_t N = lines3D_in.size();
   lines3D_out.clear();
-  for (size_t i = 0; i < N; ++i) {
-    if (checkIfValidLineBruteForce(cloud, lines3D_in[i]))
-      lines3D_out.push_back(lines3D_in[i]);
+  cv::Vec<float, 6> line_cand;
+  for (size_t i = 0; i < lines3D_in.size(); ++i) {
+    line_cand = lines3D_in[i];
+    if (checkIfValidLineBruteForce(cloud, line_cand))
+      lines3D_out.push_back(line_cand);
   }
 }
 
@@ -893,26 +987,58 @@ void LineDetector::runCheckOn2DLines(const cv::Mat& cloud,
 }
 
 bool LineDetector::checkIfValidLineBruteForce(const cv::Mat& cloud,
-                                              const cv::Vec<float, 6>& line) {
+                                              cv::Vec<float, 6>& line) {
   CHECK_EQ(cloud.type(), CV_32FC3);
+  // Minimum number of inliers for the line to be valid.
   int num_of_points_required = 10;
+  // Maximum deviation for a point to count as an inlier.
   double max_deviation = 0.01;
-  int N = cloud.rows;
-  int M = cloud.cols;
+  // This point density measures the where the points lie on the line. It is
+  // used to truncate the line on the ends, if on end lies in empty space.
+  int point_density[num_of_points_required] = {0};
+  double dist;
   cv::Vec3f start, end, point;
   start = {line[0], line[1], line[2]};
   end = {line[3], line[4], line[5]};
+  double length = normOfVector3D(start - end);
   int count_inliers = 0;
-  for (int i = 0; i < N; ++i) {
-    for (int j = 0; j < M; ++j) {
+  // For every point in the cloud: This is why it is called brute force
+  // approach.
+  for (int i = 0; i < cloud.rows; ++i) {
+    for (int j = 0; j < cloud.cols; ++j) {
       point = cloud.at<cv::Vec3f>(i, j);
-      if (distPointToLine(start, end, point) < max_deviation) ++count_inliers;
+      // Check if the distance to the line is below the threshold. This computes
+      // the distance to the infinite line.
+      if (distPointToLine(start, end, point) < max_deviation) {
+        // This is the distance from the start point projected on to the line.
+        // If its negative or larger the line length, the point may lie on the
+        // line, but not between the start and the end point.
+        dist = scalarProduct(end - start, point - start) / length;
+        if (dist < 0 || length <= dist) continue;
+        // Now the histogramm like point_density is raised at the entry where
+        // the points lies.
+        point_density[(int)(dist / length * (double)num_of_points_required)] +=
+            1;
+        ++count_inliers;
+      }
     }
   }
-  if (count_inliers < num_of_points_required)
-    return false;
-  else
-    return true;
+  // Only take lines with enough inliers.
+  if (count_inliers < num_of_points_required) return false;
+  // Check from the front and the back of the line if the density is zero.
+  int front = 0;
+  int back = num_of_points_required - 1;
+  while (0 == point_density[front]) ++front;
+  while (0 == point_density[back]) --back;
+  cv::Vec3f direction;
+  direction = end - start;
+  // This part will truncate the line, if the point_density was zero at either
+  // the back or the front. Otherwise it has no influence.
+  end = start + direction * back / (double)(num_of_points_required - 1);
+  start = start + direction * front / (double)(num_of_points_required - 1);
+  // Store the line and return.
+  line = {start[0], start[1], start[2], end[0], end[1], end[2]};
+  return true;
 }
 
 bool LineDetector::checkIfValidLineDiscont(const cv::Mat& cloud,

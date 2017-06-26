@@ -345,12 +345,12 @@ TEST_F(LineDetectionTest, testProject2Dto3DwithPlanes) {
   std::vector<cv::Vec<float, 6> > lines3D;
   line_detector_.project2Dto3DwithPlanes(cloud, lines2D, lines3D);
   ASSERT_EQ(lines3D.size(), 1);
-  EXPECT_NEAR(lines3D[0][0], 200 * scale, 1e-6);
-  EXPECT_NEAR(lines3D[0][1], 160 * scale, 1e-6);
-  EXPECT_NEAR(lines3D[0][2], 160 * scale, 1e-6);
-  EXPECT_NEAR(lines3D[0][3], 100 * scale, 1e-6);
-  EXPECT_NEAR(lines3D[0][4], 160 * scale, 1e-6);
-  EXPECT_NEAR(lines3D[0][5], 160 * scale, 1e-6);
+  EXPECT_NEAR(lines3D[0][0], 200 * scale, 1e-5);
+  EXPECT_NEAR(lines3D[0][1], 160 * scale, 1e-5);
+  EXPECT_NEAR(lines3D[0][2], 160 * scale, 1e-5);
+  EXPECT_NEAR(lines3D[0][3], 100 * scale, 1e-5);
+  EXPECT_NEAR(lines3D[0][4], 160 * scale, 1e-5);
+  EXPECT_NEAR(lines3D[0][5], 160 * scale, 1e-5);
 }
 
 TEST_F(LineDetectionTest, testProjectPointOnPlane) {
@@ -372,7 +372,7 @@ TEST_F(LineDetectionTest, testProjectPointOnPlane) {
 TEST_F(LineDetectionTest, testCheckIfValidLineBruteForce) {
   int N = 240;
   int M = 320;
-  double scale = 0.1;
+  double scale = 0.01;
   cv::Mat cloud(N, M, CV_32FC3);
   for (int i = 0; i < N; ++i) {
     for (int j = 0; j < M; ++j) {
@@ -385,11 +385,12 @@ TEST_F(LineDetectionTest, testCheckIfValidLineBruteForce) {
     }
   }
   cv::Vec<float, 6> line3D(0, 0, 0, 10, 0, 0);
-  EXPECT_TRUE(line_detector_.checkIfValidLineBruteForce(cloud, line3D));
-  line3D = {5, 2, 2, 10, 7, 7};
-  EXPECT_TRUE(line_detector_.checkIfValidLineBruteForce(cloud, line3D));
-  line3D = {5, 2, 5, 5, 30, 5};
-  EXPECT_FALSE(line_detector_.checkIfValidLineBruteForce(cloud, line3D));
+  EXPECT_TRUE(line_detector_.checkIfValidLineBruteForce(cloud, line3D)) << 1;
+  EXPECT_NEAR(line3D[3], 2.4, 0.2);
+  line3D = {0.5, 0.2, 0.2, 1, 0.7, 0.7};
+  EXPECT_TRUE(line_detector_.checkIfValidLineBruteForce(cloud, line3D)) << 2;
+  line3D = {0.5, 0.2, 0.5, 0.5, 3, 0.5};
+  EXPECT_FALSE(line_detector_.checkIfValidLineBruteForce(cloud, line3D)) << 3;
 }
 
 TEST_F(LineDetectionTest, testCheckIfValidLineDiscont) {
@@ -415,6 +416,45 @@ TEST_F(LineDetectionTest, testCheckIfValidLineDiscont) {
       << "test 2";
   line2D = {20, 50, 300, 50};
 }
+
+TEST_F(LineDetectionTest, testFind3DlinesRated) {
+  int N = 240;
+  int M = 320;
+  double scale = 0.01;
+  cv::Mat cloud(N, M, CV_32FC3);
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < M; ++j) {
+      if (j <= (M / 2)) {
+        cloud.at<cv::Vec3f>(i, j) = cv::Vec3f(i * scale, j * scale, j * scale);
+      } else {
+        cloud.at<cv::Vec3f>(i, j) =
+            cv::Vec3f(i * scale, j * scale, (M - j) * scale);
+      }
+    }
+  }
+  std::vector<cv::Vec4f> lines2D;
+  cv::Vec4f vec1(160, 100, 160, 200);
+  lines2D.push_back(vec1);
+  std::vector<cv::Vec<float, 6> > lines3D;
+  std::vector<int> rating;
+  line_detector_.find3DlinesRated(cloud, lines2D, lines3D, rating);
+  ASSERT_EQ(lines3D.size(), 1);
+  ASSERT_EQ(rating.size(), 1);
+  EXPECT_EQ(rating[0], 0);
+  EXPECT_NEAR(lines3D[0][0], 100 * scale, 1e-6);
+  EXPECT_NEAR(lines3D[0][1], 160 * scale, 1e-6);
+  EXPECT_NEAR(lines3D[0][2], 160 * scale, 1e-6);
+  EXPECT_NEAR(lines3D[0][3], 200 * scale, 1e-6);
+  EXPECT_NEAR(lines3D[0][4], 160 * scale, 1e-6);
+  EXPECT_NEAR(lines3D[0][5], 160 * scale, 1e-6);
+  vec1 = {50, 50, 250, 20};
+  lines2D.push_back(vec1);
+  line_detector_.find3DlinesRated(cloud, lines2D, lines3D, rating);
+  ASSERT_EQ(lines3D.size(), 2);
+  ASSERT_EQ(rating.size(), 2);
+  EXPECT_EQ(rating[1], 1e9);
+}
+
 }  // namespace line_detection
 
 LINE_DETECTION_TESTING_ENTRYPOINT

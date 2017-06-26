@@ -68,18 +68,38 @@ class listenAndPublish {
     cvtColor(cv_image_, cv_img_gray_, CV_RGB2GRAY);
 
     line_detection::pclFromSceneNetToMat(pcl_cloud_, 320, 240, cv_cloud_);
+
+    std::chrono::time_point<std::chrono::system_clock> start, end;
+    std::chrono::duration<double> elapsed_seconds;
+
+    start = std::chrono::system_clock::now();
     line_detector_.detectLines(cv_img_gray_, line_detection::Detector::FAST,
                                lines2D_);
+    end = std::chrono::system_clock::now();
+    elapsed_seconds = end - start;
+    ROS_INFO("Detecting lines 2D: %f", elapsed_seconds.count());
 
-    // std::vector<cv::Vec<float, 6> > lines3D_temp;
+    start = std::chrono::system_clock::now();
+    std::vector<cv::Vec<float, 6> > lines3D_temp;
     // line_detector_.projectLines2Dto3D(lines2D_, cv_cloud_, lines3D_temp);
-    // line_detector_.runCheckOn3DLines(cv_cloud_, lines3D_temp, 1, lines3D_);
+    line_detector_.project2Dto3DwithPlanes(cv_cloud_, lines2D_, lines3D_temp);
+    // line_detector_.find3DlinesRated(cv_cloud_, lines2D_, lines3D_temp);
+    end = std::chrono::system_clock::now();
+    elapsed_seconds = end - start;
+    ROS_INFO("Projecting to 3D: %f", elapsed_seconds.count());
+
+    start = std::chrono::system_clock::now();
+    line_detector_.runCheckOn3DLines(cv_cloud_, lines3D_temp, 0, lines3D_);
+    end = std::chrono::system_clock::now();
+    elapsed_seconds = end - start;
+    ROS_INFO("Check for valid lines: %f", elapsed_seconds.count());
+
+    // lines3D_ = lines3D_temp;
 
     // std::vector<cv::Vec4f> lines2D_temp;
     // line_detector_.runCheckOn2DLines(cv_cloud_, lines2D_temp, lines2D_);
     // line_detector_.projectLines2Dto3D(lines2D_, cv_cloud_, lines3D_);
 
-    line_detector_.project2Dto3DwithPlanes(cv_cloud_, lines2D_, lines3D_);
     // line_detector_.find3DlinesByShortest(cv_cloud_, lines2D_, lines3D_);
     marker_3Dlines_.header.frame_id = pcl_cloud_.header.frame_id;
     line_detection::storeLines3DinMarkerMsg(lines3D_, marker_3Dlines_);
@@ -91,13 +111,13 @@ class listenAndPublish {
     // inspect them).
     ros::Rate rate(0.2);
     ROS_INFO("Started publishing.");
-    while (!ros::isShuttingDown()) {
-      broad_caster.sendTransform(tf::StampedTransform(
-          transform, ros::Time::now(), "map", pcl_cloud_.header.frame_id));
-      pcl_pub_.publish(pcl_cloud_);
-      marker_pub_.publish(marker_3Dlines_);
-      rate.sleep();
-    }
+    // while (!ros::isShuttingDown()) {
+    broad_caster.sendTransform(tf::StampedTransform(
+        transform, ros::Time::now(), "map", pcl_cloud_.header.frame_id));
+    pcl_pub_.publish(pcl_cloud_);
+    marker_pub_.publish(marker_3Dlines_);
+    // rate.sleep();
+    // }
   }
 
  protected:
