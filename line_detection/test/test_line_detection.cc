@@ -436,7 +436,7 @@ TEST_F(LineDetectionTest, testFind3DlinesRated) {
   cv::Vec4f vec1(160, 100, 160, 200);
   lines2D.push_back(vec1);
   std::vector<cv::Vec<float, 6> > lines3D;
-  std::vector<int> rating;
+  std::vector<double> rating;
   line_detector_.find3DlinesRated(cloud, lines2D, lines3D, rating);
   ASSERT_EQ(lines3D.size(), 1);
   ASSERT_EQ(rating.size(), 1);

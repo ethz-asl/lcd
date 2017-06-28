@@ -383,7 +383,7 @@ bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
   } else {
     // If we reach this point, we have a discontinouty. In this case the
     // line_guess is projected to both planes. Whichever is nearer to the mean
-    // of the corresponding point set is chosen.
+    // of the corresponding set of points is chosen.
     cv::Vec4f hessian_new;
     cv::Vec3f start, end;
     cv::Vec<float, 6> line1, line2;
@@ -421,7 +421,7 @@ void LineDetector::detectLines(const cv::Mat& image, int detector,
   else if (detector == 3)
     detectLines(image, Detector::HOUGH, lines);
   else {
-    ROS_ERROR(
+    ROS_WARN(
         "LineDetetor::detectLines: Detector choice not valid, LSD was "
         "chosen as default.");
     detectLines(image, Detector::LSD, lines);
@@ -769,7 +769,7 @@ void LineDetector::project2Dto3DwithPlanes(
   std::vector<cv::Point2i> points_in_rect;
   std::vector<cv::Vec3f> plane_point_cand, inliers_left, inliers_right;
   std::vector<cv::Vec<float, 6> > lines3D_cand;
-  std::vector<int> rating;
+  std::vector<double> rating;
   cv::Point2i start, end;
   cv::Vec<float, 6> line3D_true;
   // Parameter: Fraction of inlier that must be found for the plane model to be
@@ -896,7 +896,7 @@ void LineDetector::find3DlinesByShortest(
 void LineDetector::find3DlinesRated(const cv::Mat& cloud,
                                     const std::vector<cv::Vec4f>& lines2D,
                                     std::vector<cv::Vec<float, 6> >& lines3D,
-                                    std::vector<int>& rating) {
+                                    std::vector<double>& rating) {
   CHECK_EQ(cloud.type(), CV_32FC3);
   int cols = cloud.cols;
   int rows = cloud.rows;
@@ -1024,7 +1024,7 @@ bool LineDetector::checkIfValidLineBruteForce(const cv::Mat& cloud,
     }
   }
   // Only take lines with enough inliers.
-  if (count_inliers < num_of_points_required) return false;
+  if (count_inliers <= num_of_points_required) return false;
   // Check from the front and the back of the line if the density is zero.
   int front = 0;
   int back = num_of_points_required - 1;

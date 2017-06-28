@@ -79,24 +79,6 @@ int main(int argc, char** argv) {
 
   cv::imshow("picture with lines", display_image);
   cv::waitKey(0);
-  cv::destroyWindow("picture with lines");
-
-  // This part is to find out in which order the lines are stored.
-  int show_num_lines = 1;
-  int show_num_times = 10;
-  cv::Mat disp_img = test_image.clone();
-  for (int i = 0; i < show_num_times; ++i) {
-    for (int j = 0; j < show_num_lines; ++j) {
-      if (i * show_num_lines + j > service.response.start_x.size()) break;
-      p1.x = service.response.start_x[i * show_num_lines + j];
-      p1.y = service.response.start_y[i * show_num_lines + j];
-      p2.x = service.response.end_x[i * show_num_lines + j];
-      p2.y = service.response.end_y[i * show_num_lines + j];
-      cv::line(disp_img, p1, p2, color, 2);
-    }
-    cv::imshow("picture with lines", disp_img);
-    cv::waitKey(0);
-  }
 
   return 0;
 }
