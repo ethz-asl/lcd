@@ -323,19 +323,31 @@ bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                         const std::vector<cv::Vec3f>& points2,
                         const cv::Vec<float, 6>& line_guess,
                         cv::Vec<float, 6>& line) {
+  LineWithPlanes line_with_planes;
+  if (find3DlineOnPlanes(points1, points2, line_guess, line_with_planes)) {
+    line = line_with_planes.line;
+    return true;
+  } else {
+    return false;
+  }
+}
+bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
+                        const std::vector<cv::Vec3f>& points2,
+                        const cv::Vec<float, 6>& line_guess,
+                        LineWithPlanes& line) {
   size_t N1 = points1.size();
   size_t N2 = points2.size();
   if (N1 < 3 || N2 < 3) return false;
   cv::Vec3f mean1, mean2, normal1, normal2;
   cv::Vec4f hessian1, hessian2;
   // Fit a plane model to the two sets of points individually.
-  if (!hessianNormalFormOfPlane(points1, hessian1))
+  if (!hessianNormalFormOfPlane(points1, line.hessian1))
     ROS_WARN("find3DlineOnPlanes: search for hessian failed.");
-  if (!hessianNormalFormOfPlane(points2, hessian2))
+  if (!hessianNormalFormOfPlane(points2, line.hessian2))
     ROS_WARN("find3DlineOnPlanes: search for hessian failed.");
   // Extract the two plane normals.
-  normal1 = {hessian1[0], hessian1[1], hessian1[2]};
-  normal2 = {hessian2[0], hessian2[1], hessian2[2]};
+  normal1 = {line.hessian1[0], line.hessian1[1], line.hessian1[2]};
+  normal2 = {line.hessian2[0], line.hessian2[1], line.hessian2[2]};
   // This parameter defines at which point 2 lines are concerned to be near.
   // This distance is computed from the means of the two set of points. If the
   // distance is higher than this value, it is assumed that the line is not the
@@ -347,7 +359,7 @@ bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
   if (normOfVector3D(mean1 - mean2) < max_mean_dist) {
     // Checks if the planes ar parallel.
     if (fabs(scalarProduct(normal1, normal2)) > 0.995) {
-      line = line_guess;
+      line.line = line_guess;
       return true;
     } else {
       // The line lying on both planes must be perpendicular to both normals, so
@@ -356,7 +368,8 @@ bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       normalizeVec3D(direction);
       // Now a point on the intersection line is searched.
       cv::Vec3f x_0;
-      getPointOnPlaneIntersectionLine(hessian1, hessian2, direction, x_0);
+      getPointOnPlaneIntersectionLine(line.hessian1, line.hessian2, direction,
+                                      x_0);
       // This part searches for start and end point, because so far we only have
       // a line from and to inifinity. The procedure used here projects all
       // points in both sets onto the line and then chooses the pair of point
@@ -377,28 +390,27 @@ bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       cv::Vec3f start, end;
       start = x_0 + direction * dist_min;
       end = x_0 + direction * dist_max;
-      line = {start[0], start[1], start[2], end[0], end[1], end[2]};
+      line.line = {start[0], start[1], start[2], end[0], end[1], end[2]};
       return true;
     }
   } else {
     // If we reach this point, we have a discontinouty. In this case the
     // line_guess is projected to both planes. Whichever is nearer to the mean
     // of the corresponding set of points is chosen.
-    cv::Vec4f hessian_new;
     cv::Vec3f start, end;
     cv::Vec<float, 6> line1, line2;
     double dist1, dist2;
     start = {line_guess[0], line_guess[1], line_guess[2]};
     end = {line_guess[3], line_guess[4], line_guess[5]};
-    start = projectPointOnPlane(hessian1, start);
-    end = projectPointOnPlane(hessian1, end);
+    start = projectPointOnPlane(line.hessian1, start);
+    end = projectPointOnPlane(line.hessian1, end);
     dist1 = normOfVector3D(start - mean1) + normOfVector3D(end - mean1);
-    line = {start[0], start[1], start[2], end[0], end[1], end[2]};
-    start = projectPointOnPlane(hessian2, start);
-    end = projectPointOnPlane(hessian2, end);
+    line.line = {start[0], start[1], start[2], end[0], end[1], end[2]};
+    start = projectPointOnPlane(line.hessian2, start);
+    end = projectPointOnPlane(line.hessian2, end);
     dist2 = normOfVector3D(start - mean2) + normOfVector3D(end - mean2);
     if (dist1 > dist2)
-      line = {start[0], start[1], start[2], end[0], end[1], end[2]};
+      line.line = {start[0], start[1], start[2], end[0], end[1], end[2]};
     return true;
   }
 }
@@ -763,6 +775,15 @@ void LineDetector::planeRANSAC(const std::vector<cv::Vec3f>& points,
 void LineDetector::project2Dto3DwithPlanes(
     const cv::Mat& cloud, const std::vector<cv::Vec4f>& lines2D,
     std::vector<cv::Vec<float, 6> >& lines3D) {
+  std::vector<LineWithPlanes> lines_with_planes;
+  lines3D.clear();
+  project2Dto3DwithPlanes(cloud, lines2D, lines_with_planes);
+  for (size_t i = 0; i < lines_with_planes.size(); ++i)
+    lines3D.push_back(lines_with_planes[i].line);
+}
+void LineDetector::project2Dto3DwithPlanes(
+    const cv::Mat& cloud, const std::vector<cv::Vec4f>& lines2D,
+    std::vector<LineWithPlanes>& lines3D) {
   CHECK_EQ(cloud.type(), CV_32FC3);
   // Declare all variables before the main loop.
   std::vector<cv::Point2f> rect_left, rect_right;
@@ -771,7 +792,7 @@ void LineDetector::project2Dto3DwithPlanes(
   std::vector<cv::Vec<float, 6> > lines3D_cand;
   std::vector<double> rating;
   cv::Point2i start, end;
-  cv::Vec<float, 6> line3D_true;
+  LineWithPlanes line3D_true;
   // Parameter: Fraction of inlier that must be found for the plane model to be
   // valid.
   double min_inliers = 0.5;

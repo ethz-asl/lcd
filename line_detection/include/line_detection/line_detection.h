@@ -35,6 +35,12 @@ const double kPi = 3.141592653589793;
 
 enum class Detector : unsigned int { LSD = 0, EDL = 1, FAST = 2, HOUGH = 3 };
 
+struct LineWithPlanes {
+  cv::Vec<float, 6> line;
+  cv::Vec4f hessian1;
+  cv::Vec4f hessian2;
+};
+
 // Returns true if lines are nearby and could be equal (low difference in angle
 // and start or end point).
 bool areLinesEqual2D(const cv::Vec4f line1, const cv::Vec4f line2);
@@ -219,6 +225,10 @@ bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                         const std::vector<cv::Vec3f>& points2,
                         const cv::Vec<float, 6>& line_guess,
                         cv::Vec<float, 6>& line);
+bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
+                        const std::vector<cv::Vec3f>& points2,
+                        const cv::Vec<float, 6>& line_guess,
+                        LineWithPlanes& line);
 
 class LineDetector {
  public:
@@ -285,6 +295,9 @@ class LineDetector {
   void project2Dto3DwithPlanes(const cv::Mat& cloud,
                                const std::vector<cv::Vec4f>& lines2D,
                                std::vector<cv::Vec<float, 6> >& lines3D);
+  void project2Dto3DwithPlanes(const cv::Mat& cloud,
+                               const std::vector<cv::Vec4f>& lines2D,
+                               std::vector<LineWithPlanes>& lines3D);
 
   // Projects 2D to 3D lines with a shortest is the best approach. Works in
   // general better than naive approach, but lines that lie on surfaces tend to
