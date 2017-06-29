@@ -1020,6 +1020,10 @@ void LineDetector::runCheckOn2DLines(const cv::Mat& cloud,
 bool LineDetector::checkIfValidLineBruteForce(const cv::Mat& cloud,
                                               cv::Vec<float, 6>& line) {
   CHECK_EQ(cloud.type(), CV_32FC3);
+  // First check: if one of the points lie exactly on the origin, get rid of it.
+  if ((line[0] == 0 && line[1] == 0 && line[2] == 0) ||
+      (line[3] == 0 && line[4] == 0 && line[5] == 0))
+    return false;
   // Minimum number of inliers for the line to be valid.
   int num_of_points_required = 10;
   // Maximum deviation for a point to count as an inlier.
