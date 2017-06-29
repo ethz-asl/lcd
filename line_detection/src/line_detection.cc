@@ -796,6 +796,7 @@ void LineDetector::project2Dto3DwithPlanes(
   // Parameter: Fraction of inlier that must be found for the plane model to be
   // valid.
   double min_inliers = 0.5;
+  bool right_found, left_found;
   // This is a first guess of the 3D lines. They are used in some cases, where
   // the lines cannot be found by intersecting planes.
   find3DlinesRated(cloud, lines2D, lines3D_cand, rating);
@@ -815,7 +816,10 @@ void LineDetector::project2Dto3DwithPlanes(
       plane_point_cand.push_back(cloud.at<cv::Vec3f>(points_in_rect[i]));
     }
     planeRANSAC(plane_point_cand, inliers_left);
-    if (inliers_left.size() < min_inliers * plane_point_cand.size()) continue;
+    if (inliers_left.size() < min_inliers * plane_point_cand.size())
+      left_found = false;
+    else
+      left_found = true;
     findPointsInRectangle(rect_right, points_in_rect);
     plane_point_cand.clear();
     for (size_t i = 0; i < points_in_rect.size(); ++i) {
@@ -823,7 +827,13 @@ void LineDetector::project2Dto3DwithPlanes(
       plane_point_cand.push_back(cloud.at<cv::Vec3f>(points_in_rect[i]));
     }
     planeRANSAC(plane_point_cand, inliers_right);
-    if (inliers_right.size() < min_inliers * plane_point_cand.size()) continue;
+    if (inliers_right.size() < min_inliers * plane_point_cand.size())
+      right_found = false;
+    else
+      right_found = true;
+    if ((!right_found) && (!left_found)) continue;
+    if (!right_found) inliers_right = inliers_left;
+    if (!left_found) inliers_left = inliers_right;
     // If both planes were found, the inliers are handled to the
     // find3DlineOnPlanes function, which takes care of different special cases.
     if (find3DlineOnPlanes(inliers_right, inliers_left, lines3D_cand[i],
