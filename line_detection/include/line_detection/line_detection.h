@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <random>
 #include <vector>
 
@@ -35,10 +36,12 @@ const double kPi = 3.141592653589793;
 
 enum class Detector : unsigned int { LSD = 0, EDL = 1, FAST = 2, HOUGH = 3 };
 
+enum class LineType : unsigned int { INTER = 0, DISCONT = 1, PLANE = 2 };
+
 struct LineWithPlanes {
   cv::Vec<float, 6> line;
-  cv::Vec4f hessian1;
-  cv::Vec4f hessian2;
+  std::vector<cv::Vec4f> hessians;
+  LineType type;
 };
 
 // Returns true if lines are nearby and could be equal (low difference in angle
@@ -143,24 +146,34 @@ cv::Vec3f projectPointOnPlane(const cv::Vec4f& hessian, const cv::Vec3f& point);
 // handled by rviz.
 void storeLines3DinMarkerMsg(const std::vector<cv::Vec<float, 6> >& lines3D,
                              visualization_msgs::Marker& disp_lines);
-
-// Writes the pcl_cloud into a cv::Mat. It is speciallyzed for the point clouds
-// that are published by the point_cloud publisher of scenenet_ros_tools.
+void storeLines3DinMarkerMsg(const std::vector<cv::Vec<float, 6> >& lines3D,
+                             visualization_msgs::Marker& disp_lines,
+                             cv::Vec3f color);
+// Writes the pcl_cloud into a cv::Mat. It is speciallyzed for the point
+// clouds that are published by the point_cloud publisher of
+// scenenet_ros_tools.
 void pclFromSceneNetToMat(const pcl::PointCloud<pcl::PointXYZRGB>& pcl_cloud,
                           int width, int height, cv::Mat& mat_cloud);
 
+void storeLinesAfterType(const std::vector<LineWithPlanes>& lines_in,
+                         std::vector<cv::Vec<float, 6> >& lines_discont,
+                         std::vector<cv::Vec<float, 6> >& lines_plane,
+                         std::vector<cv::Vec<float, 6> >& lines_inter);
+
 // Finds the y-coordinates of a line between two points.
 // Input: start:      Starting point of line.
-//        end:        End point of line. Note that start.x < end.x must hold.
-//        left_side:  For the special case for a near to horizontal line. If
+//        end:        End point of line. Note that start.x < end.x must
+//        hold. left_side:  For the special case for a near to horizontal
+//        line. If
 //                    true, it gives back the most left y value of the line,
 //                    otherwise the most right.
 //
-// Output: y_coord    The y coordinates ordered from top to bottom. Example: If
-//                    the line spans 3 rows of pixel (so 2 < |end.x - start.x| <
-//                    3), 3 values are stored in y_coord, where the first
-//                    corresponds to the lowest x (most upper in image
-//                    coordinates).
+// Output: y_coord    The y coordinates ordered from top to bottom. Example:
+// If
+//                    the line spans 3 rows of pixel (so 2 < |end.x -
+//                    start.x| < 3), 3 values are stored in y_coord, where
+//                    the first corresponds to the lowest x (most upper in
+//                    image coordinates).
 void findXCoordOfPixelsOnVector(const cv::Point2f& start,
                                 const cv::Point2f& end, bool left_side,
                                 std::vector<int>& y_coord);
@@ -359,13 +372,17 @@ class LineDetector {
                          const std::vector<cv::Vec<float, 6> >& lines3D_in,
                          const int method,
                          std::vector<cv::Vec<float, 6> >& lines3D_out);
+  void runCheckOn3DLines(const cv::Mat& cloud,
+                         const std::vector<LineWithPlanes>& lines3D_in,
+                         const int method,
+                         std::vector<LineWithPlanes>& lines3D_out);
 
-  // Does a check by applying checkIfValidLineDiscont on every line. This check
-  // was mostly to try it out, it has shown that this way to check if a line is
-  // valid is prone to errors.
+  // Does a check by applying checkIfValidLineDiscont on every line. This
+  // check was mostly to try it out, it has shown that this way to check if
+  // a line is valid is prone to errors.
   void runCheckOn2DLines(const cv::Mat& cloud,
                          const std::vector<cv::Vec4f>& lines2D_in,
-                         std::vector<cv::Vec4f> lines2D_out);
+                         std::vector<cv::Vec4f>& lines2D_out);
 
   // Checks if a line is valid by brute force approach: It computes the distance
   // between every point in the point cloud and the line and returns true if a

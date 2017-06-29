@@ -384,7 +384,7 @@ TEST_F(LineDetectionTest, testCheckIfValidLineBruteForce) {
       }
     }
   }
-  cv::Vec<float, 6> line3D(0, 0, 0, 10, 0, 0);
+  cv::Vec<float, 6> line3D(0.1, 0, 0, 10, 0, 0);
   EXPECT_TRUE(line_detector_.checkIfValidLineBruteForce(cloud, line3D)) << 1;
   EXPECT_NEAR(line3D[3], 2.4, 0.2);
   line3D = {0.5, 0.2, 0.2, 1, 0.7, 0.7};
