@@ -16,6 +16,24 @@ double computeSquareMeanDifferenceLines(const cv::Vec<float, 6>& line1,
 
 double computeSquareNearestDifferenceLines(const cv::Vec<float, 6>& line1,
                                            const cv::Vec<float, 6>& line2);
+
+class KMeansCluster {
+ public:
+  KMeansCluster();
+  KMeansCluster(const std::vector<cv::Vec<float, 6> >& lines3D);
+  KMeansCluster(const std::vector<cv::Vec<float, 6> >& lines3D,
+                unsigned int num_clusters);
+
+  void setNumberOfClusters(unsigned int num_clusters);
+  void computeMeansOfLines();
+  void runOnMeansOfLines();
+  std::vector<int> cluster_idx_;
+
+ private:
+  unsigned int K_;
+  std::vector<cv::Vec3f> line_means_;
+  std::vector<cv::Vec<float, 6> > lines_;
+};
 }  // namespace line_clustering
 
 #include "line_clustering/line_clustering_inl.h"

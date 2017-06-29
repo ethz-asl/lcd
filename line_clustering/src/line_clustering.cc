@@ -40,4 +40,34 @@ double computeSquareNearestDifferenceLines(const cv::Vec<float, 6>& line1,
   return min_dist;
 }
 
+KMeansCluster::KMeansCluster(const std::vector<cv::Vec<float, 6> >& lines3D) {
+  lines_ = lines3D;
+};
+KMeansCluster::KMeansCluster(const std::vector<cv::Vec<float, 6> >& lines3D,
+                             unsigned int num_clusters) {
+  lines_ = lines3D;
+  K_ = num_clusters;
+}
+
+void KMeansCluster::setNumberOfClusters(unsigned int num_clusters) {
+  K_ = num_clusters;
+}
+
+void KMeansCluster::computeMeansOfLines() {
+  line_means_.clear();
+  line_means_.reserve(lines_.size());
+  for (size_t i = 0; i < lines_.size(); ++i) {
+    line_means_.push_back(cv::Vec3f((lines_[i][0] + lines_[i][3]) / 2,
+                                    (lines_[i][1] + lines_[i][4]) / 2,
+                                    (lines_[i][2] + lines_[i][5]) / 2));
+  }
+}
+void KMeansCluster::runOnMeansOfLines() {
+  if (lines_.size() != line_means_.size()) computeMeansOfLines();
+  cv::kmeans(
+      line_means_, K_, cluster_idx_,
+      cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::COUNT, 10, 1),
+      3, cv::KMEANS_PP_CENTERS);
+}
+
 }  // namespace line_clustering
