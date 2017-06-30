@@ -10,6 +10,9 @@ cs_add_library(${PROJECT_NAME}
   src/line_clustering.cc
 )
 
+add_executable(cluster_and_show src/cluster_and_show_node.cc)
+target_link_libraries(cluster_and_show ${PROJECT_NAME})
+
 add_custom_target(test_data)
 add_custom_command(TARGET test_data
                    COMMAND rm -rf test_data

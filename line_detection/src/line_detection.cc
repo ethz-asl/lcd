@@ -90,9 +90,18 @@ void pclFromSceneNetToMat(const pcl::PointCloud<pcl::PointXYZRGB>& pcl_cloud,
   mat_cloud.create(height, width, CV_32FC3);
   for (int i = 0; i < height; ++i) {
     for (int j = 0; j < width; ++j) {
+      // if (fabs(pcl_cloud.points[j + i * width].x) == 0 &&
+      //     fabs(pcl_cloud.points[j + i * width].y) == 0 &&
+      //     fabs(pcl_cloud.points[j + i * width].z) == 0) {
+      //   mat_cloud.at<cv::Vec3f>(i, j) =
+      //       cv::Vec3f(std::numeric_limits<double>::quiet_NaN(),
+      //                 std::numeric_limits<double>::quiet_NaN(),
+      //                 std::numeric_limits<double>::quiet_NaN());
+      // } else {
       mat_cloud.at<cv::Vec3f>(i, j) = cv::Vec3f(
           pcl_cloud.points[j + i * width].x, pcl_cloud.points[j + i * width].y,
           pcl_cloud.points[j + i * width].z);
+      // }
     }
   }
 }
