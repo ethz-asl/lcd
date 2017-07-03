@@ -124,11 +124,11 @@ inline double distPointToLine(const cv::Vec3f& start, const cv::Vec3f& end,
          normOfVector3D(start - end);
 }
 
+// Assume normalized direction vector.
 inline cv::Vec3f projectPointOnLine(const cv::Vec3f& x_0,
                                     const cv::Vec3f& direction,
                                     const cv::Vec3f& point) {
-  return x_0 + direction / normOfVector3D(direction) *
-                   scalarProduct(direction, x_0 - point);
+  return x_0 + direction * scalarProduct(direction, point - x_0);
 }
 
 cv::Vec3f computeMean(const std::vector<cv::Vec3f>& points) {

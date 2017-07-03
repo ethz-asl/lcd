@@ -305,7 +305,7 @@ TEST_F(LineDetectionTest, testGetPointOnPlaneIntersectionLine) {
 
 TEST_F(LineDetectionTest, testFind3DlineOnPlanes) {
   cv::Vec<float, 6> line;
-  cv::Vec<float, 6> line_guess(2, 2, 2);
+  cv::Vec<float, 6> line_guess(2, 2, 2, 0, 0, 0);
   std::vector<cv::Vec3f> points1, points2;
   points1.push_back(cv::Vec3f(0, 0, 0));
   points1.push_back(cv::Vec3f(0.1, 0, 0));
@@ -316,12 +316,30 @@ TEST_F(LineDetectionTest, testFind3DlineOnPlanes) {
   points2.push_back(cv::Vec3f(0, 0.1, 2));
   points2.push_back(cv::Vec3f(0, 0, 2));
   find3DlineOnPlanes(points1, points2, line_guess, line);
-  EXPECT_NEAR(line[0], 0, 1e-6);
-  EXPECT_NEAR(line[1], 0, 1e-6);
-  EXPECT_NEAR(line[2], 2, 1e-6);
-  EXPECT_NEAR(line[3], 0, 1e-6);
-  EXPECT_NEAR(line[4], 0, 1e-6);
-  EXPECT_NEAR(line[5], 0, 1e-6);
+  EXPECT_NEAR(line[0], 0, 1e-6) << "Test Nr: 1";
+  EXPECT_NEAR(line[1], 0, 1e-6) << "Test Nr: 2";
+  EXPECT_NEAR(line[2], 2, 1e-6) << "Test Nr: 3";
+  EXPECT_NEAR(line[3], 0, 1e-6) << "Test Nr: 4";
+  EXPECT_NEAR(line[4], 0, 1e-6) << "Test Nr: 5";
+  EXPECT_NEAR(line[5], 0, 1e-6) << "Test Nr: 6";
+  points1.clear();
+  points2.clear();
+  points1.push_back(cv::Vec3f(0, 0, 0));
+  points1.push_back(cv::Vec3f(5, 0, 0));
+  points1.push_back(cv::Vec3f(5, 8, 0));
+  points1.push_back(cv::Vec3f(0, 8, 0));
+  points2.push_back(cv::Vec3f(0, 9, -3));
+  points2.push_back(cv::Vec3f(5, 9, -3));
+  points2.push_back(cv::Vec3f(5, 15, -3));
+  points2.push_back(cv::Vec3f(0, 15, -3));
+  line_guess = {7, 9, -3, -1, 9, -3};
+  find3DlineOnPlanes(points1, points2, line_guess, line);
+  EXPECT_NEAR(line[0], 5, 1e-6) << "Test Nr: 7";
+  EXPECT_NEAR(line[1], 8, 1e-6) << "Test Nr: 8";
+  EXPECT_NEAR(line[2], 0, 1e-6) << "Test Nr: 9";
+  EXPECT_NEAR(line[3], 0, 1e-6) << "Test Nr: 10";
+  EXPECT_NEAR(line[4], 8, 1e-6) << "Test Nr: 11";
+  EXPECT_NEAR(line[5], 0, 1e-6) << "Test Nr: 12";
 }
 
 TEST_F(LineDetectionTest, testProject2Dto3DwithPlanes) {
@@ -345,10 +363,10 @@ TEST_F(LineDetectionTest, testProject2Dto3DwithPlanes) {
   std::vector<cv::Vec<float, 6> > lines3D;
   line_detector_.project2Dto3DwithPlanes(cloud, lines2D, lines3D);
   ASSERT_EQ(lines3D.size(), 1);
-  EXPECT_NEAR(lines3D[0][0], 200 * scale, 1e-5);
+  EXPECT_NEAR(lines3D[0][0], 100 * scale, 1e-5);
   EXPECT_NEAR(lines3D[0][1], 160 * scale, 1e-5);
   EXPECT_NEAR(lines3D[0][2], 160 * scale, 1e-5);
-  EXPECT_NEAR(lines3D[0][3], 100 * scale, 1e-5);
+  EXPECT_NEAR(lines3D[0][3], 200 * scale, 1e-5);
   EXPECT_NEAR(lines3D[0][4], 160 * scale, 1e-5);
   EXPECT_NEAR(lines3D[0][5], 160 * scale, 1e-5);
 }

@@ -390,7 +390,7 @@ bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
   mean1 = computeMean(points1);
   mean2 = computeMean(points2);
   if (normOfVector3D(mean1 - mean2) < max_mean_dist) {
-    // Checks if the planes ar parallel.
+    // Checks if the planes are parallel.
     if (fabs(scalarProduct(normal1, normal2)) > 0.995) {
       line.line = line_guess;
       line.type = LineType::PLANE;
@@ -430,28 +430,52 @@ bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       return true;
     }
   } else {
-    // If we reach this point, we have a discontinouty. In this case the
-    // line_guess is projected to both planes. Whichever is nearer to the mean
-    // of the corresponding set of points is chosen.
-    cv::Vec3f start, end;
-    cv::Vec<float, 6> line1, line2;
-    double dist1, dist2;
-    start = {line_guess[0], line_guess[1], line_guess[2]};
-    end = {line_guess[3], line_guess[4], line_guess[5]};
-    start = projectPointOnPlane(line.hessians[0], start);
-    end = projectPointOnPlane(line.hessians[0], end);
-    dist1 = normOfVector3D(start - mean1) + normOfVector3D(end - mean1);
-    line.line = {start[0], start[1], start[2], end[0], end[1], end[2]};
-    start = {line_guess[0], line_guess[1], line_guess[2]};
-    end = {line_guess[3], line_guess[4], line_guess[5]};
-    start = projectPointOnPlane(line.hessians[1], start);
-    end = projectPointOnPlane(line.hessians[1], end);
-    dist2 = normOfVector3D(start - mean2) + normOfVector3D(end - mean2);
-    if (dist1 > dist2) {
-      line.line = {start[0], start[1], start[2], end[0], end[1], end[2]};
+    // If we reach this point, we have a discontinouty. We then try to fit a
+    // line to the set of points that lies closer to the origin (and therefore
+    // closer to the camera). This is in most cases a reasonable assumption,
+    // since the line most of the time belongs to the object that obscures the
+    // background (which causes the discontinouty).
+    // The fitting is done in 3 steps:
+    //  1.  Project the line_guess onto the plane fitted to the point set.
+    //  2.  Find the line parallel to the projected one that goes through the
+    //      point in the set of the points that is nearest to the line.
+    //  3.  From all points in the set: Project them on to the line and choose
+    //      the combination of start/end point that maximizes the line distance.
+    cv::Vec3f start(line_guess[0], line_guess[1], line_guess[2]);
+    cv::Vec3f end(line_guess[3], line_guess[4], line_guess[5]);
+    cv::Vec3f direction = end - start;
+    normalizeVec3D(direction);
+
+    const std::vector<cv::Vec3f>* points_new;
+    if (normOfVector3D(mean1) < normOfVector3D(mean2)) {
+      points_new = &points1;
+    } else {
       line.hessians[0] = line.hessians[1];
+      points_new = &points2;
     }
     line.hessians.resize(1);
+    start = projectPointOnPlane(line.hessians[0], start);
+    end = projectPointOnPlane(line.hessians[0], end);
+    cv::Vec3f nearest_point;
+    double min_dist = 1e9;
+    double dist, dist_dir, dist_dir_min, dist_dir_max;
+    for (size_t i = 0; i < points_new->size(); ++i) {
+      // dist is used to find the nearest point to the line.
+      dist = normOfVector3D(start - (*points_new)[i]) +
+             normOfVector3D(end - (*points_new)[i]);
+      if (dist < min_dist) {
+        min_dist = dist;
+        nearest_point = (*points_new)[i];
+      }
+      // dist_dir is used to find the points that maximize the line.
+      dist_dir = scalarProduct(direction, (*points_new)[i] - start);
+      if (dist_dir < dist_dir_min) dist_dir_min = dist_dir;
+      if (dist_dir > dist_dir_max) dist_dir_max = dist_dir;
+    }
+    cv::Vec3f x_0 = projectPointOnLine(nearest_point, direction, start);
+    start = x_0 + direction * dist_dir_min;
+    end = x_0 + direction * dist_dir_max;
+    line.line = {start[0], start[1], start[2], end[0], end[1], end[2]};
     line.type = LineType::DISCONT;
     return true;
   }
@@ -771,10 +795,10 @@ void LineDetector::planeRANSAC(const std::vector<cv::Vec3f>& points,
   const int N = points.size();
   inliers.clear();
   // ROS_INFO("N = %d", N);
-  const int max_it = 50;
+  const int max_it = 100;
   const int number_of_model_params = 3;
   double max_deviation = 0.005;
-  double inlier_fraction_max = 0.95;
+  double inlier_fraction_max = 0.8;
   CHECK(N > number_of_model_params) << "Not enough points to use RANSAC.";
   // Declare variables that are used for the RANSAC.
   std::vector<cv::Vec3f> random_points, inlier_candidates;
@@ -1087,8 +1111,8 @@ bool LineDetector::checkIfValidLineBruteForce(const cv::Mat& cloud,
   CHECK_EQ(cloud.type(), CV_32FC3);
   // First check: if one of the points lie exactly on the origin, get rid of
   // it.
-  if ((line[0] == 0 && line[1] == 0 && line[2] == 0) ||
-      (line[3] == 0 && line[4] == 0 && line[5] == 0))
+  if ((fabs(line[0]) < 1e-3 && fabs(line[1]) < 1e-3 && fabs(line[2]) < 1e-3) ||
+      (fabs(line[3]) < 1e-3 && fabs(line[4]) < 1e-3 && fabs(line[5]) < 1e-3))
     return false;
   // Minimum number of inliers for the line to be valid.
   int num_of_points_required = 10;
