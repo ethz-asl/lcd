@@ -99,7 +99,7 @@ TEST_F(LineDetectionTest, testComputePointCloud) {
   double r_mean = 0;
   double g_mean = 0;
   double b_mean = 0;
-  for (int i = 0; i < point_cloud.size(); i++) {
+  for (size_t i = 0u; i < point_cloud.size(); ++i) {
     if (std::isnan(point_cloud.points[i].x)) continue;
     x_mean += point_cloud.points[i].x;
     y_mean += point_cloud.points[i].y;
@@ -145,28 +145,17 @@ TEST_F(LineDetectionTest, testCheckInBoundary) {
   EXPECT_EQ(line_detection::checkInBoundary(10, 0, 3), 3);
 }
 
-TEST_F(LineDetectionTest, testCrossProdcut) {
-  EXPECT_EQ(
-      line_detection::crossProduct(cv::Vec3f(1, 0, 0), cv::Vec3f(0, 1, 0)),
-      cv::Vec3f(0, 0, 1));
-}
-
 TEST_F(LineDetectionTest, testdistPointToLine) {
   EXPECT_EQ(distPointToLine(cv::Vec3f(0, 0, 0), cv::Vec3f(1, 0, 0),
                             cv::Vec3f(0, 1, 0)),
             1);
 }
 
-TEST_F(LineDetectionTest, testScalarProduct) {
-  EXPECT_EQ(
-      line_detection::scalarProduct(cv::Vec3f(1, 0, 0), cv::Vec3f(0, 1, 0)), 0);
-}
-
 TEST_F(LineDetectionTest, testComputeDFromPlaneNormal) {
   cv::Vec3f normal(1, 2, 3);
   cv::Vec3f anchor(5, 6, 7);
   double d = line_detection::computeDfromPlaneNormal(normal, anchor);
-  EXPECT_FLOAT_EQ(scalarProduct(normal, anchor) + d, 0);
+  EXPECT_FLOAT_EQ(normal.dot(anchor) + d, 0);
 }
 
 TEST_F(LineDetectionTest, testErrorPointToPlane) {
@@ -180,8 +169,8 @@ TEST_F(LineDetectionTest, testErrorPointToPlane) {
   point_on_plane = {1, 1, 1};
   point = {0, 0, 0};
   hessian = {1, 1, 1, -3};
-  hessian = hessian / normOfVector3D(normal);
-  normalizeVec3D(normal);
+  hessian = hessian / cv::norm(normal);
+  normalizeVector3D(normal);
   EXPECT_FLOAT_EQ(errorPointToPlane(hessian, point), sqrt(3));
   EXPECT_FLOAT_EQ(errorPointToPlane(normal, point_on_plane, point), sqrt(3));
 }
@@ -363,10 +352,10 @@ TEST_F(LineDetectionTest, testProject2Dto3DwithPlanes) {
   std::vector<cv::Vec<float, 6> > lines3D;
   line_detector_.project2Dto3DwithPlanes(cloud, lines2D, lines3D);
   ASSERT_EQ(lines3D.size(), 1);
-  EXPECT_NEAR(lines3D[0][0], 100 * scale, 1e-5);
+  EXPECT_NEAR(lines3D[0][0], 200 * scale, 1e-5);
   EXPECT_NEAR(lines3D[0][1], 160 * scale, 1e-5);
   EXPECT_NEAR(lines3D[0][2], 160 * scale, 1e-5);
-  EXPECT_NEAR(lines3D[0][3], 200 * scale, 1e-5);
+  EXPECT_NEAR(lines3D[0][3], 100 * scale, 1e-5);
   EXPECT_NEAR(lines3D[0][4], 160 * scale, 1e-5);
   EXPECT_NEAR(lines3D[0][5], 160 * scale, 1e-5);
 }
@@ -379,7 +368,7 @@ TEST_F(LineDetectionTest, testProjectPointOnPlane) {
   EXPECT_NEAR(projection[1], 3, 1e-5);
   EXPECT_NEAR(projection[2], 2, 1e-5);
   hessian = {1, 1, 1, -3};
-  hessian = hessian / normOfVector3D(cv::Vec3f(1, 1, 1));
+  hessian = hessian / cv::norm(cv::Vec3f(1, 1, 1));
   point = {33, 33, 33};
   projection = projectPointOnPlane(hessian, point);
   EXPECT_NEAR(projection[0], 1, 1e-5);

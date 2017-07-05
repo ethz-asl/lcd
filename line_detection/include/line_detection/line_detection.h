@@ -81,12 +81,9 @@ inline double computeSlopeOfLine(const cv::Vec4f line) {
   return (line[1] - line[3]) / (line[0] - line[3]);
 }
 
-inline double normOfVector3D(const cv::Vec3f& vector) {
-  return sqrt(pow(vector[0], 2) + pow(vector[1], 2) + pow(vector[2], 2));
-}
 
-inline void normalizeVec3D(cv::Vec3f& vector) {
-  vector = vector / normOfVector3D(vector);
+inline void normalizeVector3D(cv::Vec3f& vector) {
+  vector = vector / cv::norm(vector);
 }
 
 inline double degToRad(const double in_deg) { return in_deg / 180.0 * kPi; }
@@ -96,10 +93,11 @@ inline double scalarProduct(const cv::Vec3f& a, const cv::Vec3f& b) {
 }
 
 // Computes d from the plane equation a*x+b*y+c*z+d=0 given the plane normal and
-// a point on the plane.
+// a point on the plane. The coefficients a, b and c are then the entries of the
+// normal.
 inline double computeDfromPlaneNormal(const cv::Vec3f& normal,
                                       const cv::Vec3f& anchor) {
-  return -scalarProduct(normal, anchor);
+  return -normal.dot(anchor);
 }
 
 // Computes the orthogonal square distance from a point to a plane (given by
@@ -108,34 +106,34 @@ inline double computeDfromPlaneNormal(const cv::Vec3f& normal,
 inline double errorPointToPlane(const cv::Vec3f& normal,
                                 const cv::Vec3f& point_on_plane,
                                 const cv::Vec3f& point) {
-  return fabs(scalarProduct(point_on_plane - point, normal));
+  return fabs((point_on_plane - point).dot(normal));
 }
 inline double errorPointToPlane(const cv::Vec4f& hessian_n_f,
                                 const cv::Vec3f& point) {
   return fabs(
-      scalarProduct(cv::Vec3f(hessian_n_f[0], hessian_n_f[1], hessian_n_f[2]),
-                    point) +
+      cv::Vec3f(hessian_n_f[0], hessian_n_f[1], hessian_n_f[2]).dot(point) +
       hessian_n_f[3]);
 }
 
 inline double distPointToLine(const cv::Vec3f& start, const cv::Vec3f& end,
                               const cv::Vec3f& point) {
-  return normOfVector3D(crossProduct(point - start, point - end)) /
-         normOfVector3D(start - end);
+  return cv::norm((point - start).cross(point - end)) / cv::norm(start - end);
 }
 
 // Assume normalized direction vector.
 inline cv::Vec3f projectPointOnLine(const cv::Vec3f& x_0,
                                     const cv::Vec3f& direction,
                                     const cv::Vec3f& point) {
-  return x_0 + direction * scalarProduct(direction, point - x_0);
+  return x_0 + direction * direction.dot(point - x_0);
 }
 
 cv::Vec3f computeMean(const std::vector<cv::Vec3f>& points) {
-  int N = points.size();
-  CHECK(N > 0);
-  cv::Vec3f mean(0, 0, 0);
-  for (size_t i = 0; i < N; ++i) mean += (points[i] / float(N));
+  const size_t num_points = points.size();
+  CHECK(num_points > 0);
+  cv::Vec3f mean(0.0f, 0.0f, 0.0f);
+  for (size_t i = 0; i < num_points; ++i) {
+    mean += (points[i] / float(num_points));
+  }
   return mean;
 }
 
@@ -153,7 +151,7 @@ void storeLines3DinMarkerMsg(const std::vector<cv::Vec<float, 6> >& lines3D,
 // clouds that are published by the point_cloud publisher of
 // scenenet_ros_tools.
 void pclFromSceneNetToMat(const pcl::PointCloud<pcl::PointXYZRGB>& pcl_cloud,
-                          int width, int height, cv::Mat& mat_cloud);
+                          cv::Mat& mat_cloud);
 
 void storeLinesAfterType(const std::vector<LineWithPlanes>& lines_in,
                          std::vector<cv::Vec<float, 6> >& lines_discont,

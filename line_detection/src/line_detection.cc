@@ -18,7 +18,7 @@ cv::Vec3f projectPointOnPlane(const cv::Vec4f& hessian,
       x_0[i] = 0;
   }
   r = point - x_0;
-  return point - scalarProduct(r, normal) * normal;
+  return point - r.dot(normal) * normal;
 }
 
 bool areLinesEqual2D(const cv::Vec4f line1, const cv::Vec4f line2) {
@@ -58,7 +58,7 @@ void storeLines3DinMarkerMsg(const std::vector<cv::Vec<float, 6> >& lines3D,
                              visualization_msgs::Marker& disp_lines,
                              cv::Vec3f color) {
   disp_lines.points.clear();
-  if (color[0] > 1 || color[1] > 1 || color[2] > 1) normOfVector3D(color);
+  if (color[0] > 1 || color[1] > 1 || color[2] > 1) cv::norm(color);
   disp_lines.action = visualization_msgs::Marker::ADD;
   disp_lines.type = visualization_msgs::Marker::LINE_LIST;
   disp_lines.scale.x = 0.03;
@@ -85,7 +85,9 @@ void storeLines3DinMarkerMsg(const std::vector<cv::Vec<float, 6> >& lines3D,
 }
 
 void pclFromSceneNetToMat(const pcl::PointCloud<pcl::PointXYZRGB>& pcl_cloud,
-                          int width, int height, cv::Mat& mat_cloud) {
+                          cv::Mat& mat_cloud) {
+  const int width = 320;
+  const int height = 240;
   CHECK_EQ(pcl_cloud.points.size(), width * height);
   mat_cloud.create(height, width, CV_32FC3);
   for (int i = 0; i < height; ++i) {
@@ -131,19 +133,19 @@ bool hessianNormalFormOfPlane(const std::vector<cv::Vec3f>& points,
     cv::Vec3f vec1 = points[1] - points[0];
     cv::Vec3f vec2 = points[2] - points[0];
     // This checks first if the points were too close.
-    double norms = normOfVector3D(vec1) * normOfVector3D(vec2);
+    double norms = cv::norm(vec1) * cv::norm(vec2);
     if (norms < 1e-6) return false;
     // Then if they lie on a line. The angle between the vectors must at least
     // be 2 degrees.
-    double cos_theta = fabs(scalarProduct(vec1, vec2)) / norms;
+    double cos_theta = fabs(vec1.dot(vec2)) / norms;
     if (cos_theta > 0.994) return false;
     // The normal already defines the orientation of the plane (it is
     // perpendicular to both vectors, since they must lie within the plane).
-    cv::Vec3f normal = crossProduct(vec1, vec2);
+    cv::Vec3f normal = vec1.cross(vec2);
     // Now bring the plane into the hessian normal form.
     hessian_normal_form = cv::Vec4f(normal[0], normal[1], normal[2],
                                     computeDfromPlaneNormal(normal, points[0]));
-    hessian_normal_form = hessian_normal_form / normOfVector3D(normal);
+    hessian_normal_form = hessian_normal_form / cv::norm(normal);
     return true;
   } else {  // If there are more than 3 points, the solution is approximate.
     cv::Vec3f mean(0, 0, 0);
@@ -287,7 +289,7 @@ bool getRectanglesFromLine(const cv::Vec4f& line,
   // Defines the length of the side perpendicular to the line.
   double relative_rect_size = 0.5;
   // Exactly as above, but defines a numerical maximum.
-  double max_rect_size = 3;
+  double max_rect_size = 5;
   double eff_rect_size = max_rect_size;
   cv::Point2f start(line[0], line[1]);
   cv::Point2f end(line[2], line[3]);
@@ -386,12 +388,12 @@ bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
   // distance is higher than this value, it is assumed that the line is not
   // the intersection of the two planes, but just lies on the one that is in
   // the foreground.
-  double max_mean_dist = 0.5;  // TODO adjust
+  double max_mean_dist = 0.1;  // TODO adjust
   mean1 = computeMean(points1);
   mean2 = computeMean(points2);
-  if (normOfVector3D(mean1 - mean2) < max_mean_dist) {
+  if (cv::norm(mean1 - mean2) < max_mean_dist) {
     // Checks if the planes are parallel.
-    if (fabs(scalarProduct(normal1, normal2)) > 0.995) {
+    if (fabs(normal1.dot(normal2)) > 0.995) {
       line.line = line_guess;
       line.type = LineType::PLANE;
       line.hessians.resize(1);
@@ -399,8 +401,8 @@ bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     } else {
       // The line lying on both planes must be perpendicular to both normals,
       // so it can be computed with the cross product.
-      cv::Vec3f direction = crossProduct(normal1, normal2);
-      normalizeVec3D(direction);
+      cv::Vec3f direction = normal1.cross(normal2);
+      normalizeVector3D(direction);
       // Now a point on the intersection line is searched.
       cv::Vec3f x_0;
       getPointOnPlaneIntersectionLine(line.hessians[0], line.hessians[1],
@@ -413,12 +415,12 @@ bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       double dist_min = 1e9;
       double dist_max = -1e9;
       for (size_t i = 0; i < N1; ++i) {
-        dist = scalarProduct(direction, points1[i] - x_0);
+        dist = direction.dot(points1[i] - x_0);
         if (dist < dist_min) dist_min = dist;
         if (dist > dist_max) dist_max = dist;
       }
       for (size_t i = 0; i < N2; ++i) {
-        dist = scalarProduct(direction, points2[i] - x_0);
+        dist = direction.dot(points2[i] - x_0);
         if (dist < dist_min) dist_min = dist;
         if (dist > dist_max) dist_max = dist;
       }
@@ -444,10 +446,10 @@ bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     cv::Vec3f start(line_guess[0], line_guess[1], line_guess[2]);
     cv::Vec3f end(line_guess[3], line_guess[4], line_guess[5]);
     cv::Vec3f direction = end - start;
-    normalizeVec3D(direction);
+    normalizeVector3D(direction);
 
     const std::vector<cv::Vec3f>* points_new;
-    if (normOfVector3D(mean1) < normOfVector3D(mean2)) {
+    if (cv::norm(mean1) < cv::norm(mean2)) {
       points_new = &points1;
     } else {
       line.hessians[0] = line.hessians[1];
@@ -459,16 +461,18 @@ bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     cv::Vec3f nearest_point;
     double min_dist = 1e9;
     double dist, dist_dir, dist_dir_min, dist_dir_max;
+    dist_dir_min = 1e9;
+    dist_dir_max = -1e9;
     for (size_t i = 0; i < points_new->size(); ++i) {
       // dist is used to find the nearest point to the line.
-      dist = normOfVector3D(start - (*points_new)[i]) +
-             normOfVector3D(end - (*points_new)[i]);
+      dist =
+          cv::norm(start - (*points_new)[i]) + cv::norm(end - (*points_new)[i]);
       if (dist < min_dist) {
         min_dist = dist;
         nearest_point = (*points_new)[i];
       }
       // dist_dir is used to find the points that maximize the line.
-      dist_dir = scalarProduct(direction, (*points_new)[i] - start);
+      dist_dir = direction.dot((*points_new)[i] - start);
       if (dist_dir < dist_dir_min) dist_dir_min = dist_dir;
       if (dist_dir > dist_dir_max) dist_dir_max = dist_dir;
     }
@@ -861,7 +865,7 @@ void LineDetector::project2Dto3DwithPlanes(
   LineWithPlanes line3D_true;
   // Parameter: Fraction of inlier that must be found for the plane model to
   // be valid.
-  double min_inliers = 0.5;
+  double min_inliers = 0.1;
   bool right_found, left_found;
   // This is a first guess of the 3D lines. They are used in some cases, where
   // the lines cannot be found by intersecting planes.
@@ -952,7 +956,7 @@ void LineDetector::find3DlinesByShortest(
     y_opt_start = lines2D[i][1];
     x_opt_end = lines2D[i][2];
     y_opt_end = lines2D[i][3];
-    // This checks are used to make shure, that we do not try to access a
+    // This checks are used to make sure, that we do not try to access a
     // point not within the image.
     x_min_start = checkInBoundaryInt(x_opt_start - patch_size, 0, rows - 1);
     x_max_start = checkInBoundaryInt(x_opt_start + patch_size, 0, rows - 1);
@@ -1125,7 +1129,7 @@ bool LineDetector::checkIfValidLineBruteForce(const cv::Mat& cloud,
   cv::Vec3f start, end, point;
   start = {line[0], line[1], line[2]};
   end = {line[3], line[4], line[5]};
-  double length = normOfVector3D(start - end);
+  double length = cv::norm(start - end);
   int count_inliers = 0;
   // For every point in the cloud: This is why it is called brute force
   // approach.
@@ -1138,7 +1142,7 @@ bool LineDetector::checkIfValidLineBruteForce(const cv::Mat& cloud,
         // This is the distance from the start point projected on to the line.
         // If its negative or larger the line length, the point may lie on the
         // line, but not between the start and the end point.
-        dist = scalarProduct(end - start, point - start) / length;
+        dist = (end - start).dot(point - start) / length;
         if (dist < 0 || length <= dist) continue;
         // Now the histogramm like point_density is raised at the entry where
         // the points lies.
@@ -1225,7 +1229,7 @@ bool LineDetector::checkIfValidLineDiscont(const cv::Mat& cloud,
       first_time = false;
       continue;
     }
-    if (normOfVector3D(current_mean - last_mean) > max_mean_diff) return false;
+    if (cv::norm(current_mean - last_mean) > max_mean_diff) return false;
     last_mean = current_mean;
   }
   return true;

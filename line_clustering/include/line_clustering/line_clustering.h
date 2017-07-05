@@ -29,9 +29,9 @@ class KMeansCluster {
   void setLines(const std::vector<cv::Vec<float, 6> >& lines3D);
   void setLines(const std::vector<line_detection::LineWithPlanes>& lines3D);
   // Computes the means of the lines that are used to cluster them.
-  void computeMeansOfLines();
+  void computeLineMeans();
   // Performs the clustering.
-  void runOnMeansOfLines();
+  void runLineMeans();
   // Returns the lines.
   std::vector<cv::Vec<float, 6> > getLines();
   // This array contains the labels of the lines.s

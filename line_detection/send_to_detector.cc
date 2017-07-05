@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
         "Both arguments may be omitted.");
     return -1;
   }
-  // define path for test image
+  // Define a path for the test image.
   std::string path;
   if (argc < 2) {
     path =
@@ -35,7 +35,7 @@ int main(int argc, char** argv) {
       node_handle.serviceClient<line_detection::RequestLineDetection>(
           "detect_lines");
 
-  // load the test image
+  // Load the image.
   cv::Mat test_image = cv::imread(path, CV_LOAD_IMAGE_COLOR);
   if (!test_image.data) {
     ROS_INFO(
@@ -69,7 +69,7 @@ int main(int argc, char** argv) {
   cv::Vec3i color = {255, 0, 0};
   cv::Mat display_image = test_image.clone();
 
-  for (int i = 0; i < service.response.start_x.size(); i++) {
+  for (size_t i = 0u; i < service.response.start_x.size(); ++i) {
     p1.x = service.response.start_x[i];
     p1.y = service.response.start_y[i];
     p2.x = service.response.end_x[i];

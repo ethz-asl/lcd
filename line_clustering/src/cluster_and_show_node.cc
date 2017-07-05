@@ -23,6 +23,9 @@ typedef message_filters::sync_policies::ExactTime<
     sensor_msgs::PointCloud2>
     MySyncPolicy;
 
+const std::string kMeansNClusterPath =
+    "/cluster_and_show/KMeansNumberOfClusters";
+
 class listenAndPublish {
  public:
   listenAndPublish() {
@@ -30,10 +33,10 @@ class listenAndPublish {
     // The Pointcloud publisher and transformation for RVIZ.
     pcl_pub_ = node_handle_.advertise<pcl::PointCloud<pcl::PointXYZRGB> >(
         "/vis_pointcloud", 2);
-    transform.setOrigin(tf::Vector3(0, 0, 0));
+    transform_.setOrigin(tf::Vector3(0, 0, 0));
     tf::Quaternion quat;
-    quat.setRPY(-3.1415 / 2, 0, 0);
-    transform.setRotation(quat);
+    quat.setRPY(-line_detection::kPi / 2.0, 0.0, 0.0);
+    transform_.setRotation(quat);
     // To publish the lines in 3D to rviz.
     display_clusters_.initPublishing(node_handle_);
     // Three topics published by scenenet_ros_tools (there are more but needed
@@ -73,7 +76,7 @@ class listenAndPublish {
     cv_depth_ = cv_depth_ptr->image;
     cvtColor(cv_image_, cv_img_gray_, CV_RGB2GRAY);
 
-    line_detection::pclFromSceneNetToMat(pcl_cloud_, 320, 240, cv_cloud_);
+    line_detection::pclFromSceneNetToMat(pcl_cloud_, cv_cloud_);
 
     std::chrono::time_point<std::chrono::system_clock> start, end;
     std::chrono::duration<double> elapsed_seconds;
@@ -97,16 +100,24 @@ class listenAndPublish {
 
     start = std::chrono::system_clock::now();
     line_detector_.runCheckOn3DLines(cv_cloud_, lines3D_temp_wp, 0,
-                                     lines3D_wp_);
+                                     lines3D_with_planes_);
     end = std::chrono::system_clock::now();
     elapsed_seconds = end - start;
     ROS_INFO("Check for valid lines: %f", elapsed_seconds.count());
 
-    ROS_INFO("Lines kept after projection: %d/%d", lines3D_wp_.size(),
+    ROS_INFO("Lines kept after projection: %d/%d", lines3D_with_planes_.size(),
              lines2D_.size());
 
-    kmeans_cluster_.setNumberOfClusters(5);
-    kmeans_cluster_.setLines(lines3D_wp_);
+    int number_of_clusters = 5;
+    if (!ros::param::get(kMeansNClusterPath, number_of_clusters)) {
+      number_of_clusters = 5;
+      ROS_WARN(
+          "The KMeansNumberOfClusters parameter is missing. It was set to the "
+          "standard value of %d.",
+          number_of_clusters);
+    }
+    kmeans_cluster_.setNumberOfClusters(number_of_clusters);
+    kmeans_cluster_.setLines(lines3D_with_planes_);
 
     start = std::chrono::system_clock::now();
     kmeans_cluster_.computeMeansOfLines();
@@ -121,12 +132,9 @@ class listenAndPublish {
     // The timestamp is set to 0 because rviz is not able to find the right
     // transformation otherwise.
     pcl_cloud_.header.stamp = 0;
-    // For testing reasons only one instance is published. Otherwise new point
-    // clouds would be published at 1 Hz (which makes it hard to visually
-    // inspect them).
     ROS_INFO("**** Started publishing ****");
-    broad_caster.sendTransform(tf::StampedTransform(
-        transform, ros::Time::now(), "map", pcl_cloud_.header.frame_id));
+    broad_caster_.sendTransform(tf::StampedTransform(
+        transform_, ros::Time::now(), "map", pcl_cloud_.header.frame_id));
     pcl_pub_.publish(pcl_cloud_);
     display_clusters_.publish();
   }
@@ -140,10 +148,10 @@ class listenAndPublish {
   pcl::PointCloud<pcl::PointXYZRGB> pcl_cloud_;
   std::vector<cv::Vec4f> lines2D_;
   std::vector<cv::Vec<float, 6> > lines3D_;
-  std::vector<line_detection::LineWithPlanes> lines3D_wp_;
+  std::vector<line_detection::LineWithPlanes> lines3D_with_planes_;
   // Publishers and Subscribers.
-  tf::TransformBroadcaster broad_caster;
-  tf::Transform transform;
+  tf::TransformBroadcaster broad_caster_;
+  tf::Transform transform_;
   ros::Publisher pcl_pub_;
   message_filters::Synchronizer<MySyncPolicy>* sync_;
   message_filters::Subscriber<sensor_msgs::Image> image_sub_;

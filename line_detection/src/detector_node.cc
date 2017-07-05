@@ -42,7 +42,7 @@ bool detectLineCallback(line_detection::RequestLineDetection::Request& req,
   res.start_y.reserve(lines.size());
   res.end_x.reserve(lines.size());
   res.end_y.reserve(lines.size());
-  for (int i = 0; i < lines.size(); i++) {
+  for (size_t i = 0u; i < lines.size(); ++i) {
     res.start_x.push_back(lines[i][0]);
     res.start_y.push_back(lines[i][1]);
     res.end_x.push_back(lines[i][2]);

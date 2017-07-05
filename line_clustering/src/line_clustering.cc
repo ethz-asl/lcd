@@ -8,12 +8,13 @@ double computePerpendicularDistanceLines(const cv::Vec<float, 6>& line1,
   cv::Vec3f end1(line1[3], line1[4], line1[5]);
   cv::Vec3f start2(line2[0], line2[1], line2[2]);
   cv::Vec3f end2(line2[3], line2[4], line2[5]);
-  cv::Vec3f temp_vec = crossProduct(start1 - end1, start2 - end2);
-  double divisor = normOfVector3D(temp_vec);
-  if (divisor < 1e-6) {
+  cv::Vec3f temp_vec = (start1 - end1).cross(start2 - end2);
+  const double divisor = cv::norm(temp_vec);
+  constexpr double min_divisor = 1e-6;
+  if (divisor < min_divisor) {
     return line_detection::distPointToLine(start1, end1, start2);
   } else {
-    return fabs(scalarProduct(temp_vec, start2 - start1)) / divisor;
+    return fabs(temp_vec.dot(start2 - start1)) / divisor;
   }
 }
 
@@ -73,7 +74,7 @@ void KMeansCluster::setLines(
   lines_set_ = true;
 }
 
-void KMeansCluster::computeMeansOfLines() {
+void KMeansCluster::computeLineMeans() {
   CHECK(lines_set_)
       << "You have to set the lines before computing their means.";
   line_means_.clear();
@@ -84,8 +85,11 @@ void KMeansCluster::computeMeansOfLines() {
                                     (lines_[i][2] + lines_[i][5]) / 2));
   }
 }
-void KMeansCluster::runOnMeansOfLines() {
-  if (lines_.size() != line_means_.size()) computeMeansOfLines();
+void KMeansCluster::runLineMeans() {
+  if (lines_.size() != line_means_.size()) {
+    computeLineMeans();
+  }
+  CHECK(k_set_) << "You need to set K before clustering.";
   cv::kmeans(line_means_, K_, cluster_idx_,
              cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::COUNT,
                               100, 0.01),
@@ -122,6 +126,9 @@ void DisplayClusters::setClusters(
     const std::vector<cv::Vec<float, 6> >& lines3D,
     const std::vector<int>& labels) {
   CHECK_EQ(lines3D.size(), labels.size());
+  CHECK(frame_id_set_) << "line_clustering::DisplayClusters::setClusters: You "
+                          "need to set the frame_id before setting the "
+                          "clusters.";
   size_t N = 0;
   line_clusters_.clear();
   for (size_t i = 0; i < lines3D.size(); ++i) {
@@ -136,12 +143,8 @@ void DisplayClusters::setClusters(
       N = 1 + labels[i];
       line_clusters_.resize(N);
     }
-    if (labels[i] < 0) {
-      ROS_WARN_ONCE(
-          "line_clustering::DisplayClusters::setClusters: A negative label has "
-          "been detected and ignored.");
-      continue;
-    }
+    CHECK(labels[i] < 0) << "line_clustering::DisplayClusters::setClusters: "
+                            "Negative lables are not allowed.";
     line_clusters_[labels[i]].push_back(lines3D[i]);
   }
   marker_lines_.resize(line_clusters_.size());
@@ -157,7 +160,6 @@ void DisplayClusters::setClusters(
 
 void DisplayClusters::initPublishing(ros::NodeHandle& node_handle) {
   pub_.resize(colors_.size());
-  size_t n;
   for (size_t i = 0; i < colors_.size(); ++i) {
     std::stringstream topic;
     topic << "/visualization_marker_" << i;
@@ -172,7 +174,7 @@ void DisplayClusters::publish() {
       << "You need to call initPublishing to advertise before publishing.";
   CHECK(frame_id_set_) << "You need to set the frame_id before publishing.";
   CHECK(clusters_set_) << "You need to set the clusters before publishing.";
-  int n;
+  size_t n;
   for (size_t i = 0; i < marker_lines_.size(); ++i) {
     n = i % pub_.size();
     pub_[n].publish(marker_lines_[i]);

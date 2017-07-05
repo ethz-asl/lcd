@@ -72,9 +72,9 @@ TEST_F(LineClusteringTest, testComputeSquareNearestDifferenceLines) {
   EXPECT_FLOAT_EQ(computeSquareNearestDifferenceLines(line1, line2), 115.94);
 }
 
-TEST_F(LineClusteringTest, testRunOnMeansOfLines) {
-  kmeans_cluster_->computeMeansOfLines();
-  kmeans_cluster_->runOnMeansOfLines();
+TEST_F(LineClusteringTest, testrunLineMeans) {
+  kmeans_cluster_->computeLineMeans();
+  kmeans_cluster_->runLineMeans();
   size_t N = kmeans_cluster_->cluster_idx_.size();
   int first_label = kmeans_cluster_->cluster_idx_[0];
   for (size_t i = 1; i < N; ++i) {

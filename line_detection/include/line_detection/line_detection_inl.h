@@ -16,7 +16,7 @@ namespace line_detection {
 //
 // Output: out:       A vector containing N unique samples of in.
 template <typename T>
-void getNUniqueRandomElements(const std::vector<T>& in, int N,
+void getNUniqueRandomElements(const std::vector<T>& in, size_t N,
                               std::default_random_engine& generator,
                               std::vector<T>& out) {
   CHECK(in.size() > N);
@@ -24,17 +24,19 @@ void getNUniqueRandomElements(const std::vector<T>& in, int N,
   out.reserve(N);
   // The algorithm uses the Fisher-Yates Shuffle to guarantee that no element is
   // sampled twice.
-  int max = in.size();
+  size_t max = in.size();
   int idx;
-  // From this array the indeces of an element is sampled.
-  int indeces[max];
-  for (int i = 0; i < max; ++i) indeces[i] = i;
+  // From this array the indices of an element is sampled.
+  int indices[max];
+  for (size_t i = 0; i < max; ++i) {
+    indices[i] = i;
+  }
   std::uniform_int_distribution<int>* distribution;
-  for (int i = max; i > max - N; --i) {
+  for (size_t i = max; i > max - N; --i) {
     distribution = new std::uniform_int_distribution<int>(0, i - 1);
     idx = (*distribution)(generator);
-    out.push_back(in[indeces[idx]]);
-    indeces[idx] = indeces[i - 1];
+    out.push_back(in[indices[idx]]);
+    indices[idx] = indices[i - 1];
   }
   delete distribution;
 }
@@ -42,7 +44,7 @@ void getNUniqueRandomElements(const std::vector<T>& in, int N,
 // An overload, that allows the use without specifyng an random engine. Be
 // careful if this is used in a loop.
 template <typename T>
-void getNUniqueRandomElements(const std::vector<T>& in, int N,
+void getNUniqueRandomElements(const std::vector<T>& in, size_t N,
                               std::vector<T>& out) {
   unsigned seed =
       std::chrono::high_resolution_clock::now().time_since_epoch().count();

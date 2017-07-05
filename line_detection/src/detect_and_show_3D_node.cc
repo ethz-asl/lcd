@@ -1,6 +1,3 @@
-#include <line_detection/line_detection.h>
-#include "line_detection/line_detection_inl.h"
-
 #include <ros/ros.h>
 
 #include <cv_bridge/cv_bridge.h>
@@ -17,10 +14,18 @@
 #include <tf/transform_broadcaster.h>
 #include <visualization_msgs/Marker.h>
 
+#include <line_detection/line_detection.h>
+#include "line_detection/line_detection_inl.h"
+
 typedef message_filters::sync_policies::ExactTime<
     sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo,
     sensor_msgs::PointCloud2>
     MySyncPolicy;
+
+const std::string kRGBImageTopic = "/camera/rgb/image_raw";
+const std::string kDepthImageTopic = "/camera/depth/image_raw";
+const std::string kCameraInfoTopic = "/camera/rgb/camera_info";
+const std::string kPointCloudTopic = "/scenenet_node/scene";
 
 class listenAndPublish {
  public:
@@ -31,9 +36,10 @@ class listenAndPublish {
         "/vis_pointcloud", 2);
     transform.setOrigin(tf::Vector3(0, 0, 0));
     tf::Quaternion quat;
-    quat.setRPY(-3.1415 / 2, 0, 0);
+    quat.setRPY(-line_detection::kPi / 2.0, 0.0, 0.0);
     transform.setRotation(quat);
-    // To publish the lines in 3D to rviz.
+    // To publish different types of lines as markers for rviz (this basically
+    // allows different colors for the different types).
     marker_pub_ = node_handle_.advertise<visualization_msgs::Marker>(
         "/visualization_marker", 1000);
     marker_pub_1_ = node_handle_.advertise<visualization_msgs::Marker>(
@@ -42,12 +48,11 @@ class listenAndPublish {
         "/visualization_marker_2", 1000);
     marker_pub_3_ = node_handle_.advertise<visualization_msgs::Marker>(
         "/visualization_marker_3", 1000);
-    // Three topics published by scenenet_ros_tools (there are more but needed
-    // here so far).
-    image_sub_.subscribe(node_handle_, "/camera/rgb/image_raw", 1);
-    depth_sub_.subscribe(node_handle_, "/camera/depth/image_raw", 1);
-    info_sub_.subscribe(node_handle_, "/camera/rgb/camera_info", 1);
-    pc_sub_.subscribe(node_handle_, "/scenenet_node/scene", 1);
+
+    image_sub_.subscribe(node_handle_, kRGBImageTopic, 1);
+    depth_sub_.subscribe(node_handle_, kDepthImageTopic, 1);
+    info_sub_.subscribe(node_handle_, kCameraInfoTopic, 1);
+    pc_sub_.subscribe(node_handle_, kPointCloudTopic, 1);
   }
 
   ~listenAndPublish() { delete sync_; }
@@ -79,7 +84,7 @@ class listenAndPublish {
     cv_depth_ = cv_depth_ptr->image;
     cvtColor(cv_image_, cv_img_gray_, CV_RGB2GRAY);
 
-    line_detection::pclFromSceneNetToMat(pcl_cloud_, 320, 240, cv_cloud_);
+    line_detection::pclFromSceneNetToMat(pcl_cloud_, cv_cloud_);
 
     std::chrono::time_point<std::chrono::system_clock> start, end;
     std::chrono::duration<double> elapsed_seconds;
@@ -103,17 +108,17 @@ class listenAndPublish {
 
     start = std::chrono::system_clock::now();
     line_detector_.runCheckOn3DLines(cv_cloud_, lines3D_temp_wp, 0,
-                                     lines3D_wp_);
+                                     lines3D_with_planes_);
     end = std::chrono::system_clock::now();
     elapsed_seconds = end - start;
     ROS_INFO("Check for valid lines: %f", elapsed_seconds.count());
 
-    ROS_INFO("Lines kept after projection: %d/%d", lines3D_wp_.size(),
+    ROS_INFO("Lines kept after projection: %d/%d", lines3D_with_planes_.size(),
              lines2D_.size());
 
     // marker_3Dlines_.header.frame_id = pcl_cloud_.header.frame_id;
     // line_detection::storeLines3DinMarkerMsg(lines3D_, marker_3Dlines_);
-    line_detection::storeLinesAfterType(lines3D_wp_, lines3D_discont_,
+    line_detection::storeLinesAfterType(lines3D_with_planes_, lines3D_discont_,
                                         lines3D_plane_, lines3D_inter_);
     line_detection::storeLines3DinMarkerMsg(lines3D_discont_,
                                             marker_3Dlines_discont_, {1, 0, 0});
@@ -157,7 +162,7 @@ class listenAndPublish {
   std::vector<cv::Vec4f> lines2D_;
   std::vector<cv::Vec<float, 6> > lines3D_, lines3D_discont_, lines3D_plane_,
       lines3D_inter_;
-  std::vector<line_detection::LineWithPlanes> lines3D_wp_;
+  std::vector<line_detection::LineWithPlanes> lines3D_with_planes_;
   visualization_msgs::Marker marker_3Dlines_, marker_3Dlines_discont_,
       marker_3Dlines_plane_, marker_3Dlines_inter_;
   // Publishers and Subscribers.
