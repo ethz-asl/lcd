@@ -76,7 +76,7 @@ class listenAndPublish {
     cv_depth_ = cv_depth_ptr->image;
     cvtColor(cv_image_, cv_img_gray_, CV_RGB2GRAY);
 
-    line_detection::pclFromSceneNetToMat(pcl_cloud_, cv_cloud_);
+    line_detection::pclFromSceneNetToMat(pcl_cloud_, &cv_cloud_);
 
     std::chrono::time_point<std::chrono::system_clock> start, end;
     std::chrono::duration<double> elapsed_seconds;
@@ -84,7 +84,7 @@ class listenAndPublish {
     ROS_INFO("**** New Image ******");
     start = std::chrono::system_clock::now();
     line_detector_.detectLines(cv_img_gray_, line_detection::Detector::LSD,
-                               lines2D_);
+                               &lines2D_);
     end = std::chrono::system_clock::now();
     elapsed_seconds = end - start;
     ROS_INFO("Detecting lines 2D: %f", elapsed_seconds.count());
@@ -93,14 +93,14 @@ class listenAndPublish {
     std::vector<cv::Vec<float, 6> > lines3D_temp;
     std::vector<line_detection::LineWithPlanes> lines3D_temp_wp;
     line_detector_.project2Dto3DwithPlanes(cv_cloud_, lines2D_,
-                                           lines3D_temp_wp);
+                                           &lines3D_temp_wp);
     end = std::chrono::system_clock::now();
     elapsed_seconds = end - start;
     ROS_INFO("Projecting to 3D: %f", elapsed_seconds.count());
 
     start = std::chrono::system_clock::now();
-    line_detector_.runCheckOn3DLines(cv_cloud_, lines3D_temp_wp, 0,
-                                     lines3D_with_planes_);
+    line_detector_.runCheckOn3DLines(cv_cloud_, lines3D_temp_wp,
+                                     &lines3D_with_planes_);
     end = std::chrono::system_clock::now();
     elapsed_seconds = end - start;
     ROS_INFO("Check for valid lines: %f", elapsed_seconds.count());
@@ -120,8 +120,8 @@ class listenAndPublish {
     kmeans_cluster_.setLines(lines3D_with_planes_);
 
     start = std::chrono::system_clock::now();
-    kmeans_cluster_.computeMeansOfLines();
-    kmeans_cluster_.runOnMeansOfLines();
+    kmeans_cluster_.initClusteringWithHessians(0.5);
+    kmeans_cluster_.runOnLinesAndHessians();
     end = std::chrono::system_clock::now();
     elapsed_seconds = end - start;
     ROS_INFO("Clustering: %f", elapsed_seconds.count());
@@ -132,6 +132,7 @@ class listenAndPublish {
     // The timestamp is set to 0 because rviz is not able to find the right
     // transformation otherwise.
     pcl_cloud_.header.stamp = 0;
+
     ROS_INFO("**** Started publishing ****");
     broad_caster_.sendTransform(tf::StampedTransform(
         transform_, ros::Time::now(), "map", pcl_cloud_.header.frame_id));

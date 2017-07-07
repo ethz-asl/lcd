@@ -83,7 +83,7 @@ int main(int argc, char** argv) {
 
   // Compute the point cloud.
   line_detection::LineDetector line_detector;
-  line_detector.computePointCloud(image, depth, K, cloud);
+  line_detector.computePointCloud(image, depth, K, &cloud);
 
   // Sparsify the point cloud for better visualization performance.
   pcl::PointCloud<pcl::PointXYZRGB> sparse_cloud;
@@ -102,8 +102,8 @@ int main(int argc, char** argv) {
   cv::rgbd::depthTo3d(depth, K, pc_mat);
   std::vector<cv::Vec4f> lines2D;
   std::vector<cv::Vec<float, 6> > lines3D;
-  line_detector.detectLines(img_gray, lines2D);
-  line_detector.projectLines2Dto3D(lines2D, pc_mat, lines3D);
+  line_detector.detectLines(img_gray, &lines2D);
+  line_detector.projectLines2Dto3D(lines2D, pc_mat, &lines3D);
   // // -------- Visualize it with PCLVisualizer -------- //
   // pcl::visualization::PCLVisualizer viewer("3D Viewer");
   // viewer.setBackgroundColor(1, 1, 1);
@@ -134,7 +134,7 @@ int main(int argc, char** argv) {
       "visualization_marker", 1000);
   visualization_msgs::Marker disp_lines;
   disp_lines.header.frame_id = "my_frame";
-  line_detection::storeLines3DinMarkerMsg(lines3D, disp_lines);
+  line_detection::storeLines3DinMarkerMsg(lines3D, &disp_lines);
   // Publish the messages. Once every 10 seconds, the transform, the cloud
   // and all the lines are published. This is because rviz often fails to
   // read all the messages in one go.

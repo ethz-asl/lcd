@@ -35,7 +35,7 @@ bool detectLineCallback(line_detection::RequestLineDetection::Request& req,
   image_cv_ptr = cv_bridge::toCvCopy(req.image, "mono8");
   // detect lines
   lines.clear();
-  line_detector.detectLines(image_cv_ptr->image, req.detector, lines);
+  line_detector.detectLines(image_cv_ptr->image, req.detector, &lines);
 
   // Store lines to the response.
   res.start_x.reserve(lines.size());

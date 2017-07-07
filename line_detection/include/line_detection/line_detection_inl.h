@@ -16,12 +16,14 @@ namespace line_detection {
 //
 // Output: out:       A vector containing N unique samples of in.
 template <typename T>
-void getNUniqueRandomElements(const std::vector<T>& in, size_t N,
-                              std::default_random_engine& generator,
-                              std::vector<T>& out) {
-  CHECK(in.size() > N);
-  out.clear();
-  out.reserve(N);
+void getNUniqueRandomElements(const std::vector<T>& in, size_t num_samples,
+                              std::default_random_engine* generator,
+                              std::vector<T>* out) {
+  CHECK_NOTNULL(generator);
+  CHECK_NOTNULL(out);
+  CHECK(in.size() > num_samples);
+  out->clear();
+  out->reserve(num_samples);
   // The algorithm uses the Fisher-Yates Shuffle to guarantee that no element is
   // sampled twice.
   size_t max = in.size();
@@ -32,10 +34,10 @@ void getNUniqueRandomElements(const std::vector<T>& in, size_t N,
     indices[i] = i;
   }
   std::uniform_int_distribution<int>* distribution;
-  for (size_t i = max; i > max - N; --i) {
+  for (size_t i = max; i > max - num_samples; --i) {
     distribution = new std::uniform_int_distribution<int>(0, i - 1);
-    idx = (*distribution)(generator);
-    out.push_back(in[indices[idx]]);
+    idx = (*distribution)(*generator);
+    out->push_back(in[indices[idx]]);
     indices[idx] = indices[i - 1];
   }
   delete distribution;
@@ -44,12 +46,12 @@ void getNUniqueRandomElements(const std::vector<T>& in, size_t N,
 // An overload, that allows the use without specifyng an random engine. Be
 // careful if this is used in a loop.
 template <typename T>
-void getNUniqueRandomElements(const std::vector<T>& in, size_t N,
-                              std::vector<T>& out) {
+void getNUniqueRandomElements(const std::vector<T>& in, size_t num_samples,
+                              std::vector<T>* out) {
   unsigned seed =
       std::chrono::high_resolution_clock::now().time_since_epoch().count();
   std::default_random_engine generator(seed);
-  getNUniqueRandomElements(in, N, generator, out);
+  getNUniqueRandomElements(in, num_samples, &generator, out);
 }
 
 }  // namespace line_detection

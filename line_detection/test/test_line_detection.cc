@@ -43,7 +43,7 @@ TEST_F(LineDetectionTest, testLSDLineDetection) {
   size_t n_lines;
   // Calling the detector with LSD.
   line_detector_.detectLines(test_img_gray_, line_detection::Detector::LSD,
-                             lines_);
+                             &lines_);
   n_lines = lines_.size();
   EXPECT_EQ(n_lines, 716)
       << "LSD detection: Expected 716 lines to be found. Found " << n_lines;
@@ -52,7 +52,7 @@ TEST_F(LineDetectionTest, testEDLLineDetection) {
   size_t n_lines;
   // Calling the detector with EDL.
   line_detector_.detectLines(test_img_gray_, line_detection::Detector::EDL,
-                             lines_);
+                             &lines_);
   n_lines = lines_.size();
   EXPECT_EQ(n_lines, 172)
       << "EDL detection: Expected 172 lines to be found. Found " << n_lines;
@@ -61,7 +61,7 @@ TEST_F(LineDetectionTest, testFASTLineDetection) {
   size_t n_lines;
   // Calling the detector with FAST.
   line_detector_.detectLines(test_img_gray_, line_detection::Detector::FAST,
-                             lines_);
+                             &lines_);
   n_lines = lines_.size();
   EXPECT_EQ(n_lines, 598)
       << "Fast detection: Expected 598 lines to be found. Found " << n_lines;
@@ -70,7 +70,7 @@ TEST_F(LineDetectionTest, testHoughLineDetection) {
   size_t n_lines;
   // Calling the detector with HOUGH.
   line_detector_.detectLines(test_img_gray_, line_detection::Detector::HOUGH,
-                             lines_);
+                             &lines_);
   n_lines = lines_.size();
   EXPECT_EQ(n_lines, 165)
       << "HOUGH detection: Expected 165 lines to be found. Found " << n_lines;
@@ -91,7 +91,7 @@ TEST_F(LineDetectionTest, testComputePointCloud) {
   // Point_cloud to be filled.
   pcl::PointCloud<pcl::PointXYZRGB> point_cloud;
   // Fill the point cloud (this is the functioned that is tested here)
-  line_detector_.computePointCloud(test_image_, test_depth_, K, point_cloud);
+  line_detector_.computePointCloud(test_image_, test_depth_, K, &point_cloud);
   // Compue the mean of all entries of the point cloud
   double x_mean = 0;
   double y_mean = 0;
@@ -182,7 +182,7 @@ TEST_F(LineDetectionTest, testHessianNormalFormOfPlane) {
   points.push_back(cv::Vec3f(5, 17, 1));
   points.push_back(cv::Vec3f(190, 3, 1));
   cv::Vec4f hessian_normal_form;
-  hessianNormalFormOfPlane(points, hessian_normal_form);
+  hessianNormalFormOfPlane(points, &hessian_normal_form);
   EXPECT_EQ(hessian_normal_form[0], 0);
   EXPECT_EQ(hessian_normal_form[1], 0);
   EXPECT_EQ(hessian_normal_form[2], -1);
@@ -195,7 +195,7 @@ TEST_F(LineDetectionTest, testHessianNormalFormOfPlane) {
   points.push_back(cv::Vec3f(150, 23, 1));
   points.push_back(cv::Vec3f(1, 1, 1));
   points.push_back(cv::Vec3f(510, 189, 1));
-  hessianNormalFormOfPlane(points, hessian_normal_form);
+  hessianNormalFormOfPlane(points, &hessian_normal_form);
   EXPECT_FLOAT_EQ(hessian_normal_form[0], 0);
   EXPECT_FLOAT_EQ(hessian_normal_form[1], 0);
   EXPECT_FLOAT_EQ(hessian_normal_form[2], 1);
@@ -229,7 +229,7 @@ TEST_F(LineDetectionTest, testPlaneRANSAC) {
   points.push_back(cv::Vec3f(5, 7, 19));
   points.push_back(cv::Vec3f(510, 189, 3));
 
-  EXPECT_TRUE(line_detector_.planeRANSAC(points, hessian_normal_form));
+  EXPECT_TRUE(line_detector_.planeRANSAC(points, &hessian_normal_form));
   EXPECT_FLOAT_EQ(hessian_normal_form[0], 0);
   EXPECT_FLOAT_EQ(hessian_normal_form[1], 0);
   EXPECT_FLOAT_EQ(fabs(hessian_normal_form[2]), 1);
@@ -240,16 +240,16 @@ TEST_F(LineDetectionTest, testFindXCoordOfPixelsOnVector) {
   cv::Point2f start(2.5, 0.3);
   cv::Point2f end(2.1, 3.9);
   std::vector<int> y_coords;
-  findXCoordOfPixelsOnVector(start, end, true, y_coords);
+  findXCoordOfPixelsOnVector(start, end, true, &y_coords);
   EXPECT_EQ(y_coords.size(), 4);
   for (int i = 0; i < 4; ++i) EXPECT_EQ(y_coords[i], 2);
 
   end.x = 7.3;
   end.y = 0.7;
-  findXCoordOfPixelsOnVector(start, end, true, y_coords);
+  findXCoordOfPixelsOnVector(start, end, true, &y_coords);
   ASSERT_EQ(y_coords.size(), 4 + 1);
   EXPECT_EQ(y_coords[4], 2);
-  findXCoordOfPixelsOnVector(start, end, false, y_coords);
+  findXCoordOfPixelsOnVector(start, end, false, &y_coords);
   ASSERT_EQ(y_coords.size(), 4 + 1 + 1);
   EXPECT_EQ(y_coords[5], 8);
 }
@@ -261,7 +261,7 @@ TEST_F(LineDetectionTest, testFindPointsInRectangle) {
   corners.push_back(cv::Point2f(0.1, 0.1));
   corners.push_back(cv::Point2f(1.9, 1.9));
   corners.push_back(cv::Point2f(1.9, 0.1));
-  findPointsInRectangle(corners, points);
+  findPointsInRectangle(corners, &points);
   ASSERT_EQ(points.size(), 4);
   for (int i = 0; i < 2; ++i) {
     for (int j = 0; j < 2; ++j) {
@@ -277,7 +277,7 @@ TEST_F(LineDetectionTest, testFindPointsInRectangle) {
   corners.push_back(cv::Point2f(0.1, 0.1));
   corners.push_back(cv::Point2f(5.9, 5.9));
   corners.push_back(cv::Point2f(5.9, 0.1));
-  findPointsInRectangle(corners, points);
+  findPointsInRectangle(corners, &points);
   EXPECT_EQ(points.size(), 36);
 }
 
@@ -286,15 +286,15 @@ TEST_F(LineDetectionTest, testGetPointOnPlaneIntersectionLine) {
   cv::Vec4f hessian2(0, 1, 0, 0);
   cv::Vec3f direction(0, 0, 1);
   cv::Vec3f x_0;
-  getPointOnPlaneIntersectionLine(hessian1, hessian2, direction, x_0);
+  getPointOnPlaneIntersectionLine(hessian1, hessian2, direction, &x_0);
   EXPECT_EQ(x_0[0], -1);
   EXPECT_EQ(x_0[1], 0);
   EXPECT_EQ(x_0[2], 0);
 }
 
 TEST_F(LineDetectionTest, testFind3DlineOnPlanes) {
-  cv::Vec<float, 6> line;
-  cv::Vec<float, 6> line_guess(2, 2, 2, 0, 0, 0);
+  cv::Vec6f line;
+  cv::Vec6f line_guess(2, 2, 2, 0, 0, 0);
   std::vector<cv::Vec3f> points1, points2;
   points1.push_back(cv::Vec3f(0, 0, 0));
   points1.push_back(cv::Vec3f(0.1, 0, 0));
@@ -304,7 +304,7 @@ TEST_F(LineDetectionTest, testFind3DlineOnPlanes) {
   points2.push_back(cv::Vec3f(0, 0, 0));
   points2.push_back(cv::Vec3f(0, 0.1, 2));
   points2.push_back(cv::Vec3f(0, 0, 2));
-  find3DlineOnPlanes(points1, points2, line_guess, line);
+  line_detector_.find3DlineOnPlanes(points1, points2, line_guess, &line);
   EXPECT_NEAR(line[0], 0, 1e-6) << "Test Nr: 1";
   EXPECT_NEAR(line[1], 0, 1e-6) << "Test Nr: 2";
   EXPECT_NEAR(line[2], 2, 1e-6) << "Test Nr: 3";
@@ -322,7 +322,7 @@ TEST_F(LineDetectionTest, testFind3DlineOnPlanes) {
   points2.push_back(cv::Vec3f(5, 15, -3));
   points2.push_back(cv::Vec3f(0, 15, -3));
   line_guess = {7, 9, -3, -1, 9, -3};
-  find3DlineOnPlanes(points1, points2, line_guess, line);
+  line_detector_.find3DlineOnPlanes(points1, points2, line_guess, &line);
   EXPECT_NEAR(line[0], 5, 1e-6) << "Test Nr: 7";
   EXPECT_NEAR(line[1], 8, 1e-6) << "Test Nr: 8";
   EXPECT_NEAR(line[2], 0, 1e-6) << "Test Nr: 9";
@@ -349,8 +349,8 @@ TEST_F(LineDetectionTest, testProject2Dto3DwithPlanes) {
   std::vector<cv::Vec4f> lines2D;
   cv::Vec4f vec1(160, 100, 160, 200);
   lines2D.push_back(vec1);
-  std::vector<cv::Vec<float, 6> > lines3D;
-  line_detector_.project2Dto3DwithPlanes(cloud, lines2D, lines3D);
+  std::vector<cv::Vec6f> lines3D;
+  line_detector_.project2Dto3DwithPlanes(cloud, lines2D, &lines3D);
   ASSERT_EQ(lines3D.size(), 1);
   EXPECT_NEAR(lines3D[0][0], 200 * scale, 1e-5);
   EXPECT_NEAR(lines3D[0][1], 160 * scale, 1e-5);
@@ -391,13 +391,13 @@ TEST_F(LineDetectionTest, testCheckIfValidLineBruteForce) {
       }
     }
   }
-  cv::Vec<float, 6> line3D(0.1, 0, 0, 10, 0, 0);
-  EXPECT_TRUE(line_detector_.checkIfValidLineBruteForce(cloud, line3D)) << 1;
+  cv::Vec6f line3D(0.1, 0, 0, 10, 0, 0);
+  EXPECT_TRUE(line_detector_.checkIfValidLineBruteForce(cloud, &line3D)) << 1;
   EXPECT_NEAR(line3D[3], 2.4, 0.2);
   line3D = {0.5, 0.2, 0.2, 1, 0.7, 0.7};
-  EXPECT_TRUE(line_detector_.checkIfValidLineBruteForce(cloud, line3D)) << 2;
+  EXPECT_TRUE(line_detector_.checkIfValidLineBruteForce(cloud, &line3D)) << 2;
   line3D = {0.5, 0.2, 0.5, 0.5, 3, 0.5};
-  EXPECT_FALSE(line_detector_.checkIfValidLineBruteForce(cloud, line3D)) << 3;
+  EXPECT_FALSE(line_detector_.checkIfValidLineBruteForce(cloud, &line3D)) << 3;
 }
 
 TEST_F(LineDetectionTest, testCheckIfValidLineDiscont) {
@@ -442,7 +442,7 @@ TEST_F(LineDetectionTest, testFind3DlinesRated) {
   std::vector<cv::Vec4f> lines2D;
   cv::Vec4f vec1(160, 100, 160, 200);
   lines2D.push_back(vec1);
-  std::vector<cv::Vec<float, 6> > lines3D;
+  std::vector<cv::Vec6f> lines3D;
   std::vector<double> rating;
   line_detector_.find3DlinesRated(cloud, lines2D, lines3D, rating);
   ASSERT_EQ(lines3D.size(), 1);

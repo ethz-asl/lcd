@@ -16,15 +16,16 @@ int main(int argc, char** argv) {
   if (argc > 3) {
     ROS_INFO(
         "usage: send_image <imagepath> <algorithm> \n"
-        "Both arguments may be omitted.");
+        "The second argument may be omitted.");
     return -1;
   }
   // Define a path for the test image.
   std::string path;
   if (argc < 2) {
-    path =
-        "/home/dominik/mydata/polybox/Dokumente/SemesterProject/Code/"
-        "kitchen.png";
+    ROS_INFO(
+        "usage: send_image <imagepath> <algorithm> \n"
+        "The second argument may be omitted.");
+    return -1;
   } else {
     path = argv[1];
   }
@@ -50,9 +51,9 @@ int main(int argc, char** argv) {
   std_msgs::Header header;
   header.seq = 1;
   header.stamp = ros::Time::now();
-  // Create CvImage
   cv_bridge::CvImage cv_image = cv_bridge::CvImage(
       header, sensor_msgs::image_encodings::RGB8, test_image);
+  // Create CvImage
   // Set the service image to the test_image (which is stored in cv_image).
   cv_image.toImageMsg(service.request.image);
   // Set algorithm. Default is LSD.
