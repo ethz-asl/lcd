@@ -32,13 +32,30 @@ typedef message_filters::sync_policies::ExactTime<
     sensor_msgs::CameraInfo, sensor_msgs::Image>
     MySyncPolicy;
 
+// This function returns a vector with labels for a vector of lines. It labels
+// them after the classification into line_detection::LineType.
 std::vector<int> clusterLinesAfterClassification(
     const std::vector<line_detection::LineWithPlanes>& lines);
 
+// This function labels with an instances image.
+// Input: lines:    Vector with the lines in 3D.
+//
+//        instances:  CV_8UC3 image that labels objects with a different color
+//                    for every instance. This image must be registered with the
+//                    depth image where the point cloud was extracted.
+//
+//        camera_info: This is used to backproject 3D points onto the instances
+//                     image.
+//
+// Output: labels:     Labels all lines according to their backprojection onto
+//                     instances. The labeling starts at 0 and goes up for every
+//                     additional instance that was found.
 void labelLinesWithInstances(
     const std::vector<line_detection::LineWithPlanes>& lines,
-    sensor_msgs::CameraInfoConstPtr camera_info, std::vector<int>* labels);
+    const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info,
+    std::vector<int>* labels);
 
+// Stores lines in marker messages.
 void storeLines3DinMarkerMsg(const std::vector<cv::Vec6f>& lines3D,
                              visualization_msgs::Marker* disp_lines,
                              cv::Vec3f color);
@@ -87,8 +104,12 @@ class ListenAndPublish {
   void start();
 
  protected:
+  // Writes a mat to a pcl cloud. This is only used to publish the cloud so that
+  // it can be displayed with rviz.
   void writeMatToPclCloud(const cv::Mat& cv_cloud, const cv::Mat& image,
                           pcl::PointCloud<pcl::PointXYZRGB>* pcl_cloud);
+  // These functions perform the actuall work. They are only here to make the
+  // masterCallback more readable.
   void detectLines();
   void projectTo3D();
   void checkLines();
@@ -96,9 +117,10 @@ class ListenAndPublish {
   void cluster();
   void initDisplay();
   void publish();
+  // This is the callback that is called by the dynamic reconfigure.
   void reconfigureCallback(line_ros_utility::line_toolsConfig& config,
                            uint32_t level);
-
+  // This callback is called by the main subsriber sync_.
   void masterCallback(const sensor_msgs::ImageConstPtr& rosmsg_image,
                       const sensor_msgs::ImageConstPtr& rosmsg_depth,
                       const sensor_msgs::ImageConstPtr& rosmsg_instances,
@@ -127,10 +149,9 @@ class ListenAndPublish {
   message_filters::Subscriber<sensor_msgs::Image> instances_sub_;
   message_filters::Subscriber<sensor_msgs::Image> cloud_sub_;
   message_filters::Subscriber<sensor_msgs::CameraInfo> info_sub_;
-  // message_filters::Subscriber<sensor_msgs::PointCloud2> pc_sub_;
   // To store parameters.
   line_detection::LineDetectionParams params_;
-  int detector_method_;
+  size_t detector_method_;
   size_t number_of_clusters_;
   size_t show_lines_or_clusters_;
   // To have the line_detection utility.

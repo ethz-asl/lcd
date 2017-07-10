@@ -268,6 +268,10 @@ class LineDetector {
   void paintLines(const std::vector<cv::Vec4f>& lines, cv::Mat* image,
                   cv::Vec3b color = {255, 0, 0});
 
+  // This function checks for all lines, if their start and end points are
+  // within the borders of an image. It returns a vector with the same amount of
+  // lines in the same order. Only start or end points that were out of the
+  // image border are shifted into it.
   std::vector<cv::Vec4f> checkLinesInBounds(
       const std::vector<cv::Vec4f>& lines2D, size_t x_max, size_t y_max);
 
@@ -280,6 +284,9 @@ class LineDetector {
                              std::vector<cv::Point2f>* rect_left,
                              std::vector<cv::Point2f>* rect_right);
 
+  // This function takes a set of points within an image and computes the
+  // average color of all pixels at these points. It appends the color in the
+  // colors vectors of the line3D.
   void assignColorToLines(const cv::Mat& image,
                           const std::vector<cv::Point2i> points,
                           LineWithPlanes* line3D);

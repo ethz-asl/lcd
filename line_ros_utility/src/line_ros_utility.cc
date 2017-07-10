@@ -58,60 +58,64 @@ void labelLinesWithInstances(
   CHECK_NOTNULL(labels);
   CHECK_EQ(instances.type(), CV_8UC3);
   labels->resize(lines.size());
+  // This class is used to perform the backprojection.
   image_geometry::PinholeCameraModel camera_model;
   camera_model.fromCameraInfo(camera_info);
+  // Store all colors that were found so far.
   std::vector<cv::Vec3b> known_colors;
-  std::vector<int> labels_on_line;
+  // This is a voting vector, where all points on a line vote for one label and
+  // the one with the highest votes wins.
   std::vector<int> labels_count;
-  cv::Point2f start, end, line;
+  // For intermiedate storage.
+  cv::Point2f point2D;
   cv::Vec3b color;
-  bool ran_out_of_image;
+  cv::Vec3f start, end, line, point3D;
+  // num_checks + 1 points are reprojected onto the image.
+  constexpr size_t num_checks = 10;
+  // Iterate over all lines.
   for (size_t i = 0; i < lines.size(); ++i) {
-    start = camera_model.project3dToPixel(
-        {lines[i].line[0], lines[i].line[1], lines[i].line[2]});
-    end = camera_model.project3dToPixel(
-        {lines[i].line[3], lines[i].line[4], lines[i].line[5]});
-    start.x =
-        line_detection::checkInBoundary(floor(start.x), 0, instances.cols - 1);
-    start.y =
-        line_detection::checkInBoundary(floor(start.y), 0, instances.rows - 1);
-    end.x =
-        line_detection::checkInBoundary(floor(end.x), 0, instances.cols - 1);
-    end.y =
-        line_detection::checkInBoundary(floor(end.y), 0, instances.rows - 1);
-    labels_on_line.clear();
+    start = {lines[i].line[0], lines[i].line[1], lines[i].line[2]};
+    end = {lines[i].line[3], lines[i].line[4], lines[i].line[5]};
+    line = end - start;
+    // Set the labels size equal to the known_colors size and initialize them
+    // with 0;
     labels_count = std::vector<int>(known_colors.size(), 0);
-    ran_out_of_image = false;
-    int iter = 0;
-    while (!(start.x == end.x && start.y == end.y)) {
-      color = instances.at<cv::Vec3b>(start);
+    for (int k = 0; k <= num_checks; ++k) {
+      // Compute a point on a line.
+      point3D = start + line * (k / (double)num_checks);
+      // Compute its reprojection.
+      point2D =
+          camera_model.project3dToPixel({point3D[0], point3D[1], point3D[2]});
+      // Check that the point2D lies within the image boundaries.
+      point2D.x = line_detection::checkInBoundary(floor(point2D.x), 0,
+                                                  instances.cols - 1);
+      point2D.y = line_detection::checkInBoundary(floor(point2D.y), 0,
+                                                  instances.rows - 1);
+      // Get the color of the pixel.
+      color = instances.at<cv::Vec3b>(point2D);
+      // Find the index of the color in the known_colors vector
       size_t j = 0;
       for (; j < known_colors.size(); ++j) {
         if (known_colors[j] == color) break;
       }
+      // If we did not find the color in the known_colors, push it back to it.
       if (j == known_colors.size()) {
         known_colors.push_back(color);
         labels_count.push_back(0);
       }
+      // Apply the vote.
       labels_count[j] += 1;
-      // Go to next pixel on the line.
-      line = end - start;
-      start.x += floor(line.x / sqrt(line.x * line.x + line.y * line.y) + 0.5);
-      start.y += floor(line.y / sqrt(line.x * line.x + line.y * line.y) + 0.5);
     }
-    if (ran_out_of_image) {
-      (*labels)[i] = 0;
-      continue;
-    }
+    // Find the label with the highest vote.
     size_t best_guess = 0;
     for (size_t j = 1; j < labels_count.size(); ++j) {
       if (labels_count[j] > labels_count[best_guess]) {
         best_guess = j;
       }
     }
-    (*labels)[i] = best_guess + 1;
+    (*labels)[i] = best_guess;
   }
-}  // namespace line_ros_utility
+}
 
 ListenAndPublish::ListenAndPublish() : params_() {
   ros::NodeHandle node_handle_;
@@ -124,13 +128,6 @@ ListenAndPublish::ListenAndPublish() : params_() {
   transform_.setRotation(quat);
   // To publish the lines in 3D to rviz.
   display_clusters_.initPublishing(node_handle_);
-  // Three topics published by scenenet_ros_tools (there are more but needed
-  // here so far).
-  // image_sub_.subscribe(node_handle_, "/camera/rgb/image_raw", 1);
-  // depth_sub_.subscribe(node_handle_, "/camera/depth/image_raw", 1);
-  // info_sub_.subscribe(node_handle_, "/camera/rgb/camera_info", 1);
-  // pc_sub_.subscribe(node_handle_, "/scenenet_node/scene", 1);
-  // instances_sub_.subscribe(node_handle_, "/camera/instances/image_raw", 1);
 
   image_sub_.subscribe(node_handle_, "/line_tools/image/rgb", 1);
   depth_sub_.subscribe(node_handle_, "/line_tools/image/depth", 1);
@@ -226,7 +223,7 @@ void ListenAndPublish::cluster() {
 }
 
 void ListenAndPublish::initDisplay() {
-  // Decide if the lines should be displayed after there classification or
+  // Decide if the lines should be displayed after their classification or
   // after clustering.
   display_clusters_.setFrameID(frame_id);
   if (show_lines_or_clusters_ == 0) {
