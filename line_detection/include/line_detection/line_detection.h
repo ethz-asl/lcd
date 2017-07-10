@@ -47,29 +47,31 @@ struct LineWithPlanes {
 
 struct LineDetectionParams {
   // default = 0.1: find3DLineOnPlanes
-  double max_dist_between_planes;
+  double max_dist_between_planes = 0.1;
   // default = 0.5: getRectanglesFromLine
-  double rectangle_offset_pixels;
+  double rectangle_offset_pixels = 0.5;
   // default = 0.5: getRectanglesFromLine
-  double max_relative_rect_size;
+  double max_relative_rect_size = 0.5;
   // default = 5.0: getRectanglesFromLine
-  double max_absolute_rect_size;
+  double max_absolute_rect_size = 5.0;
   // default = 100: LineDetector::planeRANSAC
-  unsigned int num_iter_ransac;
+  unsigned int num_iter_ransac = 100;
   // default = 0.005: LineDetector::planeRANSAC
-  double max_error_inlier_ransac;
+  double max_error_inlier_ransac = 0.005;
   // default = 0.8: LineDetector::planeRANSAC
-  double inlier_max_ransac;
+  double inlier_max_ransac = 0.8;
   // default = 0.1: LineDetector::project2Dto3DwithPlanes
-  double min_inlier_ransac;
+  double min_inlier_ransac = 0.1;
   // default = 10: LineDetector::checkIfValidLineBruteForce
-  unsigned int min_points_in_line;
+  unsigned int min_points_in_line = 10;
   // default = 0.01: LineDetector::checkIfValidLineBruteForce
-  double max_deviation_inlier_line_check;
+  double max_deviation_inlier_line_check = 0.01;
   // default = 1e6: LineDetector::find3DlinesRated
-  double max_rating_valid_line;
-  // // default = 1e-6: hessianNormalFormOfPlane
-  // double min_distance_between_points_hessian;
+  double max_rating_valid_line = 1e6;
+  // default = 1e-6: hessianNormalFormOfPlane
+  double min_distance_between_points_hessian = 1e-6;
+  // default = 0.994: hessianNormalFormOfPlane
+  double max_cos_theta_hessian_computation = 0.994;
 };
 
 // Returns true if lines are nearby and could be equal (low difference in angle
@@ -205,19 +207,6 @@ void findXCoordOfPixelsOnVector(const cv::Point2f& start,
                                 const cv::Point2f& end, bool left_side,
                                 std::vector<int>* y_coord);
 
-// This function computes the Hessian Normal Form of a plane given points on
-// that plane.
-// Input: points:   Must contain at least have 3 points that do not
-//                  lie on a line. If 3 points are given, the plane normal is
-//                  computed as the cross product. The solution is then exact.
-//                  If more than 3 points are given the function solves a
-//                  minimization problem (min sum (orthogonal dist)^2) through
-//                  SVD.
-//
-// Output: hessian_normal_form: The first 3 entries are the normal vector n, the
-//                  last one is the parameter p
-bool hessianNormalFormOfPlane(const std::vector<cv::Vec3f>& points,
-                              cv::Vec4f* hessian_normal_form);
 
 // Returns all pixels that are within or on the border of a rectangle.
 // Input: corners:  These corners define the rectangle. It must contain
@@ -281,6 +270,10 @@ class LineDetector {
   void computePointCloud(const cv::Mat& image, const cv::Mat& depth,
                          const cv::Mat& K,
                          pcl::PointCloud<pcl::PointXYZRGB>* point_cloud);
+  // Output: hessian_normal_form: The first 3 entries are the normal vector n,
+  //                              the last one is the parameter p
+  bool hessianNormalFormOfPlane(const std::vector<cv::Vec3f>& points,
+                                cv::Vec4f* hessian_normal_form);
 
   // So far this function uses a naive approach which is not yet very robust.
   void projectLines2Dto3D(const std::vector<cv::Vec4f>& lines2D,

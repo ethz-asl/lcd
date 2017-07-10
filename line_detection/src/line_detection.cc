@@ -121,56 +121,6 @@ void storeLinesAfterType(const std::vector<LineWithPlanes>& lines_in,
   }
 }
 
-bool hessianNormalFormOfPlane(const std::vector<cv::Vec3f>& points,
-                              cv::Vec4f* hessian_normal_form) {
-  CHECK_NOTNULL(hessian_normal_form);
-  const int num_points = points.size();
-  CHECK(num_points >= 3);
-  if (num_points == 3) {  // In this case an exact solution can be computed.
-    cv::Vec3f vec1 = points[1] - points[0];
-    cv::Vec3f vec2 = points[2] - points[0];
-    // This checks first if the points were too close.
-    double norms = cv::norm(vec1) * cv::norm(vec2);
-    if (norms < 1e-6) return false;
-    // Then if they lie on a line. The angle between the vectors must at least
-    // be 2 degrees.
-    double cos_theta = fabs(vec1.dot(vec2)) / norms;
-    if (cos_theta > 0.994) return false;
-    // The normal already defines the orientation of the plane (it is
-    // perpendicular to both vectors, since they must lie within the plane).
-    cv::Vec3f normal = vec1.cross(vec2);
-    // Now bring the plane into the hessian normal form.
-    *hessian_normal_form =
-        cv::Vec4f(normal[0], normal[1], normal[2],
-                  computeDfromPlaneNormal(normal, points[0]));
-    *hessian_normal_form = (*hessian_normal_form) / cv::norm(normal);
-    return true;
-  } else {  // If there are more than 3 points, the solution is approximate.
-    cv::Vec3f mean(0.0f, 0.0f, 0.0f);
-    for (size_t i = 0; i < num_points; ++i) {
-      mean += points[i] / num_points;
-    }
-    cv::Mat A(3, num_points, CV_64FC1);
-    for (size_t i = 0; i < num_points; ++i) {
-      A.at<double>(0, i) = points[i][0] - mean[0];
-      A.at<double>(1, i) = points[i][1] - mean[1];
-      A.at<double>(2, i) = points[i][2] - mean[2];
-    }
-    cv::Mat U, W, Vt;
-    cv::SVD::compute(A, W, U, Vt);
-    cv::Vec3f normal;
-    if (U.type() == CV_64FC1) {
-      normal =
-          cv::Vec3f(U.at<double>(0, 2), U.at<double>(1, 2), U.at<double>(2, 2));
-    } else if (U.type() == CV_32FC1) {
-      normal =
-          cv::Vec3f(U.at<float>(0, 2), U.at<float>(1, 2), U.at<float>(2, 2));
-    }
-    *hessian_normal_form = cv::Vec4f(normal[0], normal[1], normal[2],
-                                     computeDfromPlaneNormal(normal, mean));
-    return true;
-  }
-}
 
 void findXCoordOfPixelsOnVector(const cv::Point2f& start,
                                 const cv::Point2f& end, bool left_side,
@@ -337,18 +287,7 @@ LineDetector::LineDetector() {
   edl_detector_ =
       cv::line_descriptor::BinaryDescriptor::createBinaryDescriptor();
   fast_detector_ = cv::ximgproc::createFastLineDetector();
-  params_ = new LineDetectionParams;
-  params_->max_dist_between_planes = 0.1;
-  params_->rectangle_offset_pixels = 0.5;
-  params_->max_relative_rect_size = 0.5;
-  params_->max_absolute_rect_size = 5.0;
-  params_->num_iter_ransac = 100;
-  params_->max_error_inlier_ransac = 0.005;
-  params_->inlier_max_ransac = 0.8;
-  params_->min_inlier_ransac = 0.1;
-  params_->min_points_in_line = 10;
-  params_->max_deviation_inlier_line_check = 0.01;
-  params_->max_rating_valid_line = 1e8;
+  params_ = new LineDetectionParams();
   params_is_mine = true;
 }
 LineDetector::LineDetector(LineDetectionParams* params) {
@@ -450,7 +389,54 @@ void LineDetector::computePointCloud(
       pcl_point.g = image.at<cv::Vec3b>(j, i)[1];
       pcl_point.b = image.at<cv::Vec3b>(j, i)[2];
       point_cloud->push_back(pcl_point);
+bool LineDetector::hessianNormalFormOfPlane(
+    const std::vector<cv::Vec3f>& points, cv::Vec4f* hessian_normal_form) {
+  CHECK_NOTNULL(hessian_normal_form);
+  const int num_points = points.size();
+  CHECK(num_points >= 3);
+  if (num_points == 3) {  // In this case an exact solution can be computed.
+    cv::Vec3f vec1 = points[1] - points[0];
+    cv::Vec3f vec2 = points[2] - points[0];
+    // This checks first if the points were too close.
+    double norms = cv::norm(vec1) * cv::norm(vec2);
+    if (norms < params_->min_distance_between_points_hessian) return false;
+    // Then if they lie on a line. The angle between the vectors must at least
+    // be 2 degrees.
+    double cos_theta = fabs(vec1.dot(vec2)) / norms;
+    if (cos_theta > params_->max_cos_theta_hessian_computation) return false;
+    // The normal already defines the orientation of the plane (it is
+    // perpendicular to both vectors, since they must lie within the plane).
+    cv::Vec3f normal = vec1.cross(vec2);
+    // Now bring the plane into the hessian normal form.
+    *hessian_normal_form =
+        cv::Vec4f(normal[0], normal[1], normal[2],
+                  computeDfromPlaneNormal(normal, points[0]));
+    *hessian_normal_form = (*hessian_normal_form) / cv::norm(normal);
+    return true;
+  } else {  // If there are more than 3 points, the solution is approximate.
+    cv::Vec3f mean(0.0f, 0.0f, 0.0f);
+    for (size_t i = 0; i < num_points; ++i) {
+      mean += points[i] / num_points;
     }
+    cv::Mat A(3, num_points, CV_64FC1);
+    for (size_t i = 0; i < num_points; ++i) {
+      A.at<double>(0, i) = points[i][0] - mean[0];
+      A.at<double>(1, i) = points[i][1] - mean[1];
+      A.at<double>(2, i) = points[i][2] - mean[2];
+    }
+    cv::Mat U, W, Vt;
+    cv::SVD::compute(A, W, U, Vt);
+    cv::Vec3f normal;
+    if (U.type() == CV_64FC1) {
+      normal =
+          cv::Vec3f(U.at<double>(0, 2), U.at<double>(1, 2), U.at<double>(2, 2));
+    } else if (U.type() == CV_32FC1) {
+      normal =
+          cv::Vec3f(U.at<float>(0, 2), U.at<float>(1, 2), U.at<float>(2, 2));
+    }
+    *hessian_normal_form = cv::Vec4f(normal[0], normal[1], normal[2],
+                                     computeDfromPlaneNormal(normal, mean));
+    return true;
   }
 }
 
