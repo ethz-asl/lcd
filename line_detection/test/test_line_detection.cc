@@ -182,7 +182,7 @@ TEST_F(LineDetectionTest, testHessianNormalFormOfPlane) {
   points.push_back(cv::Vec3f(5, 17, 1));
   points.push_back(cv::Vec3f(190, 3, 1));
   cv::Vec4f hessian_normal_form;
-  hessianNormalFormOfPlane(points, &hessian_normal_form);
+  line_detector_.hessianNormalFormOfPlane(points, &hessian_normal_form);
   EXPECT_EQ(hessian_normal_form[0], 0);
   EXPECT_EQ(hessian_normal_form[1], 0);
   EXPECT_EQ(hessian_normal_form[2], -1);
@@ -195,7 +195,7 @@ TEST_F(LineDetectionTest, testHessianNormalFormOfPlane) {
   points.push_back(cv::Vec3f(150, 23, 1));
   points.push_back(cv::Vec3f(1, 1, 1));
   points.push_back(cv::Vec3f(510, 189, 1));
-  hessianNormalFormOfPlane(points, &hessian_normal_form);
+  line_detector_.hessianNormalFormOfPlane(points, &hessian_normal_form);
   EXPECT_FLOAT_EQ(hessian_normal_form[0], 0);
   EXPECT_FLOAT_EQ(hessian_normal_form[1], 0);
   EXPECT_FLOAT_EQ(hessian_normal_form[2], 1);

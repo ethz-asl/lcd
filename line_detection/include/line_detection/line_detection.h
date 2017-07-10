@@ -5,30 +5,19 @@
 
 #include <chrono>
 #include <cmath>
-#include <iostream>
+#include <fstream>
 #include <limits>
 #include <random>
 #include <vector>
 
 #include <opencv2/core.hpp>
-#include <opencv2/highgui.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/line_descriptor/descriptor.hpp>
-#include <opencv2/rgbd.hpp>
 #include <opencv2/ximgproc.hpp>
-
-#include <pcl/point_types.h>
-#include <pcl/visualization/cloud_viewer.h>
-
-#include <visualization_msgs/Marker.h>
 
 #include <glog/logging.h>
 #include <gtest/gtest.h>
-
-#include <ros/ros.h>
-
-#include <assert.h>
 
 namespace line_detection {
 
@@ -187,24 +176,6 @@ cv::Vec3f computeMean(const std::vector<cv::Vec3f>& points) {
 // Returns the projection of a point on the plane given defined by the hessian.
 cv::Vec3f projectPointOnPlane(const cv::Vec4f& hessian, const cv::Vec3f& point);
 
-// This function stores lines in visualization msgs, such that they can be
-// handled by rviz.
-void storeLines3DinMarkerMsg(const std::vector<cv::Vec6f>& lines3D,
-                             visualization_msgs::Marker* disp_lines);
-void storeLines3DinMarkerMsg(const std::vector<cv::Vec6f>& lines3D,
-                             visualization_msgs::Marker* disp_lines,
-                             cv::Vec3f color);
-// Writes the pcl_cloud into a cv::Mat. It is speciallyzed for the point
-// clouds that are published by the point_cloud publisher of
-// scenenet_ros_tools.
-void pclFromSceneNetToMat(const pcl::PointCloud<pcl::PointXYZRGB>& pcl_cloud,
-                          cv::Mat* mat_cloud);
-
-void storeLinesAfterType(const std::vector<LineWithPlanes>& lines_in,
-                         std::vector<cv::Vec6f>* lines_discont,
-                         std::vector<cv::Vec6f>* lines_plane,
-                         std::vector<cv::Vec6f>* lines_inter);
-
 // Finds the y-coordinates of a line between two points.
 // Input: start:      Starting point of line.
 //        end:        End point of line. Note that start.x < end.x must
@@ -222,7 +193,6 @@ void storeLinesAfterType(const std::vector<LineWithPlanes>& lines_in,
 void findXCoordOfPixelsOnVector(const cv::Point2f& start,
                                 const cv::Point2f& end, bool left_side,
                                 std::vector<int>* y_coord);
-
 
 // Returns all pixels that are within or on the border of a rectangle.
 // Input: corners:  These corners define the rectangle. It must contain
@@ -270,22 +240,15 @@ class LineDetector {
                    std::vector<cv::Vec4f>* lines);
   void detectLines(const cv::Mat& image, std::vector<cv::Vec4f>* lines);
 
-  // computePointCloud:
-  // Input: image:    This is used to assign color values to the point cloud.
+  // This function computes the Hessian Normal Form of a plane given points on
+  // that plane.
+  // Input: points:   Must contain at least have 3 points that do not
+  //                  lie on a line. If 3 points are given, the plane normal is
+  //                  computed as the cross product. The solution is then exact.
+  //                  If more than 3 points are given the function solves a
+  //                  minimization problem (min sum (orthogonal dist)^2) through
+  //                  SVD.
   //
-  //        depth:    The actuall depth values. Is used to compute the point
-  //                  cloud.
-  //
-  //        K:        Calibration matrix of the camera.
-  //
-  //        point_coud: The points found are stored in there. The cloud is
-  //                    ordered. This means that for every pixel in depth/image
-  //                    there is a point. Therefore some points will have NaN
-  //                    values for coordinates (wherever the depth image
-  //                    contains NaN/zeros).
-  void computePointCloud(const cv::Mat& image, const cv::Mat& depth,
-                         const cv::Mat& K,
-                         pcl::PointCloud<pcl::PointXYZRGB>* point_cloud);
   // Output: hessian_normal_form: The first 3 entries are the normal vector n,
   //                              the last one is the parameter p
   bool hessianNormalFormOfPlane(const std::vector<cv::Vec3f>& points,
@@ -304,6 +267,9 @@ class LineDetector {
   // Simply paints all lines to image.
   void paintLines(const std::vector<cv::Vec4f>& lines, cv::Mat* image,
                   cv::Vec3b color = {255, 0, 0});
+
+  std::vector<cv::Vec4f> checkLinesInBounds(
+      const std::vector<cv::Vec4f>& lines2D, size_t x_max, size_t y_max);
 
   // Finds two rectangles left and right of a line defined by 4 corner points.
   // Input:   line:   The 2D line defined as (start, end).
