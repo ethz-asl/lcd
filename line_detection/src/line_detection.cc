@@ -288,7 +288,7 @@ LineDetector::LineDetector() {
       cv::line_descriptor::BinaryDescriptor::createBinaryDescriptor();
   fast_detector_ = cv::ximgproc::createFastLineDetector();
   params_ = new LineDetectionParams();
-  params_is_mine = true;
+  params_is_mine_ = true;
 }
 LineDetector::LineDetector(LineDetectionParams* params) {
   lsd_detector_ = cv::createLineSegmentDetector(cv::LSD_REFINE_STD);
@@ -296,10 +296,10 @@ LineDetector::LineDetector(LineDetectionParams* params) {
       cv::line_descriptor::BinaryDescriptor::createBinaryDescriptor();
   fast_detector_ = cv::ximgproc::createFastLineDetector();
   params_ = params;
-  params_is_mine = false;
+  params_is_mine_ = false;
 }
 LineDetector::~LineDetector() {
-  if (params_is_mine) {
+  if (params_is_mine_) {
     delete params_;
   }
 }
@@ -347,10 +347,15 @@ void LineDetector::detectLines(const cv::Mat& image, Detector detector,
   } else if (detector == Detector::HOUGH) {  // HOUGH_DETECTOR
     cv::Mat output;
     // Parameters of the Canny should not be changed (or better: the result is
-    // very likely to get worse);
-    cv::Canny(image, output, 50, 200, 3);
+    // very likely to get worse).
+    cv::Canny(image, output, params_->canny_edges_threshold1,
+              params_->canny_edges_threshold2, params_->canny_edges_aperture);
     // Here parameter changes might improve the result.
-    cv::HoughLinesP(output, *lines, 1, CV_PI / 180, 50, 30, 10);
+    cv::HoughLinesP(output, *lines, params_->hough_detector_rho,
+                    params_->hough_detector_theta,
+                    params_->hough_detector_threshold,
+                    params_->hough_detector_minLineLength,
+                    params_->hough_detector_maxLineGap);
   }
 }
 void LineDetector::detectLines(const cv::Mat& image,
@@ -975,14 +980,15 @@ void LineDetector::project2Dto3DwithPlanes(
     // This is a workaround, more efficiently this would be implemented in the
     // function find3DlineOnPlanes.
     bool is_discont = true;
-    if ((!right_found) && (!left_found))
+    if ((!right_found) && (!left_found)) {
       continue;
-    else if (!right_found)
+    } else if (!right_found) {
       inliers_right = inliers_left;
-    else if (!left_found)
+    } else if (!left_found) {
       inliers_left = inliers_right;
-    else
+    } else {
       is_discont = false;
+    }
     // If both planes were found, the inliers are handled to the
     // find3DlineOnPlanes function, which takes care of different special
     // cases.

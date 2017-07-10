@@ -72,6 +72,22 @@ struct LineDetectionParams {
   double min_distance_between_points_hessian = 1e-6;
   // default = 0.994: hessianNormalFormOfPlane
   double max_cos_theta_hessian_computation = 0.994;
+  // default = 50: hough line detector
+  unsigned int canny_edges_threshold1 = 50;
+  // default = 200: hough line detector
+  unsigned int canny_edges_threshold2 = 200;
+  // default = 3: hough line detector
+  unsigned int canny_edges_aperture = 3;
+  // default = 1: hough line detector
+  double hough_detector_rho = 1.0;
+  // default = kPi/180: hough line detector
+  double hough_detector_theta = kPi / 180.0;
+  // default = 10: hough line detector
+  unsigned int hough_detector_threshold = 10;
+  // default = 10: hough line detector
+  double hough_detector_minLineLength = 10.0;
+  // default = 5: hough line detector
+  double hough_detector_maxLineGap = 5.0;
 };
 
 // Returns true if lines are nearby and could be equal (low difference in angle
@@ -303,11 +319,10 @@ class LineDetector {
                           LineWithPlanes* line3D);
 
   // Uses two sets of points and fit a line, assuming that the two set of
-  // points are from a plane left and right of the line. Input: points1/2:
-  // The two set of poitns.
+  // points are from a plane left and right of the line.
+  // Input: points1/2:  The two set of points.
   //
-  //        line_guess: This is a guess of the line that is used if the two
-  //        sets
+  //       line_guess:  This is a guess of the line that is used if the two sets
   //                    belong to same plane. In this case a line cannot be
   //                    determined by the intersection of the planes.
   //
@@ -435,7 +450,7 @@ class LineDetector {
   // This function does a search for a line with non NaN start and end points in
   // 3D given a line in 2D. It then computes a number of inliers to this line
   // model returns the mean error of all inliers.
-  // Input: cloud:    Point cloud given as CV_32FC3.
+  // Input: point_cloud: Point cloud given as CV_32FC3.
   //
   //        line2D:   2D line in pixel coordinates.
   //
@@ -458,7 +473,7 @@ class LineDetector {
   cv::Ptr<cv::line_descriptor::BinaryDescriptor> edl_detector_;
   cv::Ptr<cv::ximgproc::FastLineDetector> fast_detector_;
   LineDetectionParams* params_;
-  bool params_is_mine;
+  bool params_is_mine_;
 
   // find3DLineStartAndEnd:
   // Input: point_cloud:    Mat of type CV_32FC3, that stores the 3D points. A
@@ -467,7 +482,7 @@ class LineDetector {
   //
   //        line2D:         The line that was extracted in 2D.
   //
-  // Output: lines3D:       If a 3D line is found it is push_backed to this
+  // Output: line3D:        If a 3D line is found it is push_backed to this
   //                        vector. It is stored: (x_s, y_s, z_s, x_e, y_e,
   //                        z_e), wher _s/_e means start resp. end point.
   //

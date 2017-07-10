@@ -122,9 +122,13 @@ void KMeansCluster::runLineMeans() {
     computeLineMeans();
   }
   CHECK(k_set_) << "You need to set K before clustering.";
-  constexpr int max_iter = 100;
+  if (K_ >= line_means_.size()) {
+    cluster_idx_ = std::vector<int>(line_means_.size(), 0);
+    return;
+  }
+  constexpr size_t max_iter = 100;
   constexpr double epsilon = 0.01;
-  constexpr int num_attempts = 3;
+  constexpr size_t num_attempts = 3;
   cv::kmeans(line_means_, K_, cluster_idx_,
              cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::COUNT,
                               max_iter, epsilon),
@@ -155,9 +159,13 @@ void KMeansCluster::initClusteringWithHessians(double scale_hessians) {
 void KMeansCluster::runOnLinesAndHessians() {
   if (!cluster_with_hessians_init_) initClusteringWithHessians(0.5);
   CHECK(k_set_) << "You need to set K before clustering.";
-  constexpr int max_iter = 100;
+  constexpr size_t max_iter = 100;
   constexpr double epsilon = 0.01;
-  constexpr int num_attempts = 3;
+  constexpr size_t num_attempts = 3;
+  if (K_ >= lines_and_hessians_.size()) {
+    cluster_idx_ = std::vector<int>(lines_and_hessians_.size(), 0);
+    return;
+  }
   cv::kmeans(lines_and_hessians_, K_, cluster_idx_,
              cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::COUNT,
                               max_iter, epsilon),
