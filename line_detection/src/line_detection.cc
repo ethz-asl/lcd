@@ -1059,8 +1059,9 @@ void LineDetector::find3DlinesByShortest(const cv::Mat& cloud,
           for (int y_end = y_min_end; y_end <= y_max_end; ++y_end) {
             // Check that the corresponding 3D point is not NaN.
             if (std::isnan(cloud.at<cv::Vec3f>(y_start, x_start)[0]) ||
-                std::isnan(cloud.at<cv::Vec3f>(y_end, x_end)[0]))
+                std::isnan(cloud.at<cv::Vec3f>(y_end, x_end)[0])) {
               continue;
+            }
             // Compute distance and compare it to the optimal distance found
             // so far.
             start = cloud.at<cv::Vec3f>(y_start, x_start);
@@ -1198,8 +1199,9 @@ void LineDetector::runCheckOn2DLines(const cv::Mat& cloud,
   size_t N = lines2D_in.size();
   lines2D_out->clear();
   for (size_t i = 0; i < N; ++i) {
-    if (checkIfValidLineDiscont(cloud, lines2D_in[i]))
+    if (checkIfValidLineDiscont(cloud, lines2D_in[i])) {
       lines2D_out->push_back(lines2D_in[i]);
+    }
   }
 }
 
@@ -1351,7 +1353,7 @@ bool LineDetector::printToFile(const std::vector<LineWithPlanes>& lines3D,
     file.close();
     return true;
   } else {
-    ROS_INFO("LineDetector::printToFile: File could not be opened.");
+    LOG(INFO) << "LineDetector::printToFile: File could not be opened.";
     file.close();
     return false;
   }
