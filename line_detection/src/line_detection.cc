@@ -1278,25 +1278,4 @@ bool LineDetector::checkIfValidLineDiscont(const cv::Mat& cloud,
   return true;
 }
 
-bool LineDetector::printToFile(const std::vector<LineWithPlanes>& lines3D,
-                               const std::string& path) {
-  std::ofstream file(path);
-  if (file.is_open()) {
-    for (size_t i = 0; i < lines3D.size(); ++i) {
-      for (int j = 0; j < 6; ++j) file << lines3D[i].line[j] << " ";
-      for (int j = 0; j < 4; ++j) file << lines3D[i].hessians[0][j] << " ";
-      for (int j = 0; j < 4; ++j) file << lines3D[i].hessians[1][j] << " ";
-      for (int j = 0; j < 3; ++j) file << (int)lines3D[i].colors[0][j] << " ";
-      for (int j = 0; j < 2; ++j) file << (int)lines3D[i].colors[1][j] << " ";
-      file << (int)lines3D[i].colors[1][2] << std::endl;
-    }
-    file.close();
-    return true;
-  } else {
-    LOG(INFO) << "LineDetector::printToFile: File could not be opened.";
-    file.close();
-    return false;
-  }
-}
-
 }  // namespace line_detection

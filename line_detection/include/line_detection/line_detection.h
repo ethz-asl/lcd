@@ -438,9 +438,6 @@ class LineDetector {
   double findAndRate3DLine(const cv::Mat& point_cloud, const cv::Vec4f& line2D,
                            cv::Vec6f* line3D);
 
-  bool printToFile(const std::vector<LineWithPlanes>& lines3D,
-                   const std::string& path);
-
  private:
   cv::Ptr<cv::LineSegmentDetector> lsd_detector_;
   cv::Ptr<cv::line_descriptor::BinaryDescriptor> edl_detector_;

@@ -3,6 +3,7 @@
 
 #include "line_clustering/common.h"
 #include "line_detection/line_detection.h"
+#include "line_detection/line_detection_inl.h"
 
 namespace line_clustering {
 
@@ -52,6 +53,49 @@ class KMeansCluster {
   std::vector<cv::Vec<float, 14> > lines_and_hessians_;
 };
 
+// A class that performs clustering of features based on the kmediods algorithm.
+// The advantage of this method is, that it can use a precomputed distance
+// matrix, that stores the distance between all nodes. This means, an arbitrary
+// distance measure can be used.
+class KMedoidsCluster {
+ public:
+  KMedoidsCluster();
+  KMedoidsCluster(const cv::Mat& dist_mat, size_t K);
+  void setDistanceMatrix(const cv::Mat& dist_mat);
+  void setK(size_t K);
+  // Run the clustering.
+  void cluster();
+  std::vector<size_t> getLabels();
+
+ protected:
+  // Initialize clustering.
+  void init();
+  // Assign every node to its nearest center.
+  void assignDataPoints();
+  // Within a cluster, choose the node as a center so that the sum of all
+  // distances to this center is minimized.
+  void reasssignMediods();
+  // Reads out the distance matrix. Additionally guarantees that only the upper
+  // triangle of the matrix is accessed.
+  double dist(size_t i, size_t j);
+  // Stores the cluster centers.
+  std::vector<size_t> centers_;
+  // For every features, this vector stores the index of the if its
+  // corresponding center in the centers_ vector. By storing the vector index,
+  // and not the actual node index, this labeling is guaranteed to be zero
+  // based.
+  std::vector<size_t> labels_;
+  // Stores the clusters.
+  std::vector<std::vector<size_t> > clusters_;
+  // Number of clusters.
+  size_t K_;
+  // Distance matrix. dist_mat(i, j) denotes the distance between node i and j.
+  // It is sufficient if the its a upper triangular matrix.
+  cv::Mat dist_mat_;
+  // Number of points equals number of nodes.
+  size_t num_points_;
+  bool k_set_, dist_mat_set_;
+};
 }  // namespace line_clustering
 
 #include "line_clustering/line_clustering_inl.h"

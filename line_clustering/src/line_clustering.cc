@@ -173,4 +173,130 @@ void KMeansCluster::runOnLinesAndHessians() {
 }
 
 std::vector<cv::Vec6f> KMeansCluster::getLines() { return lines_; }
+
+KMedoidsCluster::KMedoidsCluster() {
+  k_set_ = false;
+  dist_mat_set_ = false;
+}
+KMedoidsCluster::KMedoidsCluster(const cv::Mat& dist_mat, size_t K) {
+  setDistanceMatrix(dist_mat);
+  setK(K);
+}
+
+void KMedoidsCluster::setDistanceMatrix(const cv::Mat& dist_mat) {
+  CHECK(dist_mat.cols == dist_mat.rows);
+  CHECK(dist_mat.type() == CV_32FC1);
+  num_points_ = dist_mat.cols;
+  dist_mat_ = dist_mat;
+  dist_mat_set_ = true;
+}
+
+void KMedoidsCluster::setK(size_t K) {
+  K_ = K;
+  k_set_ = true;
+}
+
+void KMedoidsCluster::cluster() {
+  CHECK(k_set_) << "K must be set before clustering.";
+  CHECK(dist_mat_set_) << "The distance matrix must be set before clustering.";
+  init();
+  std::vector<size_t> centers_old;
+  bool centers_changed;
+  constexpr size_t max_iter = 1e4;
+  size_t iter = 0;
+  do {
+    if (iter > max_iter) {
+      break;
+    }
+    centers_old = centers_;
+    assignDataPoints();
+    reasssignMediods();
+    centers_changed = false;
+    // Check if an entry in centers has changed.
+    for (size_t i = 0; i < centers_.size(); ++i) {
+      if (centers_[i] != centers_old[i]) {
+        centers_changed = true;
+        break;
+      }
+    }
+    ++iter;
+  } while (centers_changed);
+}
+
+std::vector<size_t> KMedoidsCluster::getLabels() { return labels_; }
+
+void KMedoidsCluster::init() {
+  size_t k;
+  // Do not allow more clusters than data points.
+  if (num_points_ <= K_) {
+    k = num_points_;
+  } else {
+    k = K_;
+  }
+  // Set cluster size to k.
+  clusters_.resize(k);
+  labels_.clear();
+  // Init labels with their own idx. This vector is used to sample the centers
+  // from it.
+  for (size_t i = 0; i < num_points_; ++i) {
+    labels_.push_back(i);
+  }
+  // No need to do a random sampling if every node is its own cluster.
+  if (k == num_points_) {
+    centers_ = labels_;
+  } else {
+    line_detection::getNUniqueRandomElements(labels_, k, &centers_);
+  }
+}
+
+double KMedoidsCluster::dist(size_t i, size_t j) {
+  // Only look up the upper triangle of the matrix.
+  if (i < j) {
+    return dist_mat_.at<float>(i, j);
+  } else {
+    return dist_mat_.at<float>(j, i);
+  }
+}
+
+void KMedoidsCluster::assignDataPoints() {
+  size_t idx;
+  // Reset all clusters.
+  for (size_t i = 0; i < clusters_.size(); ++i) {
+    clusters_[i].clear();
+  }
+  // For every data point, compute the nearest center.
+  for (size_t i = 0; i < num_points_; ++i) {
+    idx = 0;
+    for (size_t j = 1; j < centers_.size(); ++j) {
+      if (dist(i, centers_[j]) < dist(i, centers_[idx])) {
+        idx = j;
+      }
+    }
+    labels_[i] = idx;
+    clusters_[idx].push_back(i);
+  }
+}
+
+void KMedoidsCluster::reasssignMediods() {
+  float min_dist, dist_temp;
+  size_t min_dist_idx;
+  // For every data point compute the sum of distances to all other data points
+  // in the same cluster. In every cluster, reassign the center to the data
+  // point with the lowest summed distance.
+  for (size_t i = 0; i < clusters_.size(); ++i) {
+    min_dist = 1e38;
+    for (size_t j = 0; j < clusters_[i].size(); ++j) {
+      dist_temp = 0.0f;
+      for (size_t k = 0; k < clusters_[i].size(); ++k) {
+        dist_temp += dist(clusters_[i][j], clusters_[i][k]);
+      }
+      if (dist_temp < min_dist) {
+        min_dist_idx = j;
+        min_dist = dist_temp;
+      }
+    }
+    centers_[i] = clusters_[i][min_dist_idx];
+  }
+}
+
 }  // namespace line_clustering

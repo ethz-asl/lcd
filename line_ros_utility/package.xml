@@ -32,6 +32,7 @@
   <depend>tf</depend>
   <depend>dynamic_reconfigure</depend>
   <depend>image_geometry</depend>
+  <depend>rospy</depend>
 
   <depend>line_detection</depend>
   <depend>line_clustering</depend>

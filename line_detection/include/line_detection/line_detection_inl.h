@@ -44,7 +44,8 @@ void getNUniqueRandomElements(const std::vector<T>& in, size_t num_samples,
 }
 
 // An overload, that allows the use without specifyng an random engine. Be
-// careful if this is used in a loop.
+// careful if this is used in a loop (because the seed might be the same for
+// very small time differences between calls).
 template <typename T>
 void getNUniqueRandomElements(const std::vector<T>& in, size_t num_samples,
                               std::vector<T>* out) {
