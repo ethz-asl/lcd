@@ -10,11 +10,14 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from line_ros_utility.srv import *
 
+# relative path of training data from the rospackage.
+path_train_data = '/../data/traj_51'
+
 class RandomForestDistanceMeasure():
     random_forest = learn.RandomForestClassifier()
     def __init__(self):
         self.path = rospkg.RosPack().get_path('line_ros_utility')
-        train_path = self.path + '/../data/traj_50'
+        train_path = self.path + path_train_data
         from_txt = np.loadtxt(train_path + '/lines_with_labels_0.txt')
         for i in range(1, 299):
             temp_data = np.loadtxt(train_path + '/lines_with_labels_' + str(i) + '.txt')
@@ -24,24 +27,6 @@ class RandomForestDistanceMeasure():
         self.labels = from_txt[:,-1]
         self.random_forest.fit(self.data, self.labels)
         self.cvbridge = CvBridge()
-
-    def storeTreeInformation(self):
-        test_path = self.path + '/../data/traj_50/tree_data/tree_'
-        for i in range(len(self.random_forest.estimators_)):
-            np.savetxt(test_path + str(i) + '.txt',
-                       np.vstack((self.random_forest.estimators_[i].tree_.children_left,
-                                  self.random_forest.estimators_[i].tree_.children_right)),
-                       delimiter=' ', fmt='%d')
-        test_path = self.path + '/../data/traj_51'
-        for i in range(299):
-            from_txt = np.loadtxt(test_path + '/lines_with_labels_' + str(i) + '.txt')
-            if from_txt.ndim < 0:
-                continue
-            for j in range(len(self.random_forest.estimators_)):
-                non_zero = self.random_forest.estimators_[j].decision_path(from_txt[:, 0:-1]).nonzero()
-                np.savetxt(test_path + '/rf_data/decision_path_' + str(i) + '_' + str(j) + '.txt',
-                           np.vstack(non_zero),
-                           delimiter=' ', fmt='%d')
 
     def return_trees(self, req):
         print 'Recieved tree request.'
@@ -61,8 +46,7 @@ class RandomForestDistanceMeasure():
             np_array[i, :] = req.lines[i*20:(i+1)*20]
         for i in range(len(self.random_forest.estimators_)):
             image = np.array(self.random_forest.estimators_[i].decision_path(np_array).nonzero(), dtype=float)
-            image_list.append(self.cvbridge.cv2_to_imgmsg(
-                              image, "64FC1"))
+            image_list.append(self.cvbridge.cv2_to_imgmsg(image, "64FC1"))
         return RequestDecisionPathResponse(image_list)
 
 def run():

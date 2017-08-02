@@ -156,6 +156,19 @@ void KMeansCluster::initClusteringWithHessians(double scale_hessians) {
   cluster_with_hessians_init_ = true;
 }
 
+cv::Mat KMeansCluster::getDistanceMatrix() {
+  CHECK(cluster_with_hessians_init_);
+  const size_t num_lines = lines_and_hessians_.size();
+  cv::Mat dist_mat = cv::Mat::zeros(num_lines, num_lines, CV_32FC1);
+  for (size_t i = 0; i < num_lines; ++i) {
+    for (size_t j = i + 1; j < num_lines; ++j) {
+      dist_mat.at<float>(i, j) =
+          cv::norm(lines_and_hessians_[i] - lines_and_hessians_[j]);
+    }
+  }
+  return dist_mat;
+}
+
 void KMeansCluster::runOnLinesAndHessians() {
   if (!cluster_with_hessians_init_) initClusteringWithHessians(0.5);
   CHECK(k_set_) << "You need to set K before clustering.";

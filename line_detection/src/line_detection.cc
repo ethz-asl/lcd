@@ -1,5 +1,4 @@
 #include "line_detection/line_detection.h"
-#include "line_detection/line_detection_inl.h"
 
 namespace line_detection {
 
@@ -555,8 +554,8 @@ std::vector<cv::Vec4f> LineDetector::checkLinesInBounds(
   CHECK(y_max > 0);
   std::vector<cv::Vec4f> new_lines;
   new_lines.reserve(lines2D.size());
-  double x_bound = (double)x_max - 1e-9;
-  double y_bound = (double)y_max - 1e-9;
+  double x_bound = static_cast<double>(x_max) - 1e-9;
+  double y_bound = static_cast<double>(y_max) - 1e-9;
   for (size_t i = 0; i < lines2D.size(); ++i) {
     new_lines.push_back({checkInBoundary(lines2D[i][0], 0, x_bound),
                          checkInBoundary(lines2D[i][1], 0, y_bound),
@@ -882,15 +881,12 @@ void LineDetector::project2Dto3DwithPlanes(
       if (std::isnan(cloud.at<cv::Vec3f>(points_in_rect[j])[0])) continue;
       plane_point_cand.push_back(cloud.at<cv::Vec3f>(points_in_rect[j]));
     }
+    left_found = false;
     if (plane_point_cand.size() > min_points_for_ransac) {
       planeRANSAC(plane_point_cand, &inliers_left);
-      if (inliers_left.size() < min_inliers * plane_point_cand.size()) {
-        left_found = false;
-      } else {
+      if (inliers_left.size() >= min_inliers * plane_point_cand.size()) {
         left_found = true;
       }
-    } else {
-      left_found = false;
     }
     // Find lines for the right side.
     findPointsInRectangle(rect_right, &points_in_rect);
@@ -906,15 +902,12 @@ void LineDetector::project2Dto3DwithPlanes(
       if (std::isnan(cloud.at<cv::Vec3f>(points_in_rect[j])[0])) continue;
       plane_point_cand.push_back(cloud.at<cv::Vec3f>(points_in_rect[j]));
     }
+    right_found = false;
     if (plane_point_cand.size() > min_points_for_ransac) {
       planeRANSAC(plane_point_cand, &inliers_right);
-      if (inliers_right.size() < min_inliers * plane_point_cand.size()) {
-        right_found = false;
-      } else {
+      if (inliers_right.size() >= min_inliers * plane_point_cand.size()) {
         right_found = true;
       }
-    } else {
-      right_found = false;
     }
     // If any of planes were not found, the line is found at a discontinouty.
     // This is a workaround, more efficiently this would be implemented in the

@@ -38,6 +38,8 @@ class KMeansCluster {
   // adjecent to the lines.
   void initClusteringWithHessians(double scale_hessians);
   void runOnLinesAndHessians();
+  // Returns distance matrix.
+  cv::Mat getDistanceMatrix();
   // Returns the lines.
   std::vector<cv::Vec6f> getLines();
   // This array contains the labels of the lines.
@@ -94,6 +96,8 @@ class KMedoidsCluster {
   cv::Mat dist_mat_;
   // Number of points equals number of nodes.
   size_t num_points_;
+  // These are used to make sure that k and the distance matrix are set before
+  // clustering.
   bool k_set_, dist_mat_set_;
 };
 }  // namespace line_clustering

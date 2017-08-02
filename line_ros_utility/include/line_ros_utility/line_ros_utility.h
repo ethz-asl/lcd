@@ -47,6 +47,8 @@ struct SearchTree {
 std::vector<int> clusterLinesAfterClassification(
     const std::vector<line_detection::LineWithPlanes>& lines);
 
+// The lines are printed in the file given by path. They are in the format that
+// can be read by the random_forest.py node.
 bool printToFile(const std::vector<line_detection::LineWithPlanes>& lines3D,
                  const std::vector<int>& labels, const std::string& path);
 

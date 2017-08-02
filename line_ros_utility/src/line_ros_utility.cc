@@ -3,6 +3,7 @@
 namespace line_ros_utility {
 
 const std::string frame_id = "line_tools_id";
+const bool write_labeled_lines = false;
 const std::string kWritePath =
     "/home/dominik/catkin_ws/src/3d_line_toolbox/data/traj_50";
 
@@ -277,8 +278,6 @@ void ListenAndPublish::masterCallback(
       cv_bridge::toCvShare(rosmsg_cloud, "32FC3");
   cv_cloud_ = cv_cloud_ptr->image;
   CHECK(cv_cloud_.type() == CV_32FC3);
-  CHECK(cv_cloud_.cols == 320);
-  CHECK(cv_cloud_.rows == 240);
   // Extract image from message.
   cv_bridge::CvImageConstPtr cv_img_ptr =
       cv_bridge::toCvShare(rosmsg_image, "rgb8");
@@ -299,19 +298,22 @@ void ListenAndPublish::masterCallback(
   ROS_INFO("**** New Image ******");
   detectLines();
   projectTo3D();
+  ROS_INFO("Kept lines: %d/%d", lines3D_temp_wp_.size(), lines2D_.size());
   checkLines();
   printNumberOfLines();
   clusterKmeans();
   labelLinesWithInstances(lines3D_with_planes_, cv_instances_, camera_info_,
                           &labels_);
   clusterKmedoid();
-  // std::string path =
-  //     kWritePath + "/lines_with_labels_" + std::to_string(iteration_) +
-  //     ".txt";
-  // printToFile(lines3D_with_planes_, labels_, path);
 
-  initDisplay();
-  writeMatToPclCloud(cv_cloud_, cv_image_, &pcl_cloud_);
+  if (write_labeled_lines) {
+    std::string path = kWritePath + "/lines_with_labels_" +
+                       std::to_string(iteration_) + ".txt";
+    printToFile(lines3D_with_planes_, labels_, path);
+
+    initDisplay();
+    writeMatToPclCloud(cv_cloud_, cv_image_, &pcl_cloud_);
+  }
 
   // The timestamp is set to 0 because rviz is not able to find the right
   // transformation otherwise.
@@ -364,7 +366,9 @@ void ListenAndPublish::labelLinesWithInstances(
       // Find the index of the color in the known_colors vector
       size_t j = 0;
       for (; j < known_colors_.size(); ++j) {
-        if (known_colors_[j] == color) break;
+        if (known_colors_[j] == color) {
+          break;
+        }
       }
       // If we did not find the color in the known_colors, push it back to it.
       if (j == known_colors_.size()) {
