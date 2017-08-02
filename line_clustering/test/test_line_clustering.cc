@@ -87,6 +87,7 @@ TEST_F(LineClusteringTest, testrunLineMeans) {
     }
   }
 }
+
 }  // namespace line_clustering
 
 LINE_CLUSTERING_TESTING_ENTRYPOINT

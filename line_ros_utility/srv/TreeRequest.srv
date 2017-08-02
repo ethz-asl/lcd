@@ -1,0 +1,3 @@
+uint8 ask_for_trees
+---
+sensor_msgs/Image[] trees

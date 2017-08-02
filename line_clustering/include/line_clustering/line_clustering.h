@@ -1,10 +1,9 @@
 #ifndef LINE_CLUSTERING_LINE_CLUSTERING_H_
 #define LINE_CLUSTERING_LINE_CLUSTERING_H_
 
-#include <ros/ros.h>
-
 #include "line_clustering/common.h"
 #include "line_detection/line_detection.h"
+#include "line_detection/line_detection_inl.h"
 
 namespace line_clustering {
 
@@ -33,10 +32,14 @@ class KMeansCluster {
   void setLines(const std::vector<line_detection::LineWithPlanes>& lines3D);
   // Computes the means of the lines that are used to cluster them.
   void computeLineMeans();
-  // Performs the clustering.
+  // Performs the clustering on the means of lines.
   void runLineMeans();
+  // This initializes clustering with the additional information of the planes
+  // adjecent to the lines.
   void initClusteringWithHessians(double scale_hessians);
   void runOnLinesAndHessians();
+  // Returns distance matrix.
+  cv::Mat getDistanceMatrix();
   // Returns the lines.
   std::vector<cv::Vec6f> getLines();
   // This array contains the labels of the lines.
@@ -52,42 +55,51 @@ class KMeansCluster {
   std::vector<cv::Vec<float, 14> > lines_and_hessians_;
 };
 
-// This class helps publishing several different clusters of lines in different
-// colors, so that they are visualized by rviz.
-// IMPORTANT: This function cannot display more clusters than there are colors
-//            defined in the constructor. If more clusters are given to the
-//            object, only the one with the highest labels are published.
-class DisplayClusters {
+// A class that performs clustering of features based on the kmediods algorithm.
+// The advantage of this method is, that it can use a precomputed distance
+// matrix, that stores the distance between all nodes. This means, an arbitrary
+// distance measure can be used.
+class KMedoidsCluster {
  public:
-  DisplayClusters();
-  // Frame id of the marker message.
-  void setFrameID(const std::string& frame_id);
+  KMedoidsCluster();
+  KMedoidsCluster(const cv::Mat& dist_mat, size_t K);
+  void setDistanceMatrix(const cv::Mat& dist_mat);
+  void setK(size_t K);
+  // Run the clustering.
+  void cluster();
+  std::vector<size_t> getLabels();
 
-  // Is used as input for the clusters to the class:
-  // lines3D:   Vector of 3D lines.
-  //
-  // labels:    Vector of equal size as lines3D. Every entry labels the cluster
-  //            the 3D line with the same index belongs to. The lables should be
-  //            continous ((0,1,2,3 -> good), (0,4,8,16 -> bad)), because the
-  //            highest label defines how many clusters are created (in the
-  //            latter case of the example 17 clusters will be created, but only
-  //            4 will contain information).
-  void setClusters(const std::vector<cv::Vec6f>& lines3D,
-                   const std::vector<int>& labels);
-
-  // This functions advertises the message.
-  void initPublishing(ros::NodeHandle& node_handle);
-  void publish();
-
- private:
-  bool frame_id_set_, clusters_set_, initialized_;
-  std::vector<visualization_msgs::Marker> marker_lines_;
-  std::vector<std::vector<cv::Vec6f> > line_clusters_;
-  std::vector<ros::Publisher> pub_;
-  std::string frame_id_;
-  std::vector<cv::Vec3f> colors_;
+ protected:
+  // Initialize clustering.
+  void init();
+  // Assign every node to its nearest center.
+  void assignDataPoints();
+  // Within a cluster, choose the node as a center so that the sum of all
+  // distances to this center is minimized.
+  void reasssignMediods();
+  // Reads out the distance matrix. Additionally guarantees that only the upper
+  // triangle of the matrix is accessed.
+  double dist(size_t i, size_t j);
+  // Stores the cluster centers.
+  std::vector<size_t> centers_;
+  // For every features, this vector stores the index of the if its
+  // corresponding center in the centers_ vector. By storing the vector index,
+  // and not the actual node index, this labeling is guaranteed to be zero
+  // based.
+  std::vector<size_t> labels_;
+  // Stores the clusters.
+  std::vector<std::vector<size_t> > clusters_;
+  // Number of clusters.
+  size_t K_;
+  // Distance matrix. dist_mat(i, j) denotes the distance between node i and j.
+  // It is sufficient if the its a upper triangular matrix.
+  cv::Mat dist_mat_;
+  // Number of points equals number of nodes.
+  size_t num_points_;
+  // These are used to make sure that k and the distance matrix are set before
+  // clustering.
+  bool k_set_, dist_mat_set_;
 };
-
 }  // namespace line_clustering
 
 #include "line_clustering/line_clustering_inl.h"

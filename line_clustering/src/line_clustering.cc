@@ -156,6 +156,19 @@ void KMeansCluster::initClusteringWithHessians(double scale_hessians) {
   cluster_with_hessians_init_ = true;
 }
 
+cv::Mat KMeansCluster::getDistanceMatrix() {
+  CHECK(cluster_with_hessians_init_);
+  const size_t num_lines = lines_and_hessians_.size();
+  cv::Mat dist_mat = cv::Mat::zeros(num_lines, num_lines, CV_32FC1);
+  for (size_t i = 0; i < num_lines; ++i) {
+    for (size_t j = i + 1; j < num_lines; ++j) {
+      dist_mat.at<float>(i, j) =
+          cv::norm(lines_and_hessians_[i] - lines_and_hessians_[j]);
+    }
+  }
+  return dist_mat;
+}
+
 void KMeansCluster::runOnLinesAndHessians() {
   if (!cluster_with_hessians_init_) initClusteringWithHessians(0.5);
   CHECK(k_set_) << "You need to set K before clustering.";
@@ -174,85 +187,128 @@ void KMeansCluster::runOnLinesAndHessians() {
 
 std::vector<cv::Vec6f> KMeansCluster::getLines() { return lines_; }
 
-DisplayClusters::DisplayClusters() {
-  colors_.push_back({1, 0, 0});
-  colors_.push_back({0, 1, 0});
-  colors_.push_back({0, 0, 1});
-  colors_.push_back({1, 1, 0});
-  colors_.push_back({1, 0, 1});
-  colors_.push_back({0, 1, 1});
-  colors_.push_back({1, 0.5, 0});
-  colors_.push_back({1, 0, 0.5});
-  colors_.push_back({0.5, 1, 0});
-  colors_.push_back({0, 1, 0.5});
-  colors_.push_back({0.5, 0, 1});
-  colors_.push_back({0, 0.5, 1});
-
-  frame_id_set_ = false;
-  clusters_set_ = false;
-  initialized_ = false;
+KMedoidsCluster::KMedoidsCluster() {
+  k_set_ = false;
+  dist_mat_set_ = false;
+}
+KMedoidsCluster::KMedoidsCluster(const cv::Mat& dist_mat, size_t K) {
+  setDistanceMatrix(dist_mat);
+  setK(K);
 }
 
-void DisplayClusters::setFrameID(const std::string& frame_id) {
-  frame_id_ = frame_id;
-  frame_id_set_ = true;
+void KMedoidsCluster::setDistanceMatrix(const cv::Mat& dist_mat) {
+  CHECK(dist_mat.cols == dist_mat.rows);
+  CHECK(dist_mat.type() == CV_32FC1);
+  num_points_ = dist_mat.cols;
+  dist_mat_ = dist_mat;
+  dist_mat_set_ = true;
 }
 
-void DisplayClusters::setClusters(const std::vector<cv::Vec6f>& lines3D,
-                                  const std::vector<int>& labels) {
-  CHECK_EQ(lines3D.size(), labels.size());
-  CHECK(frame_id_set_) << "line_clustering::DisplayClusters::setClusters: You "
-                          "need to set the frame_id before setting the "
-                          "clusters.";
-  size_t N = 0;
-  line_clusters_.clear();
-  for (size_t i = 0; i < lines3D.size(); ++i) {
-    // This if clause sets the number of clusters. This works well as long the
-    // clusters are indexed as an array (0,1,2,3). In any other case, it creates
-    // to many clusters (which is not that bad, because empty clusters do not
-    // need a lot of memory nor a lot of time to allocate), but if one label is
-    // higher than the number of colors defined in the constructor (which
-    // defines the number of labels that can be displayed), some clusters might
-    // not be displayed.
-    if (labels[i] >= N) {
-      N = 1 + labels[i];
-      line_clusters_.resize(N);
+void KMedoidsCluster::setK(size_t K) {
+  K_ = K;
+  k_set_ = true;
+}
+
+void KMedoidsCluster::cluster() {
+  CHECK(k_set_) << "K must be set before clustering.";
+  CHECK(dist_mat_set_) << "The distance matrix must be set before clustering.";
+  init();
+  std::vector<size_t> centers_old;
+  bool centers_changed;
+  constexpr size_t max_iter = 1e4;
+  size_t iter = 0;
+  do {
+    if (iter > max_iter) {
+      break;
     }
-    CHECK(labels[i] >= 0) << "line_clustering::DisplayClusters::setClusters: "
-                             "Negative lables are not allowed.";
-    line_clusters_[labels[i]].push_back(lines3D[i]);
-  }
-  marker_lines_.resize(line_clusters_.size());
-  size_t n;
-  for (size_t i = 0; i < line_clusters_.size(); ++i) {
-    n = i % colors_.size();
-    line_detection::storeLines3DinMarkerMsg(line_clusters_[i],
-                                            &marker_lines_[i], colors_[n]);
-    marker_lines_[i].header.frame_id = frame_id_;
-  }
-  clusters_set_ = true;
+    centers_old = centers_;
+    assignDataPoints();
+    reasssignMediods();
+    centers_changed = false;
+    // Check if an entry in centers has changed.
+    for (size_t i = 0; i < centers_.size(); ++i) {
+      if (centers_[i] != centers_old[i]) {
+        centers_changed = true;
+        break;
+      }
+    }
+    ++iter;
+  } while (centers_changed);
 }
 
-void DisplayClusters::initPublishing(ros::NodeHandle& node_handle) {
-  pub_.resize(colors_.size());
-  for (size_t i = 0; i < colors_.size(); ++i) {
-    std::stringstream topic;
-    topic << "/visualization_marker_" << i;
-    pub_[i] =
-        node_handle.advertise<visualization_msgs::Marker>(topic.str(), 1000);
+std::vector<size_t> KMedoidsCluster::getLabels() { return labels_; }
+
+void KMedoidsCluster::init() {
+  size_t k;
+  // Do not allow more clusters than data points.
+  if (num_points_ <= K_) {
+    k = num_points_;
+  } else {
+    k = K_;
   }
-  initialized_ = true;
+  // Set cluster size to k.
+  clusters_.resize(k);
+  labels_.clear();
+  // Init labels with their own idx. This vector is used to sample the centers
+  // from it.
+  for (size_t i = 0; i < num_points_; ++i) {
+    labels_.push_back(i);
+  }
+  // No need to do a random sampling if every node is its own cluster.
+  if (k == num_points_) {
+    centers_ = labels_;
+  } else {
+    line_detection::getNUniqueRandomElements(labels_, k, &centers_);
+  }
 }
 
-void DisplayClusters::publish() {
-  CHECK(initialized_)
-      << "You need to call initPublishing to advertise before publishing.";
-  CHECK(frame_id_set_) << "You need to set the frame_id before publishing.";
-  CHECK(clusters_set_) << "You need to set the clusters before publishing.";
-  size_t n;
-  for (size_t i = 0; i < marker_lines_.size(); ++i) {
-    n = i % pub_.size();
-    pub_[n].publish(marker_lines_[i]);
+double KMedoidsCluster::dist(size_t i, size_t j) {
+  // Only look up the upper triangle of the matrix.
+  if (i < j) {
+    return dist_mat_.at<float>(i, j);
+  } else {
+    return dist_mat_.at<float>(j, i);
+  }
+}
+
+void KMedoidsCluster::assignDataPoints() {
+  size_t idx;
+  // Reset all clusters.
+  for (size_t i = 0; i < clusters_.size(); ++i) {
+    clusters_[i].clear();
+  }
+  // For every data point, compute the nearest center.
+  for (size_t i = 0; i < num_points_; ++i) {
+    idx = 0;
+    for (size_t j = 1; j < centers_.size(); ++j) {
+      if (dist(i, centers_[j]) < dist(i, centers_[idx])) {
+        idx = j;
+      }
+    }
+    labels_[i] = idx;
+    clusters_[idx].push_back(i);
+  }
+}
+
+void KMedoidsCluster::reasssignMediods() {
+  float min_dist, dist_temp;
+  size_t min_dist_idx;
+  // For every data point compute the sum of distances to all other data points
+  // in the same cluster. In every cluster, reassign the center to the data
+  // point with the lowest summed distance.
+  for (size_t i = 0; i < clusters_.size(); ++i) {
+    min_dist = 1e38;
+    for (size_t j = 0; j < clusters_[i].size(); ++j) {
+      dist_temp = 0.0f;
+      for (size_t k = 0; k < clusters_[i].size(); ++k) {
+        dist_temp += dist(clusters_[i][j], clusters_[i][k]);
+      }
+      if (dist_temp < min_dist) {
+        min_dist_idx = j;
+        min_dist = dist_temp;
+      }
+    }
+    centers_[i] = clusters_[i][min_dist_idx];
   }
 }
 

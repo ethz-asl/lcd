@@ -13,18 +13,11 @@ cs_add_library(${PROJECT_NAME}
 add_executable(detector src/detector_node.cc)
 target_link_libraries(detector ${PROJECT_NAME})
 
-add_executable(detect_and_show_3D src/detect_and_show_3D_node.cc)
-target_link_libraries(detect_and_show_3D ${PROJECT_NAME})
-
 add_executable(general_test general_tests.cc)
 target_link_libraries(general_test ${PROJECT_NAME})
 
 add_executable(send_to_detector send_to_detector.cc)
 target_link_libraries(send_to_detector ${catkin_LIBRARIES})
-
-add_executable(test_point_cloud_view test_point_cloud_view.cc)
-target_link_libraries(test_point_cloud_view ${PROJECT_NAME})
-
 
 add_custom_target(test_data)
 add_custom_command(TARGET test_data
