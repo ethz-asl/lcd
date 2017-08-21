@@ -633,9 +633,9 @@ void EvalData::createHeatMap(const cv::Mat& image, const cv::Mat& dist_mat,
       color = {255, 255, 255};
     } else {
       getHeatMapColor(dist(dist_mat, idx, i) / max_dist, &red, &green, &blue);
-      color[0] = (unsigned char)(255 * blue);
-      color[1] = (unsigned char)(255 * green);
-      color[2] = (unsigned char)(255 * red);
+      color[0] = static_cast<unsigned char>(255 * blue);
+      color[1] = static_cast<unsigned char>(255 * green);
+      color[2] = static_cast<unsigned char>(255 * red);
     }
 
     cv::line(heat_map_, {lines2D_[i][0], lines2D_[i][1]},
