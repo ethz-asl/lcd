@@ -1,7 +1,7 @@
 # Line Tools
 
 Toolbox containing packages for line detection and clustering. The main functionality is within the two packages line\_detection and line\_clustering. The two libraries implemented in this do only depend on the standard library, OpenCV and glog. But there are some ros nodes within the line\_detection package that depend on ROS.
-All other ROS dependencies are implemented within a third library in the package line\_ros\_utility. This includes conversion for different datasets, file input, communication with python nodes, displaying in rviz and putting the actual wotk together in a pipeline.
+All other ROS dependencies are implemented within a third library in the package line\_ros\_utility. This includes conversion for different datasets, file input, communication with python nodes, displaying in rviz and putting the actual work together in a pipeline.
 
 ## Running the pipeline
 There are two launch files within the line\_ros\_utility package:

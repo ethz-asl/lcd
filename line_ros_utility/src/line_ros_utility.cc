@@ -727,9 +727,9 @@ void EvalData::writeHeatMapColorBar(const std::string& path) {
   for (size_t i = 0; i < height; ++i) {
     getHeatMapColor(i / (double)height, &red, &green, &blue);
     for (size_t j = 0; j < width; ++j) {
-      colorbar.at<cv::Vec3b>(i, j) = {(unsigned char)(255 * blue),
-                                      (unsigned char)(255 * green),
-                                      (unsigned char)(255 * red)};
+      colorbar.at<cv::Vec3b>(i, j) = {static_cast<unsigned char>(255 * blue),
+                                      static_cast<unsigned char>(255 * green),
+                                      static_cast<unsigned char>(255 * red)};
     }
   }
   cv::imwrite(path, colorbar);

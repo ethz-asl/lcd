@@ -183,17 +183,14 @@ class ListenAndPublish {
   // This function labels with an instances image.
   // Input: lines:    Vector with the lines in 3D.
   //
-  //        instances:  CV_8UC3 image that labels objects with a different
-  //        color
+  //        instances:  CV_8UC3 image that labels objects with a different color
   //                    for every instance. This image must be registered with
   //                    the depth image where the point cloud was extracted.
   //
   //        camera_info: This is used to backproject 3D points onto the
-  //        instances
-  //                     image.
+  //                     instances image.
   //
-  // Output: labels:     Labels all lines according to their backprojection
-  // onto
+  // Output: labels:     Labels all lines according to their backprojection onto
   //                     instances. The labeling starts at 0 and goes up for
   //                     every additional instance that was found.
   void labelLinesWithInstances(

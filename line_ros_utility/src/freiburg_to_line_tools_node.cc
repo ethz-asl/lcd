@@ -40,6 +40,7 @@ class convertFreiburgToLineTools {
 
   void computePointCloudFreiburg(const cv::Mat& depth, cv::Mat* cloud) {
     CHECK_EQ(depth.type(), CV_32FC1);
+    CHECK_NOTNULL(cloud);
     const size_t height = depth.rows;
     const size_t width = depth.cols;
     constexpr double focalLength = 525.0;
