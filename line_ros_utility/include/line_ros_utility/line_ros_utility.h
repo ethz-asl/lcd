@@ -122,6 +122,30 @@ class TreeClassifier {
   cv::Mat dist_matrix_;
 };
 
+class EvalData {
+ public:
+  EvalData(const std::vector<line_detection::LineWithPlanes>& lines3D);
+
+  void createHeatMap(const cv::Mat& image, const cv::Mat& dist_mat,
+                     const size_t idx);
+  void storeHeatMaps(const cv::Mat& image, const cv::Mat& dist_mat,
+                     const std::string& path);
+  bool getHeatMapColor(float value, float* red, float* green, float* blue);
+  void getValueBetweenTwoFixedColors(float value, int& red, int& green,
+                                     int& blue);
+
+  float dist(const cv::Mat& dist_mat, size_t i, size_t j);
+
+  void projectLinesTo2D(const sensor_msgs::CameraInfoConstPtr& camera_info);
+
+  void writeHeatMapColorBar(const std::string& path);
+
+ protected:
+  std::vector<cv::Vec6f> lines3D_;
+  std::vector<cv::Vec4f> lines2D_;
+  cv::Mat heat_map_;
+};
+
 // The main class that has the full utility of line_detection, line_clustering
 // and line_ros_utility implemented. Fully functional in a ros node.
 class ListenAndPublish {
@@ -132,8 +156,8 @@ class ListenAndPublish {
   void start();
 
  protected:
-  // Writes a mat to a pcl cloud. This is only used to publish the cloud so that
-  // it can be displayed with rviz.
+  // Writes a mat to a pcl cloud. This is only used to publish the cloud so
+  // that it can be displayed with rviz.
   void writeMatToPclCloud(const cv::Mat& cv_cloud, const cv::Mat& image,
                           pcl::PointCloud<pcl::PointXYZRGB>* pcl_cloud);
   // These functions perform the actuall work. They are only here to make the
@@ -164,8 +188,7 @@ class ListenAndPublish {
   //                    the depth image where the point cloud was extracted.
   //
   //        camera_info: This is used to backproject 3D points onto the
-  //        instances
-  //                     image.
+  //                     instances image.
   //
   // Output: labels:     Labels all lines according to their backprojection onto
   //                     instances. The labeling starts at 0 and goes up for

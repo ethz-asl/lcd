@@ -310,10 +310,9 @@ void ListenAndPublish::masterCallback(
     std::string path = kWritePath + "/lines_with_labels_" +
                        std::to_string(iteration_) + ".txt";
     printToFile(lines3D_with_planes_, labels_, path);
-
-    initDisplay();
-    writeMatToPclCloud(cv_cloud_, cv_image_, &pcl_cloud_);
   }
+  initDisplay();
+  writeMatToPclCloud(cv_cloud_, cv_image_, &pcl_cloud_);
 
   // The timestamp is set to 0 because rviz is not able to find the right
   // transformation otherwise.
@@ -597,4 +596,142 @@ void TreeClassifier::computeDistanceMatrix() {
 
 cv::Mat TreeClassifier::getDistanceMatrix() { return dist_matrix_; }
 
+EvalData::EvalData(const std::vector<line_detection::LineWithPlanes>& lines3D) {
+  lines3D_.clear();
+  for (size_t i = 0; i < lines3D.size(); ++i) {
+    lines3D_.push_back(lines3D[i].line);
+  }
+}
+
+float EvalData::dist(const cv::Mat& dist_mat, size_t i, size_t j) {
+  if (i < j) {
+    return dist_mat.at<float>(i, j);
+  } else {
+    return dist_mat.at<float>(j, i);
+  }
+}
+
+void EvalData::createHeatMap(const cv::Mat& image, const cv::Mat& dist_mat,
+                             const size_t idx) {
+  CHECK_EQ(dist_mat.cols, dist_mat.rows);
+  CHECK_EQ(dist_mat.cols, lines2D_.size());
+  CHECK_EQ(dist_mat.type(), CV_32FC1);
+  CHECK_EQ(image.type(), CV_8UC3);
+  size_t num_lines = lines2D_.size();
+  cv::Vec3b color;
+  float max_dist, temp_dist;
+  float red, green, blue;
+  max_dist = -1;
+  for (size_t i = 0; i < num_lines; ++i) {
+    if (dist(dist_mat, i, idx) > max_dist) {
+      max_dist = dist(dist_mat, i, idx);
+    }
+  }
+  image.copyTo(heat_map_);
+  for (size_t i = 0; i < num_lines; ++i) {
+    if (i == idx) {
+      color = {255, 255, 255};
+    } else {
+      getHeatMapColor(dist(dist_mat, idx, i) / max_dist, &red, &green, &blue);
+      color[0] = static_cast<unsigned char>(255 * blue);
+      color[1] = static_cast<unsigned char>(255 * green);
+      color[2] = static_cast<unsigned char>(255 * red);
+    }
+
+    cv::line(heat_map_, {lines2D_[i][0], lines2D_[i][1]},
+             {lines2D_[i][2], lines2D_[i][3]}, color, 2);
+  }
+}
+
+void EvalData::storeHeatMaps(const cv::Mat& image, const cv::Mat& dist_mat,
+                             const std::string& path) {
+  size_t num_lines = lines2D_.size();
+  for (size_t i = 0; i < num_lines; ++i) {
+    createHeatMap(image, dist_mat, i);
+    std::string store_path = path + "_" + std::to_string(i) + ".jpg";
+    cv::imwrite(store_path, heat_map_);
+  }
+}
+
+void EvalData::projectLinesTo2D(
+    const sensor_msgs::CameraInfoConstPtr& camera_info) {
+  cv::Point2f p1, p2;
+  image_geometry::PinholeCameraModel camera_model;
+  camera_model.fromCameraInfo(camera_info);
+  lines2D_.clear();
+  for (size_t i = 0; i < lines3D_.size(); ++i) {
+    p1 = camera_model.project3dToPixel(
+        {lines3D_[i][0], lines3D_[i][1], lines3D_[i][2]});
+    p2 = camera_model.project3dToPixel(
+        {lines3D_[i][3], lines3D_[i][4], lines3D_[i][5]});
+    lines2D_.push_back({p1.x, p1.y, p2.x, p2.y});
+  }
+}
+
+// Copied from:
+// http://www.andrewnoske.com/wiki/Code_-_heatmaps_and_color_gradients
+bool EvalData::getHeatMapColor(float value, float* red, float* green,
+                               float* blue) {
+  const int NUM_COLORS = 4;
+  static float color[NUM_COLORS][3] = {
+      {0, 0, 1}, {0, 1, 0}, {1, 1, 0}, {1, 0, 0}};
+  // A static array of 4 colors:  (blue,   green,  yellow,  red) using {r,g,b}
+  // for each.
+
+  int idx1;  // |-- Our desired color will be between these two indexes in
+             // "color".
+  int idx2;  // |
+  float fractBetween =
+      0;  // Fraction between "idx1" and "idx2" where our value is.
+
+  if (value <= 0) {
+    idx1 = idx2 = 0;
+  }  // accounts for an input <=0
+  else if (value >= 1) {
+    idx1 = idx2 = NUM_COLORS - 1;
+  }  // accounts for an input >=0
+  else {
+    value = value * (NUM_COLORS - 1);  // Will multiply value by 3.
+    idx1 = floor(value);  // Our desired color will be after this index.
+    idx2 = idx1 + 1;      // ... and before this index (inclusive).
+    fractBetween =
+        value - float(idx1);  // Distance between the two indexes (0-1).
+  }
+
+  *red = (color[idx2][0] - color[idx1][0]) * fractBetween + color[idx1][0];
+  *green = (color[idx2][1] - color[idx1][1]) * fractBetween + color[idx1][1];
+  *blue = (color[idx2][2] - color[idx1][2]) * fractBetween + color[idx1][2];
+}
+
+// Copied from:
+// http://www.andrewnoske.com/wiki/Code_-_heatmaps_and_color_gradients
+void EvalData::getValueBetweenTwoFixedColors(float value, int& red, int& green,
+                                             int& blue) {
+  int aR = 0;
+  int aG = 0;
+  int aB = 255;  // RGB for our 1st color (blue in this case).
+  int bR = 255;
+  int bG = 0;
+  int bB = 0;  // RGB for our 2nd color (red in this case).
+
+  red = (float)(bR - aR) * value + aR;    // Evaluated as -255*value + 255.
+  green = (float)(bG - aG) * value + aG;  // Evaluates as 0.
+  blue = (float)(bB - aB) * value + aB;   // Evaluates as 255*value + 0.
+}
+
+void EvalData::writeHeatMapColorBar(const std::string& path) {
+  constexpr size_t height = 100;
+  constexpr size_t width = 10;
+  cv::Mat colorbar(height, width, CV_8UC3);
+  float red, green, blue;
+  for (size_t i = 0; i < height; ++i) {
+    getHeatMapColor(i / (double)height, &red, &green, &blue);
+    for (size_t j = 0; j < width; ++j) {
+      colorbar.at<cv::Vec3b>(i, j) = {static_cast<unsigned char>(255 * blue),
+                                      static_cast<unsigned char>(255 * green),
+                                      static_cast<unsigned char>(255 * red)};
+    }
+  }
+  cv::imwrite(path, colorbar);
+}
 }  // namespace line_ros_utility

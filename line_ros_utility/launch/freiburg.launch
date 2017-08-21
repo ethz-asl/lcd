@@ -1,0 +1,19 @@
+<launch>
+  <node
+    pkg="rqt_reconfigure"
+    type="rqt_reconfigure"
+    name="rqt_reconfigure"
+ ></node>
+  <node
+    pkg="line_ros_utility"
+    type="freiburg_to_line_tools"
+    name="freiburg_to_line_tools"
+    output="screen"
+ ></node>
+  <node
+    pkg="line_ros_utility"
+    type="detect_cluster_show"
+    name="detect_cluster_show"
+    output="screen"
+ ></node>
+</launch>
