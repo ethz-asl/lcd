@@ -19,9 +19,8 @@ $ sudo apt-get install autoconf
 Creat a catkin workspace:
 ```
 $ mkdir -p ~/catkin_ws/src
-$ cd ~/catkin_ws/
-$ catkin_make
-$ source devel/setup.bash   # overlay this workspace on top of your environment
+$ cd ~/catkin_ws/src
+$ catkin_init_workspace
 ```
 
 `git clone` the following packages to your `src` directory in catkin workspace `catkin_ws`
