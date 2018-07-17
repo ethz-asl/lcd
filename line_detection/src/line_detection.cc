@@ -1271,4 +1271,65 @@ bool LineDetector::checkIfValidLineDiscont(const cv::Mat& cloud,
   return true;
 }
 
+void getCroppedImageForLines2D(const std::vector<cv::Vec4f>& lines2D, const cv::Mat& image){
+  cv::Mat padded_image;
+  int border_height = image.rows / 2;
+  int border_width = image.cols / 2;
+
+  cv::copyMakeBorder(image, padded_image, border_height, border_height,
+    border_width, border_width, cv::BORDER_CONSTANT, cv::Scalar(0,0,0));
+
+  float min_length = 1000;
+
+  for(size_t i = 0; i < (int)lines2D.size(); ++i){
+    float rect_height = sqrt((lines2D[i][0] - lines2D[i][2]) * (lines2D[i][0] - lines2D[i][2])
+     + (lines2D[i][1] - lines2D[i][3]) * (lines2D[i][1] - lines2D[i][3]));
+    float rect_width = rect_height;
+    float rect_angle = -atan((lines2D[i][1] - lines2D[i][3]) / (lines2D[i][0] - lines2D[i][2])) * 180 / CV_PI;
+
+    if(rect_height < min_length){ min_length = rect_height; }
+
+    cv::Point2f center_point((lines2D[i][0] + lines2D[i][2])/2 + border_width,
+     (lines2D[i][1] + lines2D[i][3])/2 + border_height);
+
+    cv::RotatedRect rect(center_point, cv::Size2f(rect_width, rect_height), rect_angle);
+
+    // if (rect.angle < -45.) {
+    //     rect_angle += 90.0;
+    //     std::swap(rect.size.width, rect.size.height);
+    // }
+    cv::Mat rotation_mat = cv::getRotationMatrix2D(rect.center, 180.0 - rect_angle, 1);
+
+    // visualization
+    // cv::Point2f p1, p2;
+    //
+    // p1.x = lines2D[i][0] + border_width;
+    // p1.y = lines2D[i][1] + border_height;
+    // p2.x = lines2D[i][2] + border_width;
+    // p2.y = lines2D[i][3] + border_height;
+
+    // if(i == 0 or i == 8 or i == 10){
+    //   //cv::line(padded_image, p1, p2, cv::Vec3b(0, 255, 0), 2);
+    //   cv::imshow("original lines", padded_image);
+    //   //cv::imshow("cropped image", cropped_image);
+    //   cv::waitKey();
+    // }
+    cv::Mat rotated_padded_image, cropped_image;
+    cv::warpAffine(padded_image, rotated_padded_image, rotation_mat, padded_image.size(), cv::INTER_CUBIC);
+    cv::getRectSubPix(rotated_padded_image, rect.size, rect.center, cropped_image);
+    cv::imwrite("/home/chengkun/InternASL/catkin_ws/src/line_tools/data/lines_cropped_images/line_"
+     + std::to_string(i) + ".jpg", cropped_image);
+
+    // if(i == 0 or i == 8 or i == 10){
+    //   cv::imshow("original lines", rotated_padded_image);
+    //   //cv::imshow("cropped image", cropped_image);
+    //   cv::waitKey();
+    // }
+
+
+  }
+  std::cout << "min_length: " << min_length << '\n';
+
+}
+
 }  // namespace line_detection

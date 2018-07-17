@@ -11,7 +11,7 @@ from cv_bridge import CvBridge
 from line_ros_utility.srv import *
 
 # relative path of training data from the rospackage.
-path_train_data = '/../data/traj_51'
+path_train_data = '/../data/traj_50' # traj_51 ??
 
 class RandomForestDistanceMeasure():
     random_forest = learn.RandomForestClassifier()

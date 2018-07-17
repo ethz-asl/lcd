@@ -5,7 +5,7 @@ namespace line_ros_utility {
 const std::string frame_id = "line_tools_id";
 const bool write_labeled_lines = false;
 const std::string kWritePath =
-    "/home/dominik/catkin_ws/src/3d_line_toolbox/data/traj_50";
+    "/home/chengkun/InternASL/catkin_ws/src/line_tools/data/traj_50";
 
 std::vector<int> clusterLinesAfterClassification(
     const std::vector<line_detection::LineWithPlanes>& lines) {
@@ -100,7 +100,7 @@ ListenAndPublish::ListenAndPublish() : params_(), tree_classifier_() {
   line_detector_ = line_detection::LineDetector(&params_);
   iteration_ = 0;
   // Retrieve trees.
-  tree_classifier_.getTrees();
+  // tree_classifier_.getTrees();
 }
 ListenAndPublish::~ListenAndPublish() { delete sync_; }
 
@@ -232,8 +232,8 @@ void ListenAndPublish::publish() {
 }
 
 void ListenAndPublish::printNumberOfLines() {
-  ROS_INFO("Lines kept after projection: %d/%d", lines3D_with_planes_.size(),
-           lines2D_.size());
+  ROS_INFO("Lines kept after projection: %d/%d", static_cast<int>(lines3D_with_planes_.size()),
+           static_cast<int>(lines2D_.size()));
 }
 
 void ListenAndPublish::reconfigureCallback(
@@ -298,13 +298,13 @@ void ListenAndPublish::masterCallback(
   ROS_INFO("**** New Image ******");
   detectLines();
   projectTo3D();
-  ROS_INFO("Kept lines: %d/%d", lines3D_temp_wp_.size(), lines2D_.size());
+  ROS_INFO("Kept lines: %d/%d", static_cast<int>(lines3D_temp_wp_.size()), static_cast<int>(lines2D_.size()));
   checkLines();
   printNumberOfLines();
   clusterKmeans();
   labelLinesWithInstances(lines3D_with_planes_, cv_instances_, camera_info_,
                           &labels_);
-  clusterKmedoid();
+  // clusterKmedoid();
 
   if (write_labeled_lines) {
     std::string path = kWritePath + "/lines_with_labels_" +

@@ -115,7 +115,7 @@ inline cv::Vec3f crossProduct(const cv::Vec3f a, const cv::Vec3f b) {
 
 // Compute the slope depending on start and end point of a line.
 inline double computeSlopeOfLine(const cv::Vec4f line) {
-  return (line[1] - line[3]) / (line[0] - line[3]);
+  return (line[1] - line[3]) / (line[0] - line[2]);
 }
 
 inline void normalizeVector3D(cv::Vec3f* vector) {
@@ -467,6 +467,9 @@ class LineDetector {
   bool find3DLineStartAndEnd(const cv::Mat& point_cloud,
                              const cv::Vec4f& line2D, cv::Vec6f* line3D);
 };
+
+// Gets the cropped image for each 2D line
+void getCroppedImageForLines2D(const std::vector<cv::Vec4f>& lines2D, const cv::Mat& image);
 
 }  // namespace line_detection
 
