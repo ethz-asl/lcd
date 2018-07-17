@@ -76,5 +76,6 @@ int main(int argc, char** argv) {
   // cv::imshow("original lines", image);
   // cv::imshow("fused lines", image_new);
   // cv::waitKey();
+  std::cout << "on line_description branch" << '\n';
   return 0;
 }
