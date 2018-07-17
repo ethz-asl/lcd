@@ -51,7 +51,7 @@ int main(int argc, char** argv) {
   ROS_INFO("Number of new lines: %d", (int)lines2D_fused.size());
 
   // Save cropped images for each line (fused)
-  const bool save_cropped_images = true;
+  const bool save_cropped_images = false;
 
   if(save_cropped_images){
 
