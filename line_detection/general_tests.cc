@@ -73,8 +73,8 @@ int main(int argc, char** argv) {
   cv::Mat image_new = image.clone();
   line_detector.paintLines(lines2D, &image);
   line_detector.paintLines(lines2D_fused, &image_new, cv::Vec3b(0, 255, 0));
-  cv::imshow("original lines", image);
-  cv::imshow("fused lines", image_new);
-  cv::waitKey();
+  // cv::imshow("original lines", image);
+  // cv::imshow("fused lines", image_new);
+  // cv::waitKey();
   return 0;
 }
