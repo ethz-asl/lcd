@@ -32,21 +32,22 @@ struct LineWithPlanes {
   std::vector<cv::Vec4f> hessians;
   std::vector<cv::Vec3b> colors;
   LineType type;
+  int planes_found;
 };
 
 struct LineDetectionParams {
   // default = 0.1: find3DLineOnPlanes
-  double max_dist_between_planes = 0.1;
+  double max_dist_between_planes = 0.2;
   // default = 0.5: getRectanglesFromLine
-  double rectangle_offset_pixels = 0.5;
+  double rectangle_offset_pixels = 1;
   // default = 0.5: getRectanglesFromLine
   double max_relative_rect_size = 0.5;
   // default = 5.0: getRectanglesFromLine
-  double max_absolute_rect_size = 5.0;
+  double max_absolute_rect_size = 10.0;
   // default = 100: LineDetector::planeRANSAC
-  unsigned int num_iter_ransac = 100;
+  unsigned int num_iter_ransac = 300;
   // default = 0.005: LineDetector::planeRANSAC
-  double max_error_inlier_ransac = 0.005;
+  double max_error_inlier_ransac = 0.01;
   // default = 0.8: LineDetector::planeRANSAC
   double inlier_max_ransac = 0.8;
   // default = 0.1: LineDetector::project2Dto3DwithPlanes
@@ -77,6 +78,8 @@ struct LineDetectionParams {
   double hough_detector_minLineLength = 10.0;
   // default = 5: hough line detector
   double hough_detector_maxLineGap = 5.0;
+
+  double test_N = 200;
 };
 
 // Returns true if lines are nearby and could be equal (low difference in angle
@@ -153,7 +156,7 @@ inline double errorPointToPlane(const cv::Vec4f& hessian_n_f,
 
 inline double distPointToLine(const cv::Vec3f& start, const cv::Vec3f& end,
                               const cv::Vec3f& point) {
-  return cv::norm((point - start).cross(point - end)) / cv::norm(start - end);
+  return cv::norm((point - start).cross(start - end)) / cv::norm(start - end);
 }
 
 // Assume normalized direction vector.
@@ -305,7 +308,8 @@ class LineDetector {
                           const cv::Vec6f& line_guess, cv::Vec6f* line);
   bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                           const std::vector<cv::Vec3f>& points2,
-                          const cv::Vec6f& line_guess, LineWithPlanes* line);
+                          const cv::Vec6f& line_guess, LineWithPlanes* line,
+                          bool planes_found = true);
 
   // Fits a plane to the points using RANSAC.
   bool planeRANSAC(const std::vector<cv::Vec3f>& points,

@@ -5,7 +5,7 @@ namespace line_ros_utility {
 const std::string frame_id = "line_tools_id";
 const bool write_labeled_lines = false;
 const std::string kWritePath =
-    "/home/chengkun/InternASL/catkin_ws/src/line_tools/data/traj_50";
+    "/home/chengkun/InternASL/catkin_ws/src/line_tools/data/train/traj_1";
 
 std::vector<int> clusterLinesAfterClassification(
     const std::vector<line_detection::LineWithPlanes>& lines) {
@@ -64,7 +64,17 @@ bool printToFile(const std::vector<line_detection::LineWithPlanes>& lines3D,
       for (int j = 0; j < 4; ++j) file << lines3D[i].hessians[1][j] << " ";
       for (int j = 0; j < 3; ++j) file << (int)lines3D[i].colors[0][j] << " ";
       for (int j = 0; j < 3; ++j) file << (int)lines3D[i].colors[1][j] << " ";
-      file << labels[i] << std::endl;
+
+      if (lines3D[i].type == line_detection::LineType::DISCONT) {
+        file << 0 << " ";
+      } else if (lines3D[i].type == line_detection::LineType::PLANE) {
+        file << 1 << " ";
+      } else {
+        file << 2 << " ";
+      }
+
+      file << labels[i] << " ";
+      file << lines3D[i].planes_found << std::endl;
     }
     file.close();
     return true;
@@ -96,6 +106,7 @@ ListenAndPublish::ListenAndPublish() : params_(), tree_classifier_() {
   dynamic_rcf_callback_ =
       boost::bind(&ListenAndPublish::reconfigureCallback, this, _1, _2);
   dynamic_rcf_server_.setCallback(dynamic_rcf_callback_);
+
   // Add the parameters utility to line_detection.
   line_detector_ = line_detection::LineDetector(&params_);
   iteration_ = 0;
@@ -262,6 +273,9 @@ void ListenAndPublish::reconfigureCallback(
   params_.hough_detector_threshold = config.hough_detector_threshold;
   params_.hough_detector_minLineLength = config.hough_detector_minLineLength;
   params_.hough_detector_maxLineGap = config.hough_detector_maxLineGap;
+
+  params_.test_N = config.test_N;
+
   detector_method_ = config.detector;
   number_of_clusters_ = config.number_of_clusters;
   show_lines_or_clusters_ = config.clustering;
@@ -295,7 +309,7 @@ void ListenAndPublish::masterCallback(
   // Convert image to grayscale. That is needed for the line detection.
   cvtColor(cv_image_, cv_img_gray_, CV_RGB2GRAY);
 
-  ROS_INFO("**** New Image ******");
+  ROS_INFO("**** New Image**** Frame %d****", iteration_);
   detectLines();
   projectTo3D();
   ROS_INFO("Kept lines: %d/%d", static_cast<int>(lines3D_temp_wp_.size()), static_cast<int>(lines2D_.size()));
@@ -438,9 +452,9 @@ void DisplayClusters::setClusters(
     line_clusters_[labels[i]].push_back(lines3D[i].line);
   }
   marker_lines_.resize(line_clusters_.size());
-  size_t n;
+
   for (size_t i = 0; i < line_clusters_.size(); ++i) {
-    n = i % colors_.size();
+    size_t n = i % colors_.size();
     storeLines3DinMarkerMsg(line_clusters_[i], &marker_lines_[i], colors_[n]);
     marker_lines_[i].header.frame_id = frame_id_;
     marker_lines_[i].lifetime = ros::Duration(1.1);
@@ -464,9 +478,9 @@ void DisplayClusters::publish() {
       << "You need to call initPublishing to advertise before publishing.";
   CHECK(frame_id_set_) << "You need to set the frame_id before publishing.";
   CHECK(clusters_set_) << "You need to set the clusters before publishing.";
-  size_t n;
+
   for (size_t i = 0; i < marker_lines_.size(); ++i) {
-    n = i % pub_.size();
+    size_t n = i % pub_.size();
     pub_[n].publish(marker_lines_[i]);
   }
 }
@@ -619,7 +633,7 @@ void EvalData::createHeatMap(const cv::Mat& image, const cv::Mat& dist_mat,
   CHECK_EQ(image.type(), CV_8UC3);
   size_t num_lines = lines2D_.size();
   cv::Vec3b color;
-  float max_dist, temp_dist;
+  float max_dist;
   float red, green, blue;
   max_dist = -1;
   for (size_t i = 0; i < num_lines; ++i) {

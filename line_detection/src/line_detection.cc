@@ -42,7 +42,7 @@ bool areLinesEqual2D(const cv::Vec4f line1, const cv::Vec4f line2) {
   }
   // Set the comparison parameters. These need to be adjusted correctly.
   // angle_diffrence > 0.997261 refers is equal to effective angle < 3 deg.
-  if (angle_difference > 0.95 && min_dist < 5)
+  if (angle_difference > 0.95 && min_dist < 0.5)  // TODO
     return true;
   else
     return false;
@@ -437,7 +437,7 @@ void LineDetector::paintLines(const std::vector<cv::Vec4f>& lines,
     p2.x = lines[i][2];
     p2.y = lines[i][3];
 
-    cv::line(*image, p1, p2, color, 2);
+    cv::line(*image, p1, p2, color, 1);
   }
 }
 
@@ -536,7 +536,9 @@ double LineDetector::findAndRate3DLine(const cv::Mat& point_cloud,
       ++(*num_inliers);
     }
   }
-  if ((*num_inliers) < min_inliers)
+  if ((*num_inliers) < min_inliers ||
+   (*num_inliers) < 0.1 * sqrt(pow(start.x - end.x, 2)
+   + pow(start.y - end.y, 2)))
     return 1e9;
   else
     return rating / (*num_inliers);
@@ -632,7 +634,8 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
 bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                                       const std::vector<cv::Vec3f>& points2,
                                       const cv::Vec6f& line_guess,
-                                      LineWithPlanes* line) {
+                                      LineWithPlanes* line,
+                                      bool planes_found) {
   CHECK_NOTNULL(line);
   size_t N1 = points1.size();
   size_t N2 = points2.size();
@@ -653,10 +656,16 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
   // distance is higher than this value, it is assumed that the line is not
   // the intersection of the two planes, but just lies on the one that is in
   // the foreground.
-  constexpr double angle_difference = 0.995;
+
+  //constexpr double angle_difference = 0.995;
+  constexpr double angle_difference = 0.95;
+
   mean1 = computeMean(points1);
   mean2 = computeMean(points2);
-  if (cv::norm(mean1 - mean2) < params_->max_dist_between_planes) {
+  // if (cv::norm(mean1 - mean2) < params_->max_dist_between_planes
+  //  && planes_found)
+  if (fabs(mean1[2] - mean2[2]) < params_->max_dist_between_planes
+   && planes_found) {
     // Checks if the planes are parallel.
     if (fabs(normal1.dot(normal2)) > angle_difference) {
       line->line = line_guess;
@@ -731,20 +740,32 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     dist_dir_max = -1e9;
     for (size_t i = 0; i < points_new->size(); ++i) {
       // dist is used to find the nearest point to the line.
-      dist =
-          cv::norm(start - (*points_new)[i]) + cv::norm(end - (*points_new)[i]);
+      // dist =
+      //     cv::norm(start - (*points_new)[i]) + cv::norm(end - (*points_new)[i]);
+      dist = distPointToLine(start, end, (*points_new)[i]);
+
       if (dist < min_dist) {
         min_dist = dist;
         nearest_point = (*points_new)[i];
       }
       // dist_dir is used to find the points that maximize the line.
-      dist_dir = direction.dot((*points_new)[i] - start);
+      // dist_dir = direction.dot((*points_new)[i] - start);
+      // if (dist_dir < dist_dir_min) dist_dir_min = dist_dir;
+      // if (dist_dir > dist_dir_max) dist_dir_max = dist_dir;
+    }
+
+    //
+    for (size_t i = 0; i < points_new->size(); ++i) {
+      dist_dir = direction.dot((*points_new)[i] - nearest_point);
       if (dist_dir < dist_dir_min) dist_dir_min = dist_dir;
       if (dist_dir > dist_dir_max) dist_dir_max = dist_dir;
     }
-    cv::Vec3f x_0 = projectPointOnLine(nearest_point, direction, start);
-    start = x_0 + direction * dist_dir_min;
-    end = x_0 + direction * dist_dir_max;
+
+    // cv::Vec3f x_0 = projectPointOnLine(nearest_point, direction, start);
+    // start = x_0 + direction * dist_dir_min;
+    // end = x_0 + direction * dist_dir_max;
+    start = nearest_point + direction * dist_dir_min;
+    end = nearest_point + direction * dist_dir_max;
     line->line = {start[0], start[1], start[2], end[0], end[1], end[2]};
     line->type = LineType::DISCONT;
     return true;
@@ -781,8 +802,9 @@ void LineDetector::planeRANSAC(const std::vector<cv::Vec3f>& points,
   cv::Vec3f normal;
   cv::Vec4f hessian_normal_form;
   // Set a random seed.
-  unsigned seed =
-      std::chrono::high_resolution_clock::now().time_since_epoch().count();
+  // unsigned seed =
+  //     std::chrono::high_resolution_clock::now().time_since_epoch().count();
+  unsigned seed = 1;
   std::default_random_engine generator(seed);
   // Start RANSAC.
   for (int iter = 0; iter < max_it; ++iter) {
@@ -862,7 +884,11 @@ void LineDetector::project2Dto3DwithPlanes(
   for (size_t i = 0; i < lines2D.size(); ++i) {
     // If the rating is so high, no valid 3d line was found by the
     // find3DlinesRated function.
-    if (rating[i] > max_rating) continue;
+
+    if (rating[i] > max_rating){
+      continue;
+    }
+
     // For both the left and the right side of the line: Find a rectangle
     // defining a patch, find all points within the patch and try to fit a
     // plane to these points.
@@ -912,7 +938,9 @@ void LineDetector::project2Dto3DwithPlanes(
     // If any of planes were not found, the line is found at a discontinouty.
     // This is a workaround, more efficiently this would be implemented in the
     // function find3DlineOnPlanes.
-    bool is_discont = true;
+
+    // bool is_discont = true;
+    bool planes_found = false;
     if ((!right_found) && (!left_found)) {
       continue;
     } else if (!right_found) {
@@ -920,20 +948,31 @@ void LineDetector::project2Dto3DwithPlanes(
     } else if (!left_found) {
       inliers_left = inliers_right;
     } else {
-      is_discont = false;
+      planes_found = true;
     }
     // If both planes were found, the inliers are handled to the
     // find3DlineOnPlanes function, which takes care of different special
     // cases.
     if (find3DlineOnPlanes(inliers_right, inliers_left, lines3D_cand[i],
-                           &line3D_true)) {
+                           &line3D_true, planes_found)) {
       // Only push back the reliably found lines.
-      if (is_discont) {
-        line3D_true.type = LineType::DISCONT;
-        if (right_found) {
-          line3D_true.hessians[1] = {0.0f, 0.0f, 0.0f, 0.0f};
-        } else {
-          line3D_true.hessians[0] = {0.0f, 0.0f, 0.0f, 0.0f};
+      // if (is_discont) {
+      //   line3D_true.type = LineType::DISCONT;
+      //   if (right_found) {
+      //     line3D_true.hessians[1] = {2, 3, 3, 3};
+      //   } else {
+      //     line3D_true.hessians[0] = {2, 3, 3, 3};
+      //   }
+      // }
+      if (planes_found){
+        line3D_true.planes_found = 1;
+      }
+      else{
+        if (!right_found){
+          line3D_true.planes_found = 2;
+        }
+        if (!left_found){
+          line3D_true.planes_found = 0;
         }
       }
       lines3D->push_back(line3D_true);
