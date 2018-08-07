@@ -3,7 +3,7 @@
 namespace line_ros_utility {
 
 const std::string frame_id = "line_tools_id";
-const bool write_labeled_lines = false;
+const bool write_labeled_lines = true;
 const std::string kWritePath =
     "/home/chengkun/InternASL/catkin_ws/src/line_tools/data/train/traj_1";
 
@@ -75,6 +75,22 @@ bool printToFile(const std::vector<line_detection::LineWithPlanes>& lines3D,
 
       file << labels[i] << " ";
       file << lines3D[i].planes_found << std::endl;
+    }
+    file.close();
+    return true;
+  } else {
+    LOG(WARNING) << "LineDetector::printToFile: File could not be opened.";
+    file.close();
+    return false;
+  }
+}
+
+bool printToFile(const std::vector<cv::Vec4f>& lines2D, const std::string& path) {
+  std::ofstream file(path);
+  if (file.is_open()) {
+    for (size_t i = 0; i < lines2D.size(); ++i) {
+      for (int j = 0; j < 3; ++j) file << lines2D[i][j] << " ";
+      file << lines2D[i][3] << std::endl;
     }
     file.close();
     return true;
@@ -165,7 +181,7 @@ void ListenAndPublish::detectLines() {
 void ListenAndPublish::projectTo3D() {
   lines3D_temp_wp_.clear();
   start_time_ = std::chrono::system_clock::now();
-  line_detector_.project2Dto3DwithPlanes(cv_cloud_, cv_image_, lines2D_,
+  line_detector_.project2Dto3DwithPlanes(cv_cloud_, cv_image_, lines2D_, &lines2D_kept_tmp_,
                                          &lines3D_temp_wp_, true);
   end_time_ = std::chrono::system_clock::now();
   elapsed_seconds_ = end_time_ - start_time_;
@@ -176,7 +192,7 @@ void ListenAndPublish::checkLines() {
   lines3D_with_planes_.clear();
   start_time_ = std::chrono::system_clock::now();
   line_detector_.runCheckOn3DLines(cv_cloud_, lines3D_temp_wp_,
-                                   &lines3D_with_planes_);
+                                   &lines3D_with_planes_, lines2D_kept_tmp_, &lines2D_kept);
   end_time_ = std::chrono::system_clock::now();
   elapsed_seconds_ = end_time_ - start_time_;
   ROS_INFO("Check for valid lines: %f", elapsed_seconds_.count());
@@ -314,6 +330,9 @@ void ListenAndPublish::masterCallback(
   projectTo3D();
   ROS_INFO("Kept lines: %d/%d", static_cast<int>(lines3D_temp_wp_.size()), static_cast<int>(lines2D_.size()));
   checkLines();
+
+  CHECK_EQ(static_cast<int>(lines3D_with_planes_.size()), static_cast<int>(lines2D_kept.size()));
+
   printNumberOfLines();
   clusterKmeans();
   labelLinesWithInstances(lines3D_with_planes_, cv_instances_, camera_info_,
@@ -321,9 +340,12 @@ void ListenAndPublish::masterCallback(
   // clusterKmedoid();
 
   if (write_labeled_lines) {
-    std::string path = kWritePath + "/lines_with_labels_" +
-                       std::to_string(iteration_) + ".txt";
+    std::string path = kWritePath + "/lines_with_labels_" + std::to_string(iteration_) + ".txt";
+
+    std::string path_2D = kWritePath + "/lines_2D_" + std::to_string(iteration_) + ".txt";
+
     printToFile(lines3D_with_planes_, labels_, path);
+    printToFile(lines2D_kept, path_2D);
   }
   initDisplay();
   writeMatToPclCloud(cv_cloud_, cv_image_, &pcl_cloud_);
@@ -341,7 +363,8 @@ void ListenAndPublish::labelLinesWithInstances(
     const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info,
     std::vector<int>* labels) {
   CHECK_NOTNULL(labels);
-  CHECK_EQ(instances.type(), CV_8UC3);
+  // CHECK_EQ(instances.type(), CV_8UC3);
+  CHECK_EQ(instances.type(), CV_16UC1);
   labels->resize(lines.size());
   // This class is used to perform the backprojection.
   image_geometry::PinholeCameraModel camera_model;
@@ -351,7 +374,12 @@ void ListenAndPublish::labelLinesWithInstances(
   std::vector<int> labels_count;
   // For intermiedate storage.
   cv::Point2f point2D;
-  cv::Vec3b color;
+  // cv::Vec3b color;
+  unsigned short color;
+
+  //TODO:Intersection line 2 labels
+
+
   cv::Vec3f start, end, line, point3D;
   // num_checks + 1 points are reprojected onto the image.
   constexpr size_t num_checks = 10;
@@ -375,7 +403,9 @@ void ListenAndPublish::labelLinesWithInstances(
       point2D.y = line_detection::checkInBoundary(floor(point2D.y), 0,
                                                   instances.rows - 1);
       // Get the color of the pixel.
-      color = instances.at<cv::Vec3b>(point2D);
+      // color = instances.at<cv::Vec3b>(point2D);
+      color = instances.at<unsigned short>(point2D);
+
       // Find the index of the color in the known_colors vector
       size_t j = 0;
       for (; j < known_colors_.size(); ++j) {
@@ -398,7 +428,8 @@ void ListenAndPublish::labelLinesWithInstances(
         best_guess = j;
       }
     }
-    (*labels)[i] = best_guess;
+    // (*labels)[i] = best_guess;
+    (*labels)[i] = known_colors_[best_guess];
   }
 }
 

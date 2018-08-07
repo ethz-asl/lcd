@@ -51,7 +51,7 @@ std::vector<int> clusterLinesAfterClassification(
 // can be read by the random_forest.py node.
 bool printToFile(const std::vector<line_detection::LineWithPlanes>& lines3D,
                  const std::vector<int>& labels, const std::string& path);
-
+bool printToFile(const std::vector<cv::Vec4f>& lines2D, const std::string& path);
 // Stores lines in marker messages.
 void storeLines3DinMarkerMsg(const std::vector<cv::Vec6f>& lines3D,
                              visualization_msgs::Marker* disp_lines,
@@ -205,9 +205,13 @@ class ListenAndPublish {
   cv::Mat cv_cloud_;
   cv::Mat cv_depth_;
   cv::Mat cv_instances_;
-  std::vector<cv::Vec3b> known_colors_;
+  // std::vector<cv::Vec3b> known_colors_;
+  std::vector<unsigned short> known_colors_;
+
   pcl::PointCloud<pcl::PointXYZRGB> pcl_cloud_;
   std::vector<cv::Vec4f> lines2D_;
+  std::vector<cv::Vec4f> lines2D_kept;
+  std::vector<cv::Vec4f> lines2D_kept_tmp_;
   std::vector<cv::Vec<float, 6> > lines3D_;
   std::vector<line_detection::LineWithPlanes> lines3D_temp_wp_;
   std::vector<line_detection::LineWithPlanes> lines3D_with_planes_;

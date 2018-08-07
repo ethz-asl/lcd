@@ -330,7 +330,8 @@ class LineDetector {
                                const std::vector<cv::Vec4f>& lines2D,
                                std::vector<LineWithPlanes>* lines3D);
   void project2Dto3DwithPlanes(const cv::Mat& cloud, const cv::Mat& image,
-                               const std::vector<cv::Vec4f>& lines2D,
+                               const std::vector<cv::Vec4f>& lines2D_in,
+                               std::vector<cv::Vec4f>* lines2D_out,
                                std::vector<LineWithPlanes>* lines3D,
                                bool set_colors);
 
@@ -395,7 +396,7 @@ class LineDetector {
                          const int method, std::vector<cv::Vec6f>* lines3D_out);
   void runCheckOn3DLines(const cv::Mat& cloud,
                          const std::vector<LineWithPlanes>& lines3D_in,
-                         std::vector<LineWithPlanes>* lines3D_out);
+                         std::vector<LineWithPlanes>* lines3D_out, std::vector<cv::Vec4f>& lines2D_in, std::vector<cv::Vec4f>* lines2D_out);
 
   // Does a check by applying checkIfValidLineDiscont on every line. This
   // check was mostly to try it out, it has shown that this way to check if
@@ -441,6 +442,8 @@ class LineDetector {
   // Overload: Same as above, just without number of inliers as output.
   double findAndRate3DLine(const cv::Mat& point_cloud, const cv::Vec4f& line2D,
                            cv::Vec6f* line3D);
+
+  void shrink2Dlines(const std::vector<cv::Vec4f>& lines2D_in, std::vector<cv::Vec4f>* lines2D_out);
 
  private:
   cv::Ptr<cv::LineSegmentDetector> lsd_detector_;
