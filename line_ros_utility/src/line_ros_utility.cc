@@ -192,7 +192,7 @@ void ListenAndPublish::checkLines() {
   lines3D_with_planes_.clear();
   start_time_ = std::chrono::system_clock::now();
   line_detector_.runCheckOn3DLines(cv_cloud_, lines3D_temp_wp_,
-                                   &lines3D_with_planes_, lines2D_kept_tmp_, &lines2D_kept);
+                                   &lines3D_with_planes_, lines2D_kept_tmp_, &lines2D_kept, camera_info_);
   end_time_ = std::chrono::system_clock::now();
   elapsed_seconds_ = end_time_ - start_time_;
   ROS_INFO("Check for valid lines: %f", elapsed_seconds_.count());
@@ -334,7 +334,7 @@ void ListenAndPublish::masterCallback(
   CHECK_EQ(static_cast<int>(lines3D_with_planes_.size()), static_cast<int>(lines2D_kept.size()));
 
   printNumberOfLines();
-  clusterKmeans();
+  // clusterKmeans();
   labelLinesWithInstances(lines3D_with_planes_, cv_instances_, camera_info_,
                           &labels_);
   // clusterKmedoid();

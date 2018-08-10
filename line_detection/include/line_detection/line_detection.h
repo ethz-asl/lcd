@@ -19,6 +19,10 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
+#include <ros/ros.h>
+#include <sensor_msgs/CameraInfo.h>
+#include <image_geometry/pinhole_camera_model.h>
+
 namespace line_detection {
 
 constexpr double kPi = 3.141592653589793;
@@ -391,12 +395,13 @@ class LineDetector {
   //
   // Output: lines3D_out: All lines (or a changed version of them) that are
   //                      found to be valid are stored here.
-  void runCheckOn3DLines(const cv::Mat& cloud,
-                         const std::vector<cv::Vec6f>& lines3D_in,
-                         const int method, std::vector<cv::Vec6f>* lines3D_out);
+
+  // void runCheckOn3DLines(const cv::Mat& cloud,
+  //                        const std::vector<cv::Vec6f>& lines3D_in,
+  //                        const int method, std::vector<cv::Vec6f>* lines3D_out);
   void runCheckOn3DLines(const cv::Mat& cloud,
                          const std::vector<LineWithPlanes>& lines3D_in,
-                         std::vector<LineWithPlanes>* lines3D_out, std::vector<cv::Vec4f>& lines2D_in, std::vector<cv::Vec4f>* lines2D_out);
+                         std::vector<LineWithPlanes>* lines3D_out, std::vector<cv::Vec4f>& lines2D_in, std::vector<cv::Vec4f>* lines2D_out, sensor_msgs::CameraInfoConstPtr camera_info);
 
   // Does a check by applying checkIfValidLineDiscont on every line. This
   // check was mostly to try it out, it has shown that this way to check if
@@ -413,7 +418,7 @@ class LineDetector {
   //        line:     Line in 3D defined by (start, end).
   //
   // Ouput: return:   True if it is a possible line, false otherwise.
-  bool checkIfValidLineBruteForce(const cv::Mat& cloud, cv::Vec6f* line);
+  bool checkIfValidLineBruteForce(const cv::Mat& cloud, cv::Vec6f* line, cv::Vec4f& line_2D, sensor_msgs::CameraInfoConstPtr camera_info);
 
   // Checks if a line is valid by looking for discontinouties. It computes the
   // mean of a patch around a pixel and looks for jumps when this mean is given
@@ -444,6 +449,10 @@ class LineDetector {
                            cv::Vec6f* line3D);
 
   void shrink2Dlines(const std::vector<cv::Vec4f>& lines2D_in, std::vector<cv::Vec4f>* lines2D_out);
+
+  double getStandardDeviation(const std::vector<double>& samples, double samples_mean);
+
+  double getRatioOfPointsAroundCenter(const std::vector<double>& samples);
 
  private:
   cv::Ptr<cv::LineSegmentDetector> lsd_detector_;
