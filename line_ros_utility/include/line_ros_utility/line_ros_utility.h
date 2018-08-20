@@ -216,6 +216,7 @@ class ListenAndPublish {
   std::vector<line_detection::LineWithPlanes> lines3D_temp_wp_;
   std::vector<line_detection::LineWithPlanes> lines3D_with_planes_;
   std::vector<int> labels_;
+  std::vector<std::vector<int>> labels_left_right;
   std::vector<int> labels_rf_kmedoids_;
   sensor_msgs::CameraInfoConstPtr camera_info_;
   // Publishers and Subscribers.

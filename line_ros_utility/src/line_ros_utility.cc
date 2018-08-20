@@ -5,7 +5,7 @@ namespace line_ros_utility {
 const std::string frame_id = "line_tools_id";
 const bool write_labeled_lines = true;
 const std::string kWritePath =
-    "/home/chengkun/InternASL/catkin_ws/src/line_tools/data/train/traj_1";
+    "../data/train_lines/traj_1";
 
 std::vector<int> clusterLinesAfterClassification(
     const std::vector<line_detection::LineWithPlanes>& lines) {
@@ -72,9 +72,8 @@ bool printToFile(const std::vector<line_detection::LineWithPlanes>& lines3D,
       } else {
         file << 2 << " ";
       }
-
-      file << labels[i] << " ";
-      file << lines3D[i].planes_found << std::endl;
+      file << lines3D[i].planes_found << " ";
+      file << labels[i] << std::endl;
     }
     file.close();
     return true;
@@ -342,10 +341,18 @@ void ListenAndPublish::masterCallback(
   if (write_labeled_lines) {
     std::string path = kWritePath + "/lines_with_labels_" + std::to_string(iteration_) + ".txt";
 
+    std::string path_2D_kept = kWritePath + "/lines_2D_kept_" + std::to_string(iteration_) + ".txt";
+
     std::string path_2D = kWritePath + "/lines_2D_" + std::to_string(iteration_) + ".txt";
 
+    // 3D lines data
     printToFile(lines3D_with_planes_, labels_, path);
-    printToFile(lines2D_kept, path_2D);
+
+    // 2D lins kept (bijection with 3D lines above)
+    printToFile(lines2D_kept, path_2D_kept);
+
+    // All 2D lines detected
+    printToFile(lines2D_, path_2D);
   }
   initDisplay();
   writeMatToPclCloud(cv_cloud_, cv_image_, &pcl_cloud_);
@@ -376,9 +383,6 @@ void ListenAndPublish::labelLinesWithInstances(
   cv::Point2f point2D;
   // cv::Vec3b color;
   unsigned short color;
-
-  //TODO:Intersection line 2 labels
-
 
   cv::Vec3f start, end, line, point3D;
   // num_checks + 1 points are reprojected onto the image.

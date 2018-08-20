@@ -50,31 +50,9 @@ int main(int argc, char** argv) {
   ROS_INFO("Number of old lines: %d", (int)lines2D.size());
   ROS_INFO("Number of new lines: %d", (int)lines2D_fused.size());
 
-  // Save cropped images for each line (fused)
-  const bool save_cropped_images = false;
-
-  if(save_cropped_images){
-
-    line_detection::getCroppedImageForLines2D(lines2D_fused, image);
-    // for(size_t i = 0; i < (int)lines2D_fused.size(); ++i){
-    //   cv::Point2f top_left(lines2D_fused[i][0], lines2D_fused[i][1]);
-    //   cv::Point2f bottom_right(lines2D_fused[i][2], lines2D_fused[i][3]);
-    //   //
-    //   // cv::Point2f top_left(320, 240);
-    //   // cv::Point2f bottom_right(0, 0);
-    //   //
-    //   // std::cout << lines2D_fused[i][0] << "  " << lines2D_fused[i][1] << " " << lines2D_fused[i][2] << " " <<lines2D_fused[i][3] << std::endl;
-    //   cv::Rect line_ROI(top_left, bottom_right);
-    //   cv::Mat cropped_image = image(line_ROI);
-    //   cv::imwrite("/home/chengkun/InternASL/catkin_ws/src/line_tools/data/lines_cropped_images/line_" + std::to_string(i) + ".jpg", cropped_image);
-    // }
-  }
-
   cv::Mat image_new = image.clone();
   line_detector.paintLines(lines2D, &image, cv::Vec3b(0, 255, 0));
   line_detector.paintLines(lines2D_fused, &image_new, cv::Vec3b(0, 255, 0));
-  cv::imwrite("original.jpg", image);
-  cv::imwrite("fused.jpg", image_new);
   cv::imshow("original lines", image);
   cv::imshow("fused lines", image_new);
   cv::waitKey();

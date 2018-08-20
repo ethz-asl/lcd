@@ -672,9 +672,7 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       cv::Vec3f start(line_guess[0], line_guess[1], line_guess[2]);
       cv::Vec3f end(line_guess[3], line_guess[4], line_guess[5]);
       double length = cv::norm(start - end);
-      // Choose one of the two nearly same planes
-      // start = projectPointOnPlane(line->hessians[0], start);
-      // end = projectPointOnPlane(line->hessians[0], end);
+
       cv::Vec3f direction = end - start;
       normalizeVector3D(&direction);
 
@@ -717,12 +715,12 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       end = x_0 + direction * dist_max;
       double ratio_mid;
       ratio_mid = getRatioOfPointsAroundCenter(positions_on_line);
+      // Most points are near the start and end points, reject this line
       if (ratio_mid < 0.25){
         return false;
       }
 
       line->line = {start[0], start[1], start[2], end[0], end[1], end[2]};
-      // line->line = line_guess;
       line->type = LineType::PLANE;
       return true;
     } else {
@@ -806,10 +804,6 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     cv::Vec3f start(line_guess[0], line_guess[1], line_guess[2]);
     cv::Vec3f end(line_guess[3], line_guess[4], line_guess[5]);
 
-    //TODO: direction vector should be projected to the plane ?
-    // cv::Vec3f direction = end - start;
-    // normalizeVector3D(&direction);
-
     const std::vector<cv::Vec3f>* points_new;
     int idx;
     if (cv::norm(mean1) < cv::norm(mean2)) {
@@ -835,9 +829,6 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     std::vector<double> positions_on_line;
     positions_on_line.clear();
     for (size_t i = 0; i < points_new->size(); ++i) {
-      // dist is used to find the nearest point to the line.
-      // dist =
-      //     cv::norm(start - (*points_new)[i]) + cv::norm(end - (*points_new)[i]);
       double position_on_line = direction.dot((*points_new)[i] - start) / length;
       positions_on_line.push_back(position_on_line);
 
@@ -847,10 +838,6 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
         min_dist = dist;
         nearest_point = (*points_new)[i];
       }
-      // dist_dir is used to find the points that maximize the line.
-      // dist_dir = direction.dot((*points_new)[i] - start);
-      // if (dist_dir < dist_dir_min) dist_dir_min = dist_dir;
-      // if (dist_dir > dist_dir_max) dist_dir_max = dist_dir;
     }
 
     double ratio_mid;
@@ -858,14 +845,7 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     if (ratio_mid < 0.25){
       return false;
     }
-    // double standard_deviation;
-    // double samples_mean = 0.5;
-    // standard_deviation = getStandardDeviation(positions_on_line, samples_mean);
-    // if (standard_deviation / samples_mean > 0.5){
-    //   LOG(WARNING) << "standard deviation too large";
-    //   return false;
-    // }
-    //
+
     double max_deviation = params_->max_deviation_inlier_line_check;
     const int num_of_points_required = params_->min_points_in_line;
     int count_inliers = 0;
@@ -882,9 +862,7 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     if (count_inliers < num_of_points_required){
       return false;
     }
-    // cv::Vec3f x_0 = projectPointOnLine(nearest_point, direction, start);
-    // start = x_0 + direction * dist_dir_min;
-    // end = x_0 + direction * dist_dir_max;
+
     start = nearest_point + direction * dist_dir_min;
     end = nearest_point + direction * dist_dir_max;
     line->line = {start[0], start[1], start[2], end[0], end[1], end[2]};
@@ -1010,13 +988,6 @@ void LineDetector::project2Dto3DwithPlanes(
 
   // Loop over all 2D lines.
   for (size_t i = 0; i < lines2D.size(); ++i) {
-    // If the rating is so high, no valid 3d line was found by the
-    // find3DlinesRated function.
-
-    // if (rating[i] > max_rating){
-    //   continue;
-    // }
-
     // For both the left and the right side of the line: Find a rectangle
     // defining a patch, find all points within the patch and try to fit a
     // plane to these points.
@@ -1075,11 +1046,7 @@ void LineDetector::project2Dto3DwithPlanes(
         right_found = true;
       }
     }
-    // If any of planes were not found, the line is found at a discontinouty.
-    // This is a workaround, more efficiently this would be implemented in the
-    // function find3DlineOnPlanes.
 
-    // bool is_discont = true;
     bool planes_found = false;
     if ((!right_found) && (!left_found)) {
       continue;
@@ -1096,14 +1063,6 @@ void LineDetector::project2Dto3DwithPlanes(
     if (find3DlineOnPlanes(inliers_right, inliers_left, lines3D_cand[i],
                            &line3D_true, planes_found)) {
       // Only push back the reliably found lines.
-      // if (is_discont) {
-      //   line3D_true.type = LineType::DISCONT;
-      //   if (right_found) {
-      //     line3D_true.hessians[1] = {2, 3, 3, 3};
-      //   } else {
-      //     line3D_true.hessians[0] = {2, 3, 3, 3};
-      //   }
-      // }
       if (planes_found){
         line3D_true.planes_found = 1;
       }
@@ -1253,43 +1212,6 @@ void LineDetector::find3DlinesRated(const cv::Mat& cloud,
     rate_mid = findAndRate3DLine(cloud, lines2D[i], &line3D);
     rate_up = findAndRate3DLine(cloud, upper_line2D, &upper_line3D);
 
-    // check length
-    double length_low, length_mid, length_up;
-    cv::Point2f start_low, end_low;
-    cv::Point2f start_mid, end_mid;
-    cv::Point2f start_up, end_up;
-    start_low.x = lower_line2D[0];
-    start_low.y = lower_line2D[1];
-    end_low.x = lower_line2D[2];
-    end_low.y = lower_line2D[3];
-
-    start_mid.x = lines2D[i][0];
-    start_mid.y = lines2D[i][1];
-    end_mid.x = lines2D[i][2];
-    end_mid.y = lines2D[i][3];
-
-    start_up.x = upper_line2D[0];
-    start_up.y = upper_line2D[1];
-    end_up.x = upper_line2D[2];
-    end_up.y = upper_line2D[3];
-
-    length_low = cv::norm(cloud.at<cv::Vec3f>(start_low) - cloud.at<cv::Vec3f>(end_low));
-    length_mid = cv::norm(cloud.at<cv::Vec3f>(start_mid) - cloud.at<cv::Vec3f>(end_mid));
-    length_up = cv::norm(cloud.at<cv::Vec3f>(start_up) - cloud.at<cv::Vec3f>(end_up));
-
-    // if (length_up < length_mid && length_up < length_low) {
-    //   lines3D->push_back(upper_line3D);
-    //   rating->push_back(rate_up);
-    // } else if (length_low < length_mid) {
-    //   lines3D->push_back(lower_line3D);
-    //   rating->push_back(rate_low);
-    // } else {
-    //   lines3D->push_back(line3D);
-    //   rating->push_back(rate_mid);
-    // }
-    // A floating point value that decribes a position in an image is always
-    // within the pixel described through the floor operation.
-
     if (rate_up < rate_mid && rate_up < rate_low) {
       lines3D->push_back(upper_line3D);
       rating->push_back(rate_up);
@@ -1316,20 +1238,6 @@ void LineDetector::find3DlinesRated(const cv::Mat& cloud,
   }
 }
 
-// void LineDetector::runCheckOn3DLines(const cv::Mat& cloud,
-//                                      const std::vector<cv::Vec6f>& lines3D_in,
-//                                      const int method,
-//                                      std::vector<cv::Vec6f>* lines3D_out) {
-//   CHECK_NOTNULL(lines3D_out);
-//   lines3D_out->clear();
-//   cv::Vec6f line_cand;
-//   for (size_t i = 0; i < lines3D_in.size(); ++i) {
-//     line_cand = lines3D_in[i];
-//     if (checkIfValidLineBruteForce(cloud, &line_cand)) {
-//       lines3D_out->push_back(line_cand);
-//     }
-//   }
-// }
 void LineDetector::runCheckOn3DLines(
     const cv::Mat& cloud, const std::vector<LineWithPlanes>& lines3D_in,
     std::vector<LineWithPlanes>* lines3D_out, std::vector<cv::Vec4f>& lines2D_in, std::vector<cv::Vec4f>* lines2D_out, sensor_msgs::CameraInfoConstPtr camera_info) {
@@ -1340,7 +1248,7 @@ void LineDetector::runCheckOn3DLines(
   for (size_t i = 0; i < lines3D_in.size(); ++i) {
     line_cand = lines3D_in[i];
     line_cand_2D = lines2D_in[i];
-    if (checkIfValidLineBruteForce(cloud, &(line_cand.line), line_cand_2D, camera_info)) {
+    if (checkIfValidLine(cloud, &(line_cand.line), line_cand_2D, camera_info)) {
       lines3D_out->push_back(line_cand);
       lines2D_out->push_back(line_cand_2D);
     }
@@ -1360,7 +1268,7 @@ void LineDetector::runCheckOn2DLines(const cv::Mat& cloud,
   }
 }
 
-bool LineDetector::checkIfValidLineBruteForce(const cv::Mat& cloud,
+bool LineDetector::checkIfValidLine(const cv::Mat& cloud,
                                               cv::Vec6f* line, cv::Vec4f& line_2D, sensor_msgs::CameraInfoConstPtr camera_info) {
   CHECK_NOTNULL(line);
   CHECK_EQ(cloud.type(), CV_32FC3);
@@ -1373,7 +1281,7 @@ bool LineDetector::checkIfValidLineBruteForce(const cv::Mat& cloud,
     return false;
   }
 
-  // If the 2D line is two close to the edges, remove it
+  // If the 2D line is two close to the edges, reject it
   double min_distance_to_edge = 4;
   if (line_2D[0] + line_2D[2] < min_distance_to_edge || line_2D[1] + line_2D[3] < min_distance_to_edge || line_2D[0] + line_2D[2] > 320*2 - min_distance_to_edge || line_2D[1] + line_2D[3] > 240*2 - min_distance_to_edge) {
     return false;
@@ -1394,15 +1302,16 @@ bool LineDetector::checkIfValidLineBruteForce(const cv::Mat& cloud,
   cv::Point2f start_2D, end_2D;
   start_2D = camera_model.project3dToPixel({start[0], start[1], start[2]});
   end_2D = camera_model.project3dToPixel({end[0], end[1], end[2]});
-  //TODO: check also orientation
 
   cv::Vec2f line_dir_true{line_2D[2] - line_2D[0], line_2D[3] - line_2D[1]};
   cv::Vec2f line_dir{end_2D.x - start_2D.x, end_2D.y - start_2D.y};
 
+  // Check difference of length
   if(cv::norm(line_dir) / cv::norm(line_dir_true) > 1.5) {
     return false;
   }
 
+  // Check difference of angle
   if(fabs(line_dir.dot(line_dir_true) / (cv::norm(line_dir) * cv::norm(line_dir_true))) < 0.95) {
     return false;
   }
@@ -1477,67 +1386,6 @@ bool LineDetector::checkIfValidLineDiscont(const cv::Mat& cloud,
   return true;
 }
 
-void getCroppedImageForLines2D(const std::vector<cv::Vec4f>& lines2D, const cv::Mat& image){
-  cv::Mat padded_image;
-  int border_height = image.rows / 2;
-  int border_width = image.cols / 2;
-
-  cv::copyMakeBorder(image, padded_image, border_height, border_height,
-    border_width, border_width, cv::BORDER_CONSTANT, cv::Scalar(0,0,0));
-
-  float min_length = 1000;
-
-  for(size_t i = 0; i < (int)lines2D.size(); ++i){
-    float rect_height = sqrt((lines2D[i][0] - lines2D[i][2]) * (lines2D[i][0] - lines2D[i][2])
-     + (lines2D[i][1] - lines2D[i][3]) * (lines2D[i][1] - lines2D[i][3]));
-    float rect_width = rect_height;
-    float rect_angle = -atan((lines2D[i][1] - lines2D[i][3]) / (lines2D[i][0] - lines2D[i][2])) * 180 / CV_PI;
-
-    if(rect_height < min_length){ min_length = rect_height; }
-
-    cv::Point2f center_point((lines2D[i][0] + lines2D[i][2])/2 + border_width,
-     (lines2D[i][1] + lines2D[i][3])/2 + border_height);
-
-    cv::RotatedRect rect(center_point, cv::Size2f(rect_width, rect_height), rect_angle);
-
-    // if (rect.angle < -45.) {
-    //     rect_angle += 90.0;
-    //     std::swap(rect.size.width, rect.size.height);
-    // }
-    cv::Mat rotation_mat = cv::getRotationMatrix2D(rect.center, 180.0 - rect_angle, 1);
-
-    // visualization
-    // cv::Point2f p1, p2;
-    //
-    // p1.x = lines2D[i][0] + border_width;
-    // p1.y = lines2D[i][1] + border_height;
-    // p2.x = lines2D[i][2] + border_width;
-    // p2.y = lines2D[i][3] + border_height;
-
-    // if(i == 0 or i == 8 or i == 10){
-    //   //cv::line(padded_image, p1, p2, cv::Vec3b(0, 255, 0), 2);
-    //   cv::imshow("original lines", padded_image);
-    //   //cv::imshow("cropped image", cropped_image);
-    //   cv::waitKey();
-    // }
-    cv::Mat rotated_padded_image, cropped_image;
-    cv::warpAffine(padded_image, rotated_padded_image, rotation_mat, padded_image.size(), cv::INTER_CUBIC);
-    cv::getRectSubPix(rotated_padded_image, rect.size, rect.center, cropped_image);
-    cv::imwrite("/home/chengkun/InternASL/catkin_ws/src/line_tools/data/lines_cropped_images/line_"
-     + std::to_string(i) + ".jpg", cropped_image);
-
-    // if(i == 0 or i == 8 or i == 10){
-    //   cv::imshow("original lines", rotated_padded_image);
-    //   //cv::imshow("cropped image", cropped_image);
-    //   cv::waitKey();
-    // }
-
-
-  }
-  std::cout << "min_length: " << min_length << '\n';
-
-}
-
 void LineDetector::shrink2Dlines(const std::vector<cv::Vec4f>& lines2D_in, std::vector<cv::Vec4f>* lines2D_out){
   lines2D_out->clear();
 
@@ -1562,16 +1410,6 @@ void LineDetector::shrink2Dlines(const std::vector<cv::Vec4f>& lines2D_in, std::
       lines2D_out->push_back(cv::Vec4f(start[0], start[1], end[0], end[1]));
     }
    }
-}
-
-double LineDetector::getStandardDeviation(const std::vector<double>& samples, double samples_mean){
-  double standard_deviation = 0;
-  int N = samples.size();
-  for(int i = 0; i < N; ++i){
-    standard_deviation += (samples[i] - samples_mean) * (samples[i] - samples_mean);
-  }
-  standard_deviation = standard_deviation / N;
-  return standard_deviation;
 }
 
 double LineDetector::getRatioOfPointsAroundCenter(const std::vector<double>& samples){
