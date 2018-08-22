@@ -10,12 +10,12 @@ cs_add_library(${PROJECT_NAME}
   src/line_clustering.cc
 )
 
-#add_custom_target(test_data)
-#add_custom_command(TARGET test_data
-#                   COMMAND rm -rf test_data
-#                   COMMAND mkdir -p test_data
-#                   COMMAND cp -r ${CMAKE_SOURCE_DIR}/../test_data/line_clustering/*
-#                                 test_data/ || :)
+add_custom_target(test_data)
+add_custom_command(TARGET test_data
+                   COMMAND rm -rf test_data
+                   COMMAND mkdir -p test_data
+                   COMMAND cp -r ${CMAKE_SOURCE_DIR}/../test_data/line_clustering/*
+                                 test_data/ || :)
 
 catkin_add_gtest(test_line_clustering test/test_line_clustering.cc)
 target_link_libraries(test_line_clustering ${PROJECT_NAME} pthread)

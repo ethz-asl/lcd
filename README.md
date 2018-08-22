@@ -1,7 +1,7 @@
 # Line Tools
 
 The repository contains two main parts:
-1. ROS packages for detecting lines in rgb-d image.
+1. ROS packages for detecting lines and clustering in rgb-d image.
 2. Python scripts for processing lines data and training on the data to get embeddings for detected lines.
 
 ## Build instructions for ROS packages

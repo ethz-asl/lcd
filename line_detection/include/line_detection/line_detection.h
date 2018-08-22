@@ -19,9 +19,9 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
+#include <image_geometry/pinhole_camera_model.h>
 #include <ros/ros.h>
 #include <sensor_msgs/CameraInfo.h>
-#include <image_geometry/pinhole_camera_model.h>
 
 namespace line_detection {
 
@@ -36,39 +36,33 @@ struct LineWithPlanes {
   std::vector<cv::Vec4f> hessians;
   std::vector<cv::Vec3b> colors;
   LineType type;
-  int planes_found;
-};
-
-struct LineWithLabels {
-  cv::Vec6f line;
-  std::vector<cv::Vec4f> hessians;
-  std::vector<cv::Vec3b> colors;
-  LineType type;
-  int label_left, label_right;
-  int planes_found;
 };
 
 struct LineDetectionParams {
-  // default = 0.1: find3DLineOnPlanes
-  double max_dist_between_planes = 0.2;
+  // default = 0.3: find3DLineOnPlanes
+  double max_dist_between_planes = 0.3;
   // default = 0.5: getRectanglesFromLine
-  double rectangle_offset_pixels = 1;
+  double rectangle_offset_pixels = 0.5;
   // default = 0.5: getRectanglesFromLine
   double max_relative_rect_size = 0.5;
   // default = 5.0: getRectanglesFromLine
-  double max_absolute_rect_size = 10.0;
+  double max_absolute_rect_size = 5.0;
+  // default = 20: LineDetector::project2Dto3DwithPlanes
+  unsigned int min_points_in_rect = 20;
   // default = 100: LineDetector::planeRANSAC
   unsigned int num_iter_ransac = 300;
   // default = 0.005: LineDetector::planeRANSAC
-  double max_error_inlier_ransac = 0.01;
+  double max_error_inlier_ransac = 0.005;
   // default = 0.8: LineDetector::planeRANSAC
   double inlier_max_ransac = 0.8;
   // default = 0.1: LineDetector::project2Dto3DwithPlanes
   double min_inlier_ransac = 0.1;
   // default = 10: LineDetector::checkIfValidLineBruteForce
   unsigned int min_points_in_line = 10;
-  // default = 0.01: LineDetector::checkIfValidLineBruteForce
-  double max_deviation_inlier_line_check = 0.01;
+  // default = 0.01: LineDetector::checkIfValidLineWith2DInfo
+  double min_length_line_3D = 0.01;
+  // default = 0.02: LineDetector::checkIfValidLineBruteForce
+  double max_deviation_inlier_line_check = 0.02;
   // default = 1e6: LineDetector::find3DlinesRated
   double max_rating_valid_line = 1e6;
   // default = 1e-6: hessianNormalFormOfPlane
@@ -91,8 +85,6 @@ struct LineDetectionParams {
   double hough_detector_minLineLength = 10.0;
   // default = 5: hough line detector
   double hough_detector_maxLineGap = 5.0;
-
-  double test_N = 200;
 };
 
 // Returns true if lines are nearby and could be equal (low difference in angle
@@ -217,7 +209,7 @@ void findXCoordOfPixelsOnVector(const cv::Point2f& start,
 //                  function depends on the ordering of the corner point and
 //                  might be wrong.
 // Output: points:  A vector of pixel coordinates.
-void findPointsInRectangle(const std::vector<cv::Point2f> corners,
+void findPointsInRectangle(std::vector<cv::Point2f> corners,
                            std::vector<cv::Point2i>* points);
 
 // Takes two planes and computes the intersection line. This function takes
@@ -304,7 +296,7 @@ class LineDetector {
   // average color of all pixels at these points. It appends the color in the
   // colors vectors of the line3D.
   void assignColorToLines(const cv::Mat& image,
-                          const std::vector<cv::Point2i> points,
+                          const std::vector<cv::Point2i>& points,
                           LineWithPlanes* line3D);
 
   // Uses two sets of points and fit a line, assuming that the two set of
@@ -342,6 +334,7 @@ class LineDetector {
   void project2Dto3DwithPlanes(const cv::Mat& cloud,
                                const std::vector<cv::Vec4f>& lines2D,
                                std::vector<LineWithPlanes>* lines3D);
+  // Overload: Add output lines2D_out that correspond to lines3D
   void project2Dto3DwithPlanes(const cv::Mat& cloud, const cv::Mat& image,
                                const std::vector<cv::Vec4f>& lines2D_in,
                                std::vector<cv::Vec4f>* lines2D_out,
@@ -394,22 +387,34 @@ class LineDetector {
                         const std::vector<cv::Vec4f>& lines2D,
                         std::vector<cv::Vec6f>* lines3D);
 
-  // Does a check by applying checkIfValidLineBruteForce to every line (see
-  // functon description for more information).
-  // Input: cloud:      Point cloud in the format CV_32FC3.
+  // Does a check by applying checkIfValidLineBruteForce to every line ( using
+  // checkIfValidLineBruteForce function to check).
+  // Input: cloud:      Point cloud in the
+  // format CV_32FC3.
   //
   //        lines3D_in: 3D lines to be checked.
   //
-  //        lines2D_in: 2D lines corresponding to 3D lines
-  //
-  //        method:     Not implemented.
-  //
-  // Output: lines3D_out: All lines (or a changed version of them) that are
-  //                      found to be valid are stored here.
-  //         lines2D_out: 2D lines corresponding to 3D lines
+  // Output: lines3D_out: All 3D lines that are considered as valid
   void runCheckOn3DLines(const cv::Mat& cloud,
                          const std::vector<LineWithPlanes>& lines3D_in,
-                         std::vector<LineWithPlanes>* lines3D_out, std::vector<cv::Vec4f>& lines2D_in, std::vector<cv::Vec4f>* lines2D_out, sensor_msgs::CameraInfoConstPtr camera_info);
+                         std::vector<LineWithPlanes>* lines3D_out);
+  // Overload: Check the validity of 3D lines with the help of the corresponded
+  // 2D lines (using checkIfValidLineWith2DInfo function to check)
+  // Input: cloud: Point cloud in the format CV_32FC3.
+  //
+  //        lines2D_in: 2D lines corresponding to lines3D_in.
+  //
+  //        lines3D_in: 3D lines to be checked.
+  //
+  //        lines2D_out: 2D lines corresponding to lines3D_out.
+  //
+  //        lines3D_out: All 3D lines that are considered as valid. after check
+  void runCheckOn3DLines(const cv::Mat& cloud,
+                         std::vector<cv::Vec4f>& lines2D_in,
+                         const std::vector<LineWithPlanes>& lines3D_in,
+                         sensor_msgs::CameraInfoConstPtr& camera_info,
+                         std::vector<cv::Vec4f>* lines2D_out,
+                         std::vector<LineWithPlanes>* lines3D_out);
 
   // Does a check by applying checkIfValidLineDiscont on every line. This
   // check was mostly to try it out, it has shown that this way to check if
@@ -418,7 +423,7 @@ class LineDetector {
                          const std::vector<cv::Vec4f>& lines2D_in,
                          std::vector<cv::Vec4f>* lines2D_out);
 
-  // Checks if a line is valid:
+  // Checks if a line is valid with 2D information:
 
   // Input: cloud:    Point cloud as CV_32FC3
   //
@@ -429,7 +434,19 @@ class LineDetector {
   //        camera_info:  camera information
   //
   // Ouput: return:   True if it is a valid line, false otherwise.
-  bool checkIfValidLine(const cv::Mat& cloud, cv::Vec6f* line, cv::Vec4f& line_2D, sensor_msgs::CameraInfoConstPtr camera_info);
+  bool checkIfValidLineWith2DInfo(const cv::Mat& cloud, cv::Vec4f& line_2D,
+                                  sensor_msgs::CameraInfoConstPtr camera_info,
+                                  cv::Vec6f* line);
+
+  // Checks if a line is valid by brute force approach: It computes the distance
+  // between every point in the point cloud and the line and returns true if a
+  // sufficiently large number of this distances are below a threshold.
+  // Input: cloud:    Point cloud as CV_32FC3
+  //
+  //        line:     Line in 3D defined by (start, end).
+  //
+  // Ouput: return:   True if it is a possible line, false otherwise.
+  bool checkIfValidLineBruteForce(const cv::Mat& cloud, cv::Vec6f* line);
 
   // Checks if a line is valid by looking for discontinouties. It computes the
   // mean of a patch around a pixel and looks for jumps when this mean is given
@@ -462,11 +479,20 @@ class LineDetector {
   // Shrink 2D lines
   // Input: lines2D_in: 2D lines to be shrinked
   //
+  //        shrink_coff: A 2D line will be shrunk to shrink_coff
+  //                     times the original length while retaining the center.
+  //                     The value should between 0 and 1
+  //
+  //        min_length: If line length afer shrinking is less than min_length,
+  //        keep the original line
   // Output: lines2D_out: 2D lines shrinked
-  void shrink2Dlines(const std::vector<cv::Vec4f>& lines2D_in, std::vector<cv::Vec4f>* lines2D_out);
+  void shrink2Dlines(const std::vector<cv::Vec4f>& lines2D_in,
+                     const double shrink_coff, const double min_length,
+                     std::vector<cv::Vec4f>* lines2D_out);
 
   // Get the fraction of points that are around the line's center
-  // Input: samples: points distance to line start point divided by the line length
+  // Input: samples: points distance to line start point divided by the line
+  // length
   //
   // Output: return: fraction of points that are around center
   double getRatioOfPointsAroundCenter(const std::vector<double>& samples);

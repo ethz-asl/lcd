@@ -4,8 +4,7 @@ namespace line_ros_utility {
 
 const std::string frame_id = "line_tools_id";
 const bool write_labeled_lines = true;
-const std::string kWritePath =
-    "../data/train_lines/traj_1";
+const std::string kWritePath = "../data/train_lines/traj_1";
 
 std::vector<int> clusterLinesAfterClassification(
     const std::vector<line_detection::LineWithPlanes>& lines) {
@@ -72,7 +71,6 @@ bool printToFile(const std::vector<line_detection::LineWithPlanes>& lines3D,
       } else {
         file << 2 << " ";
       }
-      file << lines3D[i].planes_found << " ";
       file << labels[i] << std::endl;
     }
     file.close();
@@ -84,11 +82,14 @@ bool printToFile(const std::vector<line_detection::LineWithPlanes>& lines3D,
   }
 }
 
-bool printToFile(const std::vector<cv::Vec4f>& lines2D, const std::string& path) {
+bool printToFile(const std::vector<cv::Vec4f>& lines2D,
+                 const std::string& path) {
   std::ofstream file(path);
   if (file.is_open()) {
-    for (size_t i = 0; i < lines2D.size(); ++i) {
-      for (int j = 0; j < 3; ++j) file << lines2D[i][j] << " ";
+    for (size_t i = 0u; i < lines2D.size(); ++i) {
+      for (size_t j = 0u; j < 3; ++j) {
+        file << lines2D[i][j] << " ";
+      }
       file << lines2D[i][3] << std::endl;
     }
     file.close();
@@ -180,8 +181,9 @@ void ListenAndPublish::detectLines() {
 void ListenAndPublish::projectTo3D() {
   lines3D_temp_wp_.clear();
   start_time_ = std::chrono::system_clock::now();
-  line_detector_.project2Dto3DwithPlanes(cv_cloud_, cv_image_, lines2D_, &lines2D_kept_tmp_,
-                                         &lines3D_temp_wp_, true);
+  line_detector_.project2Dto3DwithPlanes(cv_cloud_, cv_image_, lines2D_,
+                                         &lines2D_kept_tmp_, &lines3D_temp_wp_,
+                                         true);
   end_time_ = std::chrono::system_clock::now();
   elapsed_seconds_ = end_time_ - start_time_;
   ROS_INFO("Projecting to 3D: %f", elapsed_seconds_.count());
@@ -190,8 +192,9 @@ void ListenAndPublish::projectTo3D() {
 void ListenAndPublish::checkLines() {
   lines3D_with_planes_.clear();
   start_time_ = std::chrono::system_clock::now();
-  line_detector_.runCheckOn3DLines(cv_cloud_, lines3D_temp_wp_,
-                                   &lines3D_with_planes_, lines2D_kept_tmp_, &lines2D_kept, camera_info_);
+  line_detector_.runCheckOn3DLines(cv_cloud_, lines2D_kept_tmp_,
+                                   lines3D_temp_wp_, camera_info_,
+                                   &lines2D_kept, &lines3D_with_planes_);
   end_time_ = std::chrono::system_clock::now();
   elapsed_seconds_ = end_time_ - start_time_;
   ROS_INFO("Check for valid lines: %f", elapsed_seconds_.count());
@@ -258,8 +261,8 @@ void ListenAndPublish::publish() {
 }
 
 void ListenAndPublish::printNumberOfLines() {
-  ROS_INFO("Lines kept after projection: %d/%d", static_cast<int>(lines3D_with_planes_.size()),
-           static_cast<int>(lines2D_.size()));
+  ROS_INFO("Lines kept after projection: %lu/%lu", lines3D_with_planes_.size(),
+           lines2D_.size());
 }
 
 void ListenAndPublish::reconfigureCallback(
@@ -288,8 +291,6 @@ void ListenAndPublish::reconfigureCallback(
   params_.hough_detector_threshold = config.hough_detector_threshold;
   params_.hough_detector_minLineLength = config.hough_detector_minLineLength;
   params_.hough_detector_maxLineGap = config.hough_detector_maxLineGap;
-
-  params_.test_N = config.test_N;
 
   detector_method_ = config.detector;
   number_of_clusters_ = config.number_of_clusters;
@@ -324,13 +325,14 @@ void ListenAndPublish::masterCallback(
   // Convert image to grayscale. That is needed for the line detection.
   cvtColor(cv_image_, cv_img_gray_, CV_RGB2GRAY);
 
-  ROS_INFO("**** New Image**** Frame %d****", iteration_);
+  ROS_INFO("**** New Image**** Frame %lu****", iteration_);
   detectLines();
   projectTo3D();
-  ROS_INFO("Kept lines: %d/%d", static_cast<int>(lines3D_temp_wp_.size()), static_cast<int>(lines2D_.size()));
+  ROS_INFO("Kept lines: %lu/%lu", lines3D_temp_wp_.size(), lines2D_.size());
   checkLines();
 
-  CHECK_EQ(static_cast<int>(lines3D_with_planes_.size()), static_cast<int>(lines2D_kept.size()));
+  CHECK_EQ(static_cast<int>(lines3D_with_planes_.size()),
+           static_cast<int>(lines2D_kept.size()));
 
   printNumberOfLines();
   // clusterKmeans();
@@ -339,11 +341,14 @@ void ListenAndPublish::masterCallback(
   // clusterKmedoid();
 
   if (write_labeled_lines) {
-    std::string path = kWritePath + "/lines_with_labels_" + std::to_string(iteration_) + ".txt";
+    std::string path = kWritePath + "/lines_with_labels_" +
+                       std::to_string(iteration_) + ".txt";
 
-    std::string path_2D_kept = kWritePath + "/lines_2D_kept_" + std::to_string(iteration_) + ".txt";
+    std::string path_2D_kept =
+        kWritePath + "/lines_2D_kept_" + std::to_string(iteration_) + ".txt";
 
-    std::string path_2D = kWritePath + "/lines_2D_" + std::to_string(iteration_) + ".txt";
+    std::string path_2D =
+        kWritePath + "/lines_2D_" + std::to_string(iteration_) + ".txt";
 
     // 3D lines data
     printToFile(lines3D_with_planes_, labels_, path);
@@ -432,8 +437,7 @@ void ListenAndPublish::labelLinesWithInstances(
         best_guess = j;
       }
     }
-    // (*labels)[i] = best_guess;
-    (*labels)[i] = known_colors_[best_guess];
+    labels->at(i) = known_colors_[best_guess];
   }
 }
 
