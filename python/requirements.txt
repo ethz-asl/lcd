@@ -1,0 +1,14 @@
+matplotlib
+numpy<=1.14.5
+opencv-python
+open3d-python
+pandas
+pathlib
+Pillow
+rospkg
+scipy
+sklearn
+tensorflow
+tensorboard
+pyyaml
+python-dateutil>=2.5.0

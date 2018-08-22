@@ -29,3 +29,23 @@
 *.app
 
 .DS_Store
+
+# Temporary
+tmp/
+
+# Data
+data/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# .npy file
+*.npy
+
+# Logs
+logs/
