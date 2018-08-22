@@ -37,7 +37,7 @@ Run `get_virtual_camera_images.py` to get the virtual camera image associated to
 python get_virtual_camera_images.py
 ```
 
-Notice that these images data are reprojection of the pointcloud from a different viewpoint and there are black parts in the images that have no data. We can further more inpaint these images to fill in the "small" black parts. To inpaint, check the notebook `examples/Go_through_our_data.ipynb`.
+Notice that these images data are reprojection of the pointcloud from a different viewpoint and there are black parts in the images that have no data. We can further more inpaint these images to fill in the "small" black parts. To inpaint, check the notebook `examples/00-Go_through_our_data.ipynb`.
 
 Take trajectory 1 as an example, we split its 300 frames to `train`, `val` and `test` (ratio = 3:1:1). (Normally one can follow the split of dataset provided by `SceneNetRGBD`)
 ```bash
@@ -59,8 +59,5 @@ python train.py
 
 The checkpoint for 30 epoches is stored in `logs`.
 
-## Visualization
-See `examples/Visualization.ipynb`.
-
 ## Notebooks
-Notebooks provide better comprehension of the codes. One can check them in `examples`.
+Notebooks provide better comprehension of the codes as well as some visualizations. One can check them in `examples`.
