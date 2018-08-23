@@ -5,7 +5,6 @@ open3d-python
 pandas
 pathlib
 Pillow
-rospkg
 scipy
 sklearn
 tensorflow

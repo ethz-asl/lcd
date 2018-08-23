@@ -16,18 +16,6 @@ class SceneNetCameraModel:
         self.fx = camera_intrinsics[0, 0]
         self.fy = camera_intrinsics[1, 1]
 
-    def cx(self):
-        return self.cx
-
-    def cy(self):
-        return self.cy
-
-    def fx(self):
-        return self.fx
-
-    def fy(self):
-        return self.fy
-
 
 def get_camera_model():
     """Camera model for SceneNetRGBD dataset"""
@@ -208,11 +196,11 @@ def pcl_lines_for_plot(data_lines, lines_color):
 
 def rgbd_to_pcl(rgb_image, depth_image, camera_model):
     """Convert rgb-d image to pointcloud"""
-    center_x = camera_model.cx()
-    center_y = camera_model.cy()
+    center_x = camera_model.cx
+    center_y = camera_model.cy
 
-    constant_x = 1 / camera_model.fx()
-    constant_y = 1 / camera_model.fy()
+    constant_x = 1 / camera_model.fx
+    constant_y = 1 / camera_model.fy
 
     vs = np.array(
         [(v - center_x) * constant_x for v in range(0, depth_image.shape[1])])
@@ -258,11 +246,11 @@ def convert_camera_coordinates_to_world(coor_camera, trajectory, frame):
 
 
 def euclidean_ray_length_to_z_coordinate(depth_image, camera_model):
-    center_x = camera_model.cx()
-    center_y = camera_model.cy()
+    center_x = camera_model.cx
+    center_y = camera_model.cy
 
-    constant_x = 1 / camera_model.fx()
-    constant_y = 1 / camera_model.fy()
+    constant_x = 1 / camera_model.fx
+    constant_y = 1 / camera_model.fy
 
     vs = np.array(
         [(v - center_x) * constant_x for v in range(0, depth_image.shape[1])])

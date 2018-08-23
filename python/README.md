@@ -24,6 +24,16 @@ Tensorflow cpu version is used here. If you want to use gpu, change `requirement
 Before reaching to this repository, make sure that you have followed the instructions for the ros packages and get the lines data in `../data/train_lines`.
 
 Here we use the trajectory 1 in the [train_0](https://robotvault.bitbucket.io/scenenet-rgbd.html) dataset of `SceneNetRGBD` as an example. You first need to clone the repository [pySceneNetRGBD](https://github.com/jmccormac/pySceneNetRGBD), download the dataset as well as the protobuf to `pySceneNetRGBD/data`. Set `pySceneNetRGBD_root` in `tools/pathconfig.py` properly.
+```bash
+cd ../..
+git clone https://github.com/jmccormac/pySceneNetRGBD.git
+cd pySceneNetRGBD
+mkdir data && cd data
+wget http://www.doc.ic.ac.uk/~ahanda/train_split/train_0.tar.gz train_0.tar.gz
+wget http://www.doc.ic.ac.uk/~ahanda/train_protobufs.tar.gz train_protobufs.tar.gz
+tar -xvzf train_0.tar.gz train_protobufs.tar.gz
+cd .. && make
+```
 
 If you want to try other trajectories, change the variables `path_to_photos` and `path_to_lines` accordingly.
 
@@ -55,9 +65,7 @@ train with **AlexNet** and **triplet loss**:
 ```bash
 python train.py
 ```
-**Note**: If you use a different train set, you need to calculate the train set mean with `tools/train_set_mean.py` and change `mean = np.array([22.47429166, 20.13914579, 5.62511388])` to your new mean in `model/datagenerator.py`
-
-The checkpoint for 30 epoches is stored in `logs`.
+**Note**: If you use a different train set, you need to calculate the train set mean with `tools/train_set_mean.py` and pass the train set mean to the `ImageDataGenerator`.
 
 ## Notebooks
 Notebooks provide better comprehension of the codes as well as some visualizations. One can check them in `examples`.
