@@ -7,11 +7,14 @@ Adapted from https://github.com/kratzert/finetune_alexnet_with_tensorflow/blob/m
 
 
 class ImageDataGenerator:
-    def __init__(self, class_list, horizontal_flip=False, shuffle=False, mean=np.array([22.47429166, 20.13914579, 5.62511388]), scale_size=(227, 227)):
+    def __init__(self, class_list, horizontal_flip=False, shuffle=False, image_type='bgr', mean=np.array([22.47429166, 20.13914579, 5.62511388]), scale_size=(227, 227)):
 
         # Init params
         self.horizontal_flip = horizontal_flip
         self.shuffle = shuffle
+        self.image_type = image_type
+        if image_type not in ['bgr', 'bgr-d']:
+            raise ValueError("Images should be 'bgr' or 'bgr-d'")
         self.mean = mean
         self.scale_size = scale_size
         self.pointer = 0
@@ -80,10 +83,24 @@ class ImageDataGenerator:
         self.pointer += batch_size
 
         # Read images
-        images = np.ndarray(
-            [batch_size, self.scale_size[0], self.scale_size[1], 3])
+        if self.image_type == 'bgr':
+            images = np.ndarray(
+                [batch_size, self.scale_size[0], self.scale_size[1], 3])
+        elif self.image_type == 'bgr-d':
+            images = np.ndarray(
+                [batch_size, self.scale_size[0], self.scale_size[1], 4])
         for i in range(len(paths)):
-            img = cv2.imread(paths[i], cv2.IMREAD_UNCHANGED)
+            if self.image_type == 'bgr':
+                # bgr image
+                img = cv2.imread(paths[i], cv2.IMREAD_UNCHANGED)
+            elif self.image_type == 'bgr-d':
+                path_rgb = paths[i]
+                path_depth = path_rgb.replace('rgb', 'depth')
+                img_bgr = cv2.imread(path_rgb, cv2.IMREAD_UNCHANGED)
+                img_depth = cv2.imread(path_depth, cv2.IMREAD_UNCHANGED)
+                # bgr-d image
+                img = np.dstack([img_bgr, img_depth])
+
             # flip image at random if flag is selected
             if self.horizontal_flip and np.random.random() < 0.5:
                 img = cv2.flip(img, 1)

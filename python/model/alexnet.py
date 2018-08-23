@@ -10,12 +10,15 @@ import numpy as np
 class AlexNet(object):
 
     def __init__(self, x, keep_prob, skip_layer,
-                 weights_path='DEFAULT'):
+                 input_images='bgr', weights_path='DEFAULT'):
 
         # Parse input arguments into class variables
         self.X = x
         self.KEEP_PROB = keep_prob
         self.SKIP_LAYER = skip_layer
+        self.INPUT__IMAGES = input_images
+        if input_images not in ['bgr', 'bgr-d']:
+            raise ValueError("Input images should be 'bgr' or 'bgr-d'")
 
         if weights_path == 'DEFAULT':
             self.WEIGHTS_PATH = os.path.join(os.path.dirname(
@@ -49,8 +52,8 @@ class AlexNet(object):
         pool5 = max_pool(conv5, 3, 3, 2, 2, padding='VALID', name='pool5')
 
         # 6th Layer: Flatten -> FC (w ReLu) -> Dropout
-        flattened = tf.reshape(pool5, [-1, 6*6*256])
-        fc6 = fc(flattened, 6*6*256, 4096, name='fc6')
+        flattened = tf.reshape(pool5, [-1, 6 * 6 * 256])
+        fc6 = fc(flattened, 6 * 6 * 256, 4096, name='fc6')
         dropout6 = dropout(fc6, self.KEEP_PROB)
 
         # 7th Layer: FC (w ReLu) -> Dropout
@@ -76,23 +79,43 @@ class AlexNet(object):
 
             # Check if the layer is one of the layers that should be reinitialized
             if op_name not in self.SKIP_LAYER:
+                # For rgb-d images input, just initialize the weights corresponding to the bgr channels and the biases
+                if self.INPUT__IMAGES == 'bgr-d' and op_name == 'conv1':
+                    with tf.variable_scope(op_name, reuse=True):
+                        # Loop over list of weights/biases and assign them to their corresponding tf variable
+                        for data in weights_dict[op_name]:
 
-                with tf.variable_scope(op_name, reuse=True):
+                            # Biases
+                            if len(data.shape) == 1:
 
-                    # Loop over list of weights/biases and assign them to their corresponding tf variable
-                    for data in weights_dict[op_name]:
+                                var = tf.get_variable(
+                                    'biases', trainable=False)
+                                session.run(var.assign(data))
 
-                        # Biases
-                        if len(data.shape) == 1:
+                            # Weights
+                            else:
 
-                            var = tf.get_variable('biases', trainable=False)
-                            session.run(var.assign(data))
+                                var = tf.get_variable(
+                                    'weights', trainable=False)
+                                session.run(var[:, :, :3, :].assign(data))
+                else:
+                    with tf.variable_scope(op_name, reuse=True):
 
-                        # Weights
-                        else:
+                        # Loop over list of weights/biases and assign them to their corresponding tf variable
+                        for data in weights_dict[op_name]:
 
-                            var = tf.get_variable('weights', trainable=False)
-                            session.run(var.assign(data))
+                            # Biases
+                            if len(data.shape) == 1:
+
+                                var = tf.get_variable(
+                                    'biases', trainable=False)
+                                session.run(var.assign(data))
+
+                            # Weights
+                            else:
+                                var = tf.get_variable(
+                                    'weights', trainable=False)
+                                session.run(var.assign(data))
 
 
 """
@@ -109,14 +132,15 @@ def conv(x, filter_height, filter_width, num_filters, stride_y, stride_x, name,
     input_channels = int(x.get_shape()[-1])
 
     # Create lambda function for the convolution
-    def convolve(i, k): return tf.nn.conv2d(i, k,
-                                            strides=[1, stride_y, stride_x, 1],
-                                            padding=padding)
+    def convolve(i, k):
+        return tf.nn.conv2d(i, k,
+                            strides=[1, stride_y, stride_x, 1],
+                            padding=padding)
 
     with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
         # Create tf variables for the weights and biases of the conv layer
         weights = tf.get_variable(
-            'weights', shape=[filter_height, filter_width, input_channels/groups, num_filters], trainable=True)
+            'weights', shape=[filter_height, filter_width, input_channels / groups, num_filters], trainable=True)
         biases = tf.get_variable('biases', shape=[num_filters], trainable=True)
 
         if groups == 1:
@@ -155,7 +179,7 @@ def fc(x, num_in, num_out, name, relu=True):
         # Matrix multiply weights and inputs and add bias
         act = tf.nn.xw_plus_b(x, weights, biases, name=scope.name)
 
-        if relu == True:
+        if relu is True:
             # Apply ReLu non linearity
             relu = tf.nn.relu(act)
             return relu

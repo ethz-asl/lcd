@@ -57,7 +57,7 @@ def get_origin_virtual_camera(line, distance, debug=False):
     plane1_normal = line[6:9]  # plane normal already normalized
     plane2_normal = line[10:13]
 
-    n = -3  # value of n depends on the data format for line
+    n = -2  # value of n depends on the data format for line
     if line[n] == 0:  # dicontinuty line
         if debug is True:
             print("disconti")
@@ -101,7 +101,7 @@ def get_origin_virtual_camera(line, distance, debug=False):
     min_dist = np.inf
     origin_view_fram = origin_cand[0]
 
-    # choose the nearest origin of line view frame to the original camera frame
+    # choose the nearest origin of virtual camera to the real camera's origin
     for origin in origin_cand:
         if np.linalg.norm(origin) < min_dist:
             min_dist = np.linalg.norm(origin)

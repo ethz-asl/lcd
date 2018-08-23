@@ -51,6 +51,6 @@ for frame_id in range(300):
         cv2.imwrite(
             '../data/train/traj_1/frame_{0}/rgb/{1}.png'.format(frame_id, i), rgb_image_from_line_view)
         cv2.imwrite(
-            '../data/train/traj_1/frame_{0}/depth/{1}.png'.format(frame_id, i), depth_image_from_line_view)
+            '../data/train/traj_1/frame_{0}/depth/{1}.png'.format(frame_id, i), depth_image_from_line_view.astype(np.uint16))
 
     print('frame {0} finished processing'.format(frame_id))
