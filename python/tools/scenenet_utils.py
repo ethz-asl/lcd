@@ -3,17 +3,51 @@ import open3d
 import sys
 
 import pathconfig
-import scenenet_to_rosbag
 import scenenet_pb2 as sn
 
-from image_geometry import PinholeCameraModel
 from camera_pose_and_intrinsics_example import camera_to_world_with_pose, interpolate_poses
 
 
+class SceneNetCameraModel:
+    def __init__(self, camera_intrinsics):
+        self.P = camera_intrinsics
+        self.cx = camera_intrinsics[0, 2]
+        self.cy = camera_intrinsics[1, 2]
+        self.fx = camera_intrinsics[0, 0]
+        self.fy = camera_intrinsics[1, 1]
+
+    def cx(self):
+        return self.cx
+
+    def cy(self):
+        return self.cy
+
+    def fx(self):
+        return self.fx
+
+    def fy(self):
+        return self.fy
+
+
 def get_camera_model():
-    camera_info = scenenet_to_rosbag.get_camera_info()
-    camera_model = PinholeCameraModel()
-    camera_model.fromCameraInfo(camera_info)
+    """Camera model for SceneNetRGBD dataset"""
+    def camera_intrinsic_transform(vfov=45,
+                                   hfov=60,
+                                   pixel_width=320,
+                                   pixel_height=240):
+        """Camera intrinsic matrix for SceneNetRGBD dataset"""
+        camera_intrinsics = np.zeros((3, 4))
+        camera_intrinsics[2, 2] = 1
+        camera_intrinsics[0, 0] = (
+            pixel_width / 2.0) / np.tan(np.radians(hfov / 2.0))
+        camera_intrinsics[0, 2] = pixel_width / 2.0
+        camera_intrinsics[1, 1] = (
+            pixel_height / 2.0) / np.tan(np.radians(vfov / 2.0))
+        camera_intrinsics[1, 2] = pixel_height / 2.0
+        return camera_intrinsics
+
+    camera_intrinsic_matrix = camera_intrinsic_transform()
+    camera_model = SceneNetCameraModel(camera_intrinsic_matrix)
     return camera_model
 
 
@@ -186,7 +220,7 @@ def rgbd_to_pcl(rgb_image, depth_image, camera_model):
         [(u - center_y) * constant_y for u in range(0, depth_image.shape[0])])
 
     # euclidean_ray_length_to_z_coordinate
-    depth_image = scenenet_to_rosbag.euclidean_ray_length_to_z_coordinate(
+    depth_image = euclidean_ray_length_to_z_coordinate(
         depth_image, camera_model)
     # Convert depth from cm to m.
     depth_image = depth_image / 1000.0
@@ -221,3 +255,21 @@ def convert_camera_coordinates_to_world(coor_camera, trajectory, frame):
     coor_homo_world = camera_to_world_matrix.dot(coor_homo_camera)
 
     return coor_homo_world[:3]
+
+
+def euclidean_ray_length_to_z_coordinate(depth_image, camera_model):
+    center_x = camera_model.cx()
+    center_y = camera_model.cy()
+
+    constant_x = 1 / camera_model.fx()
+    constant_y = 1 / camera_model.fy()
+
+    vs = np.array(
+        [(v - center_x) * constant_x for v in range(0, depth_image.shape[1])])
+    us = np.array(
+        [(u - center_y) * constant_y for u in range(0, depth_image.shape[0])])
+
+    return (np.sqrt(
+        np.square(depth_image / 1000.0) /
+        (1 + np.square(vs[np.newaxis, :]) + np.square(us[:, np.newaxis]))) *
+        1000.0).astype(np.uint16)

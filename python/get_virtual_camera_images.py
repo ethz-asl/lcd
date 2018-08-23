@@ -7,7 +7,7 @@ import numpy as np
 import cv2
 import pandas as pd
 
-from tools import scenenet_to_rosbag, scenenet_utils
+from tools import scenenet_utils
 from tools import pathconfig
 
 path_to_photos = os.path.join(

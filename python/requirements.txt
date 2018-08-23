@@ -1,4 +1,4 @@
-matplotlib
+matplotlib==1.5.3
 numpy<=1.14.5
 opencv-python
 open3d-python
