@@ -188,7 +188,7 @@ with tf.Session() as sess:
         print("{} Saving checkpoint of model...".format(datetime.now()))
         # save checkpoint of the model
         checkpoint_name = os.path.join(
-            checkpoint_path, 'model_epoch' + str(epoch + 1) + '.ckpt')
+            checkpoint_path, image_type + '_model_epoch' + str(epoch + 1) + '.ckpt')
         save_path = saver.save(sess, checkpoint_name)
 
         print("{} Model checkpoint saved at {}".format(

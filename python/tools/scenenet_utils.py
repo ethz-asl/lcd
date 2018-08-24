@@ -1,5 +1,4 @@
 import numpy as np
-import open3d
 import sys
 
 import pathconfig
@@ -9,12 +8,23 @@ from camera_pose_and_intrinsics_example import camera_to_world_with_pose, interp
 
 
 class SceneNetCameraModel:
+    """A simplified camera model class mainly for storing camera intrinsics.
+    """
+
     def __init__(self, camera_intrinsics):
         self.P = camera_intrinsics
         self.cx = camera_intrinsics[0, 2]
         self.cy = camera_intrinsics[1, 2]
         self.fx = camera_intrinsics[0, 0]
         self.fy = camera_intrinsics[1, 1]
+
+    def project3dToPixel(self, point_3d):
+        """Project 3d point to pixel.
+        """
+        point_coor_homo = np.append(point_3d, [1])
+        pixel_homo = self.P.dot(point_coor_homo.T)
+        pixel = np.rint(pixel_homo / pixel_homo[2]).astype(int)[:2]
+        return pixel
 
 
 def get_camera_model():
@@ -72,17 +82,20 @@ def project_pcl_to_image(pointcloud, camera_model):
 
 
 def get_origin_virtual_camera(line, distance, debug=False):
-    """Get the origin of virtual camera for the line.
+    """Get the origin of virtual camera for the line. The origin candidates are determined by the surfaces normals of the line. The virtual camera origin is chosen as the nearest point to real camera origin.
     """
+    # x axis is taken as the direction of the line
     x = (line[3:6] - line[:3]) / np.linalg.norm(line[3:6] - line[:3])
     middle_point = (line[3:6] + line[:3]) / 2
     plane1_normal = line[6:9]  # plane normal already normalized
     plane2_normal = line[10:13]
 
-    n = -2  # value of n depends on the data format for line
+    # Get possible virtual camera optical axis, store them in the list z_cand
+    n = -2  # value of n depends on the data format for line, n indicate line's type
     if line[n] == 0:  # dicontinuty line
         if debug is True:
             print("disconti")
+        # discontinuty line only has one valid surface normal, the other one is [0, 0, 0, 0]
         if np.linalg.norm(plane1_normal) <= 0.001:
             z_cand = [plane2_normal, -plane2_normal]
         if np.linalg.norm(plane2_normal) <= 0.001:
@@ -91,6 +104,7 @@ def get_origin_virtual_camera(line, distance, debug=False):
     if line[n] == 1:  # plane(surface) line
         if debug is True:
             print("plane")
+        # Surface line has 2 similar surface normals, thus we can always take only plane 1's normal
         z_cand = [plane1_normal, -plane1_normal]
 
     if line[n] == 2:  # intersection line
@@ -109,7 +123,7 @@ def get_origin_virtual_camera(line, distance, debug=False):
 
     origin_cand = []
     for z in z_cand:
-        # project vector z onto the line perpandicular plane
+        # Project vector z onto the plane which is perpendicular to the line
         p1 = np.array([0, 0, 0])
         p2 = z
 
@@ -121,15 +135,15 @@ def get_origin_virtual_camera(line, distance, debug=False):
         origin_cand.append(origin)
 
     min_dist = np.inf
-    origin_view_fram = origin_cand[0]
+    origin_virtual_camera = origin_cand[0]
 
     # choose the nearest origin of virtual camera to the real camera's origin
     for origin in origin_cand:
         if np.linalg.norm(origin) < min_dist:
             min_dist = np.linalg.norm(origin)
-            origin_view_fram = origin
+            origin_virtual_camera = origin
 
-    return origin_view_fram
+    return origin_virtual_camera
 
 
 def virtual_camera_pose(line, distance):
@@ -162,40 +176,8 @@ def pcl_transform(pointcloud, T):
     return pcl_new
 
 
-def pcl_lines_for_plot(data_lines, lines_color):
-    """Get points on the lines for 3D visualization in open3d.
-    """
-    lines_number = data_lines.shape[0]
-    pcl_lines = [[] for n in range(lines_number)]
-
-    for i in range(lines_number):
-        line = data_lines[i]
-        start = line[:3]
-        end = line[3:6]
-        vector = end - start
-        interpolate = np.linspace(0, 1, 100)
-
-        points = np.vstack((start + n * vector for n in interpolate))
-        if np.unique(lines_color).shape[0] > 3:
-            np.random.seed(lines_color[i])
-            rgb = np.random.randint(255, size=(1, 3)) / 255.0
-        else:
-            if lines_color[i] == 0:  # discontinuty line
-                rgb = np.array([1, 0, 0])
-            if lines_color[i] == 1:  # plane(surface) line
-                rgb = np.array([[0, 1, 0]])
-            if lines_color[i] == 2:  # intersection line
-                rgb = np.array([[0, 0, 1]])
-        rgbs = np.vstack((rgb for n in interpolate))
-
-        pcl_lines[i] = open3d.PointCloud()
-        pcl_lines[i].points = open3d.Vector3dVector(points)
-        pcl_lines[i].colors = open3d.Vector3dVector(rgbs)
-    return pcl_lines
-
-
 def rgbd_to_pcl(rgb_image, depth_image, camera_model):
-    """Convert rgb-d image to pointcloud"""
+    """Convert rgb-d image to pointcloud. Adapted from https://github.com/ethz-asl/scenenet_ros_tools/blob/master/nodes/scenenet_to_rosbag.py"""
     center_x = camera_model.cx
     center_y = camera_model.cy
 
@@ -224,6 +206,8 @@ def rgbd_to_pcl(rgb_image, depth_image, camera_model):
 
 
 def convert_camera_coordinates_to_world(coor_camera, trajectory, frame):
+    """Convert coordinates in camera frame to coordinates in world frame.
+    """
     trajectories = sn.Trajectories()
     try:
         with open(pathconfig.protobuf_path, 'rb') as f:
@@ -246,6 +230,7 @@ def convert_camera_coordinates_to_world(coor_camera, trajectory, frame):
 
 
 def euclidean_ray_length_to_z_coordinate(depth_image, camera_model):
+    """From https://github.com/ethz-asl/scenenet_ros_tools/blob/master/nodes/scenenet_to_rosbag.py"""
     center_x = camera_model.cx
     center_y = camera_model.cy
 
@@ -257,7 +242,4 @@ def euclidean_ray_length_to_z_coordinate(depth_image, camera_model):
     us = np.array(
         [(u - center_y) * constant_y for u in range(0, depth_image.shape[0])])
 
-    return (np.sqrt(
-        np.square(depth_image / 1000.0) /
-        (1 + np.square(vs[np.newaxis, :]) + np.square(us[:, np.newaxis]))) *
-        1000.0).astype(np.uint16)
+    return (np.sqrt(np.square(depth_image / 1000.0) / (1 + np.square(vs[np.newaxis, :]) + np.square(us[:, np.newaxis]))) * 1000.0).astype(np.uint16)

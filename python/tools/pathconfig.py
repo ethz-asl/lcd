@@ -1,3 +1,6 @@
+"""
+To config path variables.
+"""
 import sys
 import os
 

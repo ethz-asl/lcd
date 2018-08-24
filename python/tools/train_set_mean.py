@@ -4,6 +4,8 @@ import argparse
 
 
 def get_train_set_mean(file_path, image_type):
+    """Get the train set mean.
+    """
     image_paths = []
     with open(file_path) as f:
         lines = f.readlines()
