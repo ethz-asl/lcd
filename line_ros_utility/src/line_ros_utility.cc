@@ -3,7 +3,7 @@
 namespace line_ros_utility {
 
 const std::string frame_id = "line_tools_id";
-const bool write_labeled_lines = true;
+const bool write_labeled_lines = false;
 const std::string kWritePath = "../data/train_lines/traj_1";
 
 std::vector<int> clusterLinesAfterClassification(
@@ -192,9 +192,9 @@ void ListenAndPublish::projectTo3D() {
 void ListenAndPublish::checkLines() {
   lines3D_with_planes_.clear();
   start_time_ = std::chrono::system_clock::now();
-  line_detector_.runCheckOn3DLines(cv_cloud_, lines2D_kept_tmp_,
-                                   lines3D_temp_wp_, camera_info_,
-                                   &lines2D_kept, &lines3D_with_planes_);
+  line_detector_.runCheckOn3DLines(cv_cloud_, camera_P_, lines2D_kept_tmp_,
+                                   lines3D_temp_wp_, &lines2D_kept,
+                                   &lines3D_with_planes_);
   end_time_ = std::chrono::system_clock::now();
   elapsed_seconds_ = end_time_ - start_time_;
   ROS_INFO("Check for valid lines: %f", elapsed_seconds_.count());
@@ -321,7 +321,11 @@ void ListenAndPublish::masterCallback(
   cv_instances_ = cv_instances_ptr->image;
   // Store camera message.
   camera_info_ = rosmsg_info;
-
+  // Get camera projection matrix
+  image_geometry::PinholeCameraModel camera_model;
+  camera_model.fromCameraInfo(camera_info_);
+  camera_P_ = cv::Mat(camera_model.projectionMatrix());
+  camera_P_.convertTo(camera_P_, CV_32F);
   // Convert image to grayscale. That is needed for the line detection.
   cvtColor(cv_image_, cv_img_gray_, CV_RGB2GRAY);
 

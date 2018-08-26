@@ -51,7 +51,8 @@ std::vector<int> clusterLinesAfterClassification(
 // can be read by the random_forest.py node.
 bool printToFile(const std::vector<line_detection::LineWithPlanes>& lines3D,
                  const std::vector<int>& labels, const std::string& path);
-bool printToFile(const std::vector<cv::Vec4f>& lines2D, const std::string& path);
+bool printToFile(const std::vector<cv::Vec4f>& lines2D,
+                 const std::string& path);
 // Stores lines in marker messages.
 void storeLines3DinMarkerMsg(const std::vector<cv::Vec6f>& lines3D,
                              visualization_msgs::Marker* disp_lines,
@@ -87,7 +88,7 @@ class DisplayClusters {
  private:
   bool frame_id_set_, clusters_set_, initialized_;
   std::vector<visualization_msgs::Marker> marker_lines_;
-  std::vector<std::vector<cv::Vec<float, 6> > > line_clusters_;
+  std::vector<std::vector<cv::Vec<float, 6>>> line_clusters_;
   std::vector<ros::Publisher> pub_;
   std::string frame_id_;
   std::vector<cv::Vec3f> colors_;
@@ -212,13 +213,15 @@ class ListenAndPublish {
   std::vector<cv::Vec4f> lines2D_;
   std::vector<cv::Vec4f> lines2D_kept;
   std::vector<cv::Vec4f> lines2D_kept_tmp_;
-  std::vector<cv::Vec<float, 6> > lines3D_;
+  std::vector<cv::Vec<float, 6>> lines3D_;
   std::vector<line_detection::LineWithPlanes> lines3D_temp_wp_;
   std::vector<line_detection::LineWithPlanes> lines3D_with_planes_;
   std::vector<int> labels_;
   std::vector<std::vector<int>> labels_left_right;
   std::vector<int> labels_rf_kmedoids_;
   sensor_msgs::CameraInfoConstPtr camera_info_;
+  // Camera projection matrix
+  cv::Mat camera_P_;
   // Publishers and Subscribers.
   tf::TransformBroadcaster broad_caster_;
   tf::Transform transform_;

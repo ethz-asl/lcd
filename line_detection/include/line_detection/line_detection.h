@@ -19,10 +19,6 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
-#include <image_geometry/pinhole_camera_model.h>
-#include <ros/ros.h>
-#include <sensor_msgs/CameraInfo.h>
-
 namespace line_detection {
 
 constexpr double kPi = 3.141592653589793;
@@ -409,10 +405,9 @@ class LineDetector {
   //        lines2D_out: 2D lines corresponding to lines3D_out.
   //
   //        lines3D_out: All 3D lines that are considered as valid. after check
-  void runCheckOn3DLines(const cv::Mat& cloud,
-                         std::vector<cv::Vec4f>& lines2D_in,
+  void runCheckOn3DLines(const cv::Mat& cloud, const cv::Mat& camera_P,
+                         const std::vector<cv::Vec4f>& lines2D_in,
                          const std::vector<LineWithPlanes>& lines3D_in,
-                         sensor_msgs::CameraInfoConstPtr& camera_info,
                          std::vector<cv::Vec4f>* lines2D_out,
                          std::vector<LineWithPlanes>* lines3D_out);
 
@@ -429,14 +424,13 @@ class LineDetector {
   //
   //        line:     Line in 3D defined by (start, end).
   //
+  //        camera_P:  camera projection matrix
+  //
   //        line_2D:  Line in 2D correcponded to 3D line
   //
-  //        camera_info:  camera information
-  //
   // Ouput: return:   True if it is a valid line, false otherwise.
-  bool checkIfValidLineWith2DInfo(const cv::Mat& cloud, cv::Vec4f& line_2D,
-                                  sensor_msgs::CameraInfoConstPtr camera_info,
-                                  cv::Vec6f* line);
+  bool checkIfValidLineWith2DInfo(const cv::Mat& cloud, const cv::Mat& camera_P,
+                                  cv::Vec4f& line_2D, cv::Vec6f* line);
 
   // Checks if a line is valid by brute force approach: It computes the distance
   // between every point in the point cloud and the line and returns true if a
