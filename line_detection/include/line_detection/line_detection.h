@@ -167,7 +167,7 @@ inline cv::Vec3f projectPointOnLine(const cv::Vec3f& x_0,
   return x_0 + direction * direction.dot(point - x_0);
 }
 
-cv::Vec3f computeMean(const std::vector<cv::Vec3f>& points) {
+inline cv::Vec3f computeMean(const std::vector<cv::Vec3f>& points) {
   const size_t num_points = points.size();
   CHECK(num_points > 0);
   cv::Vec3f mean(0.0f, 0.0f, 0.0f);

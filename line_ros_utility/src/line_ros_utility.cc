@@ -9,7 +9,7 @@ const std::string kWritePath = "../data/train_lines/traj_1";
 std::vector<int> clusterLinesAfterClassification(
     const std::vector<line_detection::LineWithPlanes>& lines) {
   std::vector<int> label;
-  for (size_t i = 0; i < lines.size(); ++i) {
+  for (size_t i = 0u; i < lines.size(); ++i) {
     if (lines[i].type == line_detection::LineType::DISCONT) {
       label.push_back(0);
     } else if (lines[i].type == line_detection::LineType::PLANE) {
@@ -40,7 +40,7 @@ void storeLines3DinMarkerMsg(const std::vector<cv::Vec6f>& lines3D,
   // is the start and the second is the end of the line. The third is then again
   // the start of the next line, and so on.
   geometry_msgs::Point p;
-  for (size_t i = 0; i < lines3D.size(); ++i) {
+  for (size_t i = 0u; i < lines3D.size(); ++i) {
     p.x = lines3D[i][0];
     p.y = lines3D[i][1];
     p.z = lines3D[i][2];
@@ -57,7 +57,7 @@ bool printToFile(const std::vector<line_detection::LineWithPlanes>& lines3D,
   CHECK(labels.size() == lines3D.size());
   std::ofstream file(path);
   if (file.is_open()) {
-    for (size_t i = 0; i < lines3D.size(); ++i) {
+    for (size_t i = 0u; i < lines3D.size(); ++i) {
       for (int j = 0; j < 6; ++j) file << lines3D[i].line[j] << " ";
       for (int j = 0; j < 4; ++j) file << lines3D[i].hessians[0][j] << " ";
       for (int j = 0; j < 4; ++j) file << lines3D[i].hessians[1][j] << " ";
@@ -143,8 +143,8 @@ void ListenAndPublish::writeMatToPclCloud(
   const size_t height = cv_cloud.rows;
   pcl_cloud->points.resize(width * height);
   pcl::PointXYZRGB point;
-  for (size_t i = 0; i < height; ++i) {
-    for (size_t j = 0; j < width; ++j) {
+  for (size_t i = 0u; i < height; ++i) {
+    for (size_t j = 0u; j < width; ++j) {
       point.x = cv_cloud.at<cv::Vec3f>(i, j)[0];
       point.y = cv_cloud.at<cv::Vec3f>(i, j)[1];
       point.z = cv_cloud.at<cv::Vec3f>(i, j)[2];
@@ -229,7 +229,7 @@ void ListenAndPublish::clusterKmedoid() {
   ROS_INFO("Cluster on distance matrix: %f", elapsed_seconds_.count());
   std::vector<size_t> labels = kmedoids_cluster_.getLabels();
   labels_rf_kmedoids_.clear();
-  for (size_t i = 0; i < labels.size(); ++i) {
+  for (size_t i = 0u; i < labels.size(); ++i) {
     labels_rf_kmedoids_.push_back(labels[i]);
   }
 }
@@ -397,7 +397,7 @@ void ListenAndPublish::labelLinesWithInstances(
   // num_checks + 1 points are reprojected onto the image.
   constexpr size_t num_checks = 10;
   // Iterate over all lines.
-  for (size_t i = 0; i < lines.size(); ++i) {
+  for (size_t i = 0u; i < lines.size(); ++i) {
     start = {lines[i].line[0], lines[i].line[1], lines[i].line[2]};
     end = {lines[i].line[3], lines[i].line[4], lines[i].line[5]};
     line = end - start;
@@ -478,7 +478,7 @@ void DisplayClusters::setClusters(
                           "clusters.";
   size_t N = 0;
   line_clusters_.clear();
-  for (size_t i = 0; i < lines3D.size(); ++i) {
+  for (size_t i = 0u; i < lines3D.size(); ++i) {
     // This if-clause sets the number of clusters. This works well as long the
     // clusters are indexed as an array (0,1,2,3). In any other case, it creates
     // to many clusters (which is not that bad, because empty clusters do not
@@ -496,7 +496,7 @@ void DisplayClusters::setClusters(
   }
   marker_lines_.resize(line_clusters_.size());
 
-  for (size_t i = 0; i < line_clusters_.size(); ++i) {
+  for (size_t i = 0u; i < line_clusters_.size(); ++i) {
     size_t n = i % colors_.size();
     storeLines3DinMarkerMsg(line_clusters_[i], &marker_lines_[i], colors_[n]);
     marker_lines_[i].header.frame_id = frame_id_;
@@ -507,7 +507,7 @@ void DisplayClusters::setClusters(
 
 void DisplayClusters::initPublishing(ros::NodeHandle& node_handle) {
   pub_.resize(colors_.size());
-  for (size_t i = 0; i < colors_.size(); ++i) {
+  for (size_t i = 0u; i < colors_.size(); ++i) {
     std::stringstream topic;
     topic << "/visualization_marker_" << i;
     pub_[i] =
@@ -522,7 +522,7 @@ void DisplayClusters::publish() {
   CHECK(frame_id_set_) << "You need to set the frame_id before publishing.";
   CHECK(clusters_set_) << "You need to set the clusters before publishing.";
 
-  for (size_t i = 0; i < marker_lines_.size(); ++i) {
+  for (size_t i = 0u; i < marker_lines_.size(); ++i) {
     size_t n = i % pub_.size();
     pub_[n].publish(marker_lines_[i]);
   }
@@ -547,12 +547,12 @@ void TreeClassifier::getTrees() {
     ros::shutdown();
   }
   trees_.resize(tree_service.response.trees.size());
-  for (size_t i = 0; i < tree_service.response.trees.size(); ++i) {
+  for (size_t i = 0u; i < tree_service.response.trees.size(); ++i) {
     cv_bridge::CvImagePtr cv_ptr_ =
         cv_bridge::toCvCopy(tree_service.response.trees[i], "64FC1");
     trees_[i].children_left.clear();
     trees_[i].children_right.clear();
-    for (size_t j = 0; j < cv_ptr_->image.cols; ++j) {
+    for (size_t j = 0u; j < cv_ptr_->image.cols; ++j) {
       trees_[i].children_left.push_back(cv_ptr_->image.at<double>(0, j));
       trees_[i].children_right.push_back(cv_ptr_->image.at<double>(1, j));
     }
@@ -567,20 +567,20 @@ void TreeClassifier::getLineDecisionPath(
     return;
   }
   // Fill in the line.
-  for (size_t i = 0; i < num_lines_; ++i) {
-    for (size_t j = 0; j < 6; ++j) {
+  for (size_t i = 0u; i < num_lines_; ++i) {
+    for (size_t j = 0u; j < 6; ++j) {
       service.request.lines.push_back(lines[i].line[j]);
     }
-    for (size_t j = 0; j < 4; ++j) {
+    for (size_t j = 0u; j < 4; ++j) {
       service.request.lines.push_back(lines[i].hessians[0][j]);
     }
-    for (size_t j = 0; j < 4; ++j) {
+    for (size_t j = 0u; j < 4; ++j) {
       service.request.lines.push_back(lines[i].hessians[1][j]);
     }
-    for (size_t j = 0; j < 3; ++j) {
+    for (size_t j = 0u; j < 3; ++j) {
       service.request.lines.push_back((float)lines[i].colors[0][j]);
     }
-    for (size_t j = 0; j < 3; ++j) {
+    for (size_t j = 0u; j < 3; ++j) {
       service.request.lines.push_back((float)lines[i].colors[1][j]);
     }
   }
@@ -593,14 +593,14 @@ void TreeClassifier::getLineDecisionPath(
   CHECK_EQ(service.response.decision_paths.size(), trees_.size());
   decision_paths_.resize(trees_.size());
   // For every tree, fill in the decision paths
-  for (size_t i = 0; i < trees_.size(); ++i) {
+  for (size_t i = 0u; i < trees_.size(); ++i) {
     cv_bridge::CvImagePtr cv_ptr_ =
         cv_bridge::toCvCopy(service.response.decision_paths[i], "64FC1");
     CHECK_EQ(cv_ptr_->image.rows, 2);
     decision_paths_[i].release();
     int size[2] = {(int)num_lines_, 60000};
     decision_paths_[i].create(2, size, CV_8U);
-    for (size_t j = 0; j < cv_ptr_->image.cols; ++j) {
+    for (size_t j = 0u; j < cv_ptr_->image.cols; ++j) {
       decision_paths_[i].ref<unsigned char>(
           cv_ptr_->image.at<double>(0, j), cv_ptr_->image.at<double>(1, j)) = 1;
     }
@@ -640,10 +640,10 @@ double TreeClassifier::computeDistance(const SearchTree& tree,
 void TreeClassifier::computeDistanceMatrix() {
   dist_matrix_ = cv::Mat(num_lines_, num_lines_, CV_32FC1, 0.0f);
   float dummy;
-  for (size_t i = 0; i < num_lines_; ++i) {
+  for (size_t i = 0u; i < num_lines_; ++i) {
     for (size_t j = i + 1; j < num_lines_; ++j) {
       dummy = 0;
-      for (size_t k = 0; k < trees_.size(); ++k) {
+      for (size_t k = 0u; k < trees_.size(); ++k) {
         dummy += computeDistance(trees_[k], decision_paths_[k], i, j, 0);
       }
       dist_matrix_.at<float>(i, j) = dummy / (double)trees_.size();
@@ -655,7 +655,7 @@ cv::Mat TreeClassifier::getDistanceMatrix() { return dist_matrix_; }
 
 EvalData::EvalData(const std::vector<line_detection::LineWithPlanes>& lines3D) {
   lines3D_.clear();
-  for (size_t i = 0; i < lines3D.size(); ++i) {
+  for (size_t i = 0u; i < lines3D.size(); ++i) {
     lines3D_.push_back(lines3D[i].line);
   }
 }
@@ -679,7 +679,7 @@ void EvalData::createHeatMap(const cv::Mat& image, const cv::Mat& dist_mat,
   float max_dist;
   float red, green, blue;
   max_dist = -1;
-  for (size_t i = 0; i < num_lines; ++i) {
+  for (size_t i = 0u; i < num_lines; ++i) {
     if (dist(dist_mat, i, idx) > max_dist) {
       max_dist = dist(dist_mat, i, idx);
     }
@@ -703,7 +703,7 @@ void EvalData::createHeatMap(const cv::Mat& image, const cv::Mat& dist_mat,
 void EvalData::storeHeatMaps(const cv::Mat& image, const cv::Mat& dist_mat,
                              const std::string& path) {
   size_t num_lines = lines2D_.size();
-  for (size_t i = 0; i < num_lines; ++i) {
+  for (size_t i = 0u; i < num_lines; ++i) {
     createHeatMap(image, dist_mat, i);
     std::string store_path = path + "_" + std::to_string(i) + ".jpg";
     cv::imwrite(store_path, heat_map_);
@@ -716,7 +716,7 @@ void EvalData::projectLinesTo2D(
   image_geometry::PinholeCameraModel camera_model;
   camera_model.fromCameraInfo(camera_info);
   lines2D_.clear();
-  for (size_t i = 0; i < lines3D_.size(); ++i) {
+  for (size_t i = 0u; i < lines3D_.size(); ++i) {
     p1 = camera_model.project3dToPixel(
         {lines3D_[i][0], lines3D_[i][1], lines3D_[i][2]});
     p2 = camera_model.project3dToPixel(
@@ -781,9 +781,9 @@ void EvalData::writeHeatMapColorBar(const std::string& path) {
   constexpr size_t width = 10;
   cv::Mat colorbar(height, width, CV_8UC3);
   float red, green, blue;
-  for (size_t i = 0; i < height; ++i) {
+  for (size_t i = 0u; i < height; ++i) {
     getHeatMapColor(i / (double)height, &red, &green, &blue);
-    for (size_t j = 0; j < width; ++j) {
+    for (size_t j = 0u; j < width; ++j) {
       colorbar.at<cv::Vec3b>(i, j) = {static_cast<unsigned char>(255 * blue),
                                       static_cast<unsigned char>(255 * green),
                                       static_cast<unsigned char>(255 * red)};
