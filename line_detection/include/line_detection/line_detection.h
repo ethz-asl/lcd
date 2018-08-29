@@ -295,8 +295,11 @@ class LineDetector {
                           const std::vector<cv::Point2i>& points,
                           LineWithPlanes* line3D);
 
-  // Uses two sets of points and fit a line, assuming that the two set of
-  // points are from a plane left and right of the line.
+  // (The two folloewing functions are depreciated.They remain here just for
+  // back compatibility concerns.)
+  // Uses two sets of points and fit a line,
+  // assuming that the two set of points are from a plane left and right of the
+  // line.
   // Input: points1/2:  The two set of points.
   //
   //       line_guess:  This is a guess of the line that is used if the two sets
@@ -309,8 +312,20 @@ class LineDetector {
                           const cv::Vec6f& line_guess, cv::Vec6f* line);
   bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                           const std::vector<cv::Vec3f>& points2,
-                          const cv::Vec6f& line_guess, LineWithPlanes* line,
-                          bool planes_found = true);
+                          const cv::Vec6f& line_guess, LineWithPlanes* line);
+
+  // Find 3D line using the points on the planes found by planeRANSAC.
+  // Input:  points1/2: Two sets of points.
+  //
+  //         line_guess: Initial guess of the line.
+  //
+  //         planes_found: True if and only if both planes of the line are found
+  //
+  // Output:  line:  The 3D line found.
+  bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
+                          const std::vector<cv::Vec3f>& points2,
+                          const cv::Vec6f& line_guess, const bool planes_found,
+                          LineWithPlanes* line);
 
   // Fits a plane to the points using RANSAC.
   bool planeRANSAC(const std::vector<cv::Vec3f>& points,
@@ -484,12 +499,62 @@ class LineDetector {
                      const double shrink_coff, const double min_length,
                      std::vector<cv::Vec4f>* lines2D_out);
 
-  // Get the fraction of points that are around the line's center
-  // Input: samples: points distance to line start point divided by the line
-  // length
+  // Get the neares point to the 3D line.
+  // Input:  points: A set of points.
   //
-  // Output: return: fraction of points that are around center
+  //         start: Start point of the line.
+  //
+  //         end: End point of the line.
+  //
+  // Output: nearest_point: Nearest point to the line in the points set.
+  void getNearestPointToLine(const std::vector<cv::Vec3f>& points,
+                             const cv::Vec3f& start, const cv::Vec3f& end,
+                             cv::Vec3f* nearest_point);
+
+  // Get the fraction of points that are around the line's center
+  // Input: samples: Points distance to line start point divided by the line
+  // length.
+  //
+  // Return: Fraction of points that are around center. A sample i is "Around
+  // center" means that samples[i] belongs to [0.25, 0.75].
   double getRatioOfPointsAroundCenter(const std::vector<double>& samples);
+
+  // Adjust the start and end points of 3D line using the inliers of the line.
+  // All points considered as inliers of the line are projected onto the
+  // line and then the pair of points that maximizes the distance of
+  // the line are chosen.
+  //
+  //  Input:  points: A set of points.
+  //
+  //          start_in: Initial start point of the line.
+  //
+  //          end_in: Initial end point of the line.
+  //
+  //  Output: start_out: Start point of the line after adjusting.
+  //
+  //          end_out: End point of the line after adjusting.
+  //
+  //  Return: False if the number of inliers of the line is less than the
+  // threshold min_points_in_line.
+  bool adjustLineUsingInliers(const std::vector<cv::Vec3f>& points,
+                              const cv::Vec3f& start_in,
+                              const cv::Vec3f& end_in, cv::Vec3f* start_out,
+                              cv::Vec3f* end_out);
+
+  // Check if a line is valid using the inliers of the line. If the ratio of the
+  // inliers that lie around the center of the line is smaller than the
+  // threshold kRatioThreshold, the line is not valid.
+  //
+  // Input: points: A set of points.
+  //
+  //        start: Start point of the line.
+  //
+  //        end: End point of the line.
+  //
+  // Return: True if the line if valid, false if not.
+  bool checkIfValidLineUsingInliers(const std::vector<cv::Vec3f>& points,
+                                    const cv::Vec3f& start,
+                                    const cv::Vec3f& end);
 
  private:
   cv::Ptr<cv::LineSegmentDetector> lsd_detector_;

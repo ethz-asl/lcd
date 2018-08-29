@@ -611,10 +611,11 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     return false;
   }
 }
+
 bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                                       const std::vector<cv::Vec3f>& points2,
                                       const cv::Vec6f& line_guess,
-                                      LineWithPlanes* line, bool planes_found) {
+                                      LineWithPlanes* line) {
   CHECK_NOTNULL(line);
   size_t N1 = points1.size();
   size_t N2 = points2.size();
@@ -634,91 +635,14 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
   // This distance is computed from the means of the two set of points. If the
   // distance is higher than this value, it is assumed that the line is not
   // the intersection of the two planes, but just lies on the one that is in
-  // the foreground
-
+  // the foreground.
+  constexpr double angle_difference = 0.995;
   mean1 = computeMean(points1);
   mean2 = computeMean(points2);
-
-  // If the distance along the plane1/2's normal direction between the two
-  // sets of points is small and the both support planes for line are found,
-  // the line should be either intersection line or surface line, otherwise
-  // the line is discontinouty line.
-  if (fabs((mean1 - mean2).dot(normal1)) < params_->max_dist_between_planes &&
-      fabs((mean1 - mean2).dot(normal2)) < params_->max_dist_between_planes &&
-      planes_found) {
-    // Checks if the planes are parallel. If the angle between the two planes'
-    // normal vectors is small, they are parallel and the line is surface
-    // line.
-    constexpr double kAngleDifference = 0.95;
-    if (fabs(normal1.dot(normal2)) > kAngleDifference) {
-      // Get the initial line guess
-      cv::Vec3f start(line_guess[0], line_guess[1], line_guess[2]);
-      cv::Vec3f end(line_guess[3], line_guess[4], line_guess[5]);
-      double length = cv::norm(start - end);
-
-      cv::Vec3f direction = end - start;
-      normalizeVector3D(&direction);
-
-      double dist;
-      double dist_min = 1e9;
-      double dist_max = -1e9;
-
-      int count_inliers = 0;
-      std::vector<double> positions_on_line;
-
-      // Project the points near the guess line onto it to adjust the guess
-      // line
-      for (size_t i = 0u; i < N1; ++i) {
-        if (distPointToLine(start, end, points1[i]) >
-            params_->max_deviation_inlier_line_check) {
-          continue;
-        }
-        ++count_inliers;
-        dist = direction.dot(points1[i] - start);
-        if (dist < dist_min) {
-          dist_min = dist;
-        }
-        if (dist > dist_max) {
-          dist_max = dist;
-        }
-        double position_on_line = direction.dot(points1[i] - start) / length;
-        positions_on_line.push_back(position_on_line);
-      }
-      for (size_t i = 0u; i < N2; ++i) {
-        if (distPointToLine(start, end, points2[i]) >
-            params_->max_deviation_inlier_line_check) {
-          continue;
-        }
-        ++count_inliers;
-        dist = direction.dot(points2[i] - start);
-        if (dist < dist_min) {
-          dist_min = dist;
-        }
-        if (dist > dist_max) {
-          dist_max = dist;
-        }
-        double position_on_line = direction.dot(points2[i] - start) / length;
-        positions_on_line.push_back(position_on_line);
-      }
-      // The line is not valid if it has few inliers
-      if (count_inliers < params_->min_points_in_line) {
-        return false;
-      }
-
-      // Update start and end points of the line.
-      end = start + direction * dist_max;
-      start = start + direction * dist_min;
-
-      // Ratio of points that are between lower*length and upper*length of the
-      // line
-      const double ratio_mid = getRatioOfPointsAroundCenter(positions_on_line);
-      // Most points are near the start and end points, reject this line
-      constexpr double kRatioThreshold = 0.25;
-      if (ratio_mid < kRatioThreshold) {
-        return false;
-      }
-
-      line->line = {start[0], start[1], start[2], end[0], end[1], end[2]};
+  if (cv::norm(mean1 - mean2) < params_->max_dist_between_planes) {
+    // Checks if the planes are parallel.
+    if (fabs(normal1.dot(normal2)) > angle_difference) {
+      line->line = line_guess;
       line->type = LineType::PLANE;
       return true;
     } else {
@@ -737,60 +661,19 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       double dist;
       double dist_min = 1e9;
       double dist_max = -1e9;
-      double max_deviation = params_->max_deviation_inlier_line_check;
-      const int num_of_points_required = params_->min_points_in_line;
-      int count_inliers = 0;
-
-      for (size_t i = 0u; i < N1; ++i) {
-        if (distPointToLine(x_0, x_0 + direction, points1[i]) > max_deviation) {
-          continue;
-        }
-        ++count_inliers;
+      for (size_t i = 0; i < N1; ++i) {
         dist = direction.dot(points1[i] - x_0);
-        if (dist < dist_min) {
-          dist_min = dist;
-        }
-        if (dist > dist_max) {
-          dist_max = dist;
-        }
+        if (dist < dist_min) dist_min = dist;
+        if (dist > dist_max) dist_max = dist;
       }
-      for (size_t i = 0u; i < N2; ++i) {
-        if (distPointToLine(x_0, x_0 + direction, points2[i]) > max_deviation) {
-          continue;
-        }
-        ++count_inliers;
+      for (size_t i = 0; i < N2; ++i) {
         dist = direction.dot(points2[i] - x_0);
-        if (dist < dist_min) {
-          dist_min = dist;
-        }
-        if (dist > dist_max) {
-          dist_max = dist;
-        }
-      }
-      if (count_inliers < num_of_points_required) {
-        return false;
+        if (dist < dist_min) dist_min = dist;
+        if (dist > dist_max) dist_max = dist;
       }
       cv::Vec3f start, end;
       start = x_0 + direction * dist_min;
       end = x_0 + direction * dist_max;
-
-      double length = cv::norm(start - end);
-      std::vector<double> positions_on_line;
-      positions_on_line.clear();
-      for (size_t i = 0; i < N1; ++i) {
-        double position_on_line = direction.dot(points1[i] - start) / length;
-        positions_on_line.push_back(position_on_line);
-      }
-      for (size_t i = 0; i < N2; ++i) {
-        double position_on_line = direction.dot(points2[i] - start) / length;
-        positions_on_line.push_back(position_on_line);
-      }
-      double ratio_mid;
-      ratio_mid = getRatioOfPointsAroundCenter(positions_on_line);
-      if (ratio_mid < 0.25) {
-        return false;
-      }
-
       line->line = {start[0], start[1], start[2], end[0], end[1], end[2]};
       line->type = LineType::INTER;
       return true;
@@ -806,10 +689,11 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     //  2.  Find the line parallel to the projected one that goes through the
     //      point in the set of the points that is nearest to the line.
     //  3.  From all points in the set: Project them on to the line and choose
-    //      the combination of start/end point that maximizes the line
-    //      distance.
+    //      the combination of start/end point that maximizes the line distance.
     cv::Vec3f start(line_guess[0], line_guess[1], line_guess[2]);
     cv::Vec3f end(line_guess[3], line_guess[4], line_guess[5]);
+    cv::Vec3f direction = end - start;
+    normalizeVector3D(&direction);
 
     const std::vector<cv::Vec3f>* points_new;
     int idx;
@@ -823,60 +707,184 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     line->hessians[abs(idx - 1)] = {0.0f, 0.0f, 0.0f, 0.0f};
     start = projectPointOnPlane(line->hessians[idx], start);
     end = projectPointOnPlane(line->hessians[idx], end);
-    double length = cv::norm(start - end);
-    // direction vector after projection
-    cv::Vec3f direction = end - start;
-    normalizeVector3D(&direction);
-
     cv::Vec3f nearest_point;
     double min_dist = 1e9;
     double dist, dist_dir, dist_dir_min, dist_dir_max;
     dist_dir_min = 1e9;
     dist_dir_max = -1e9;
-    std::vector<double> positions_on_line;
     for (size_t i = 0; i < points_new->size(); ++i) {
-      double position_on_line =
-          direction.dot((*points_new)[i] - start) / length;
-      positions_on_line.push_back(position_on_line);
-
-      dist = distPointToLine(start, end, (*points_new)[i]);
-
+      // dist is used to find the nearest point to the line.
+      dist =
+          cv::norm(start - (*points_new)[i]) + cv::norm(end - (*points_new)[i]);
       if (dist < min_dist) {
         min_dist = dist;
         nearest_point = (*points_new)[i];
       }
-    }
-
-    double ratio_mid;
-    ratio_mid = getRatioOfPointsAroundCenter(positions_on_line);
-    if (ratio_mid < 0.25) {
-      return false;
-    }
-
-    double max_deviation = params_->max_deviation_inlier_line_check;
-    const int num_of_points_required = params_->min_points_in_line;
-    int count_inliers = 0;
-
-    for (size_t i = 0; i < points_new->size(); ++i) {
-      if (distPointToLine(start, end, (*points_new)[i]) > max_deviation) {
-        continue;
-      }
-      ++count_inliers;
-      dist_dir = direction.dot((*points_new)[i] - nearest_point);
+      // dist_dir is used to find the points that maximize the line.
+      dist_dir = direction.dot((*points_new)[i] - start);
       if (dist_dir < dist_dir_min) dist_dir_min = dist_dir;
       if (dist_dir > dist_dir_max) dist_dir_max = dist_dir;
     }
-    if (count_inliers < num_of_points_required) {
-      return false;
-    }
-
-    start = nearest_point + direction * dist_dir_min;
-    end = nearest_point + direction * dist_dir_max;
+    cv::Vec3f x_0 = projectPointOnLine(nearest_point, direction, start);
+    start = x_0 + direction * dist_dir_min;
+    end = x_0 + direction * dist_dir_max;
     line->line = {start[0], start[1], start[2], end[0], end[1], end[2]};
     line->type = LineType::DISCONT;
     return true;
   }
 }
+
+bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
+                                      const std::vector<cv::Vec3f>& points2,
+                                      const cv::Vec6f& line_guess,
+                                      const bool planes_found,
+                                      LineWithPlanes* line) {
+  CHECK_NOTNULL(line);
+  size_t N1 = points1.size();
+  size_t N2 = points2.size();
+  if (N1 < 3 || N2 < 3) return false;
+  cv::Vec3f mean1, mean2, normal1, normal2;
+  line->hessians.resize(2);
+  // cv::Vec4f hessian1, hessian2;
+  // Fit a plane model to the two sets of points individually.
+  if (!hessianNormalFormOfPlane(points1, &(line->hessians[0])))
+    LOG(WARNING) << "find3DlineOnPlanes: search for hessian failed.";
+  if (!hessianNormalFormOfPlane(points2, &(line->hessians[1])))
+    LOG(WARNING) << "find3DlineOnPlanes: search for hessian failed.";
+  // Extract the two plane normals.
+  normal1 = {line->hessians[0][0], line->hessians[0][1], line->hessians[0][2]};
+  normal2 = {line->hessians[1][0], line->hessians[1][1], line->hessians[1][2]};
+
+  //  Cmpute mean points of the two sets.
+  mean1 = computeMean(points1);
+  mean2 = computeMean(points2);
+
+  //  To consider a line found as valid. It should has enough number of inliers
+  //  and enough inliers around line's center.
+  bool enough_num_inliers, enough_inliers_around_center;
+
+  // If the distance along the plane1/2's normal direction between the two
+  // sets of points is small and the both support planes for line are found,
+  // the line should be either intersection line or surface line, otherwise
+  // the line is discontinouty line.
+  if (fabs((mean1 - mean2).dot(normal1)) < params_->max_dist_between_planes &&
+      fabs((mean1 - mean2).dot(normal2)) < params_->max_dist_between_planes &&
+      planes_found) {
+    // Concatenate two set of points. For surface and intersection line, points1
+    // and points2 are diffrent and thus no repetition of points.
+    std::vector<cv::Vec3f> points;
+    points.reserve(points1.size() + points2.size());
+    points.insert(points.end(), points1.begin(), points1.end());
+    points.insert(points.end(), points2.begin(), points2.end());
+
+    // Checks if the planes are parallel. If the angle between the two planes'
+    // normal vectors is small, they are parallel and the line is surface
+    // line.
+    constexpr double kAngleDifference = 0.95;
+    if (fabs(normal1.dot(normal2)) > kAngleDifference) {
+      // Get the initial line guess
+      cv::Vec3f start_guess(line_guess[0], line_guess[1], line_guess[2]);
+      cv::Vec3f end_guess(line_guess[3], line_guess[4], line_guess[5]);
+
+      cv::Vec3f start, end;
+      enough_num_inliers =
+          adjustLineUsingInliers(points, start_guess, end_guess, &start, &end);
+
+      line->line = {start[0], start[1], start[2], end[0], end[1], end[2]};
+      line->type = LineType::PLANE;
+
+      enough_inliers_around_center =
+          checkIfValidLineUsingInliers(points, start, end);
+
+      if (enough_num_inliers && enough_inliers_around_center) {
+        return true;
+      } else {
+        return false;
+      }
+    } else {
+      // The line lying on both planes must be perpendicular to both normals,
+      // so it can be computed with the cross product.
+      cv::Vec3f direction = normal1.cross(normal2);
+      normalizeVector3D(&direction);
+      // Now a point on the intersection line is searched.
+      cv::Vec3f x_0;
+      getPointOnPlaneIntersectionLine(line->hessians[0], line->hessians[1],
+                                      direction, &x_0);
+
+      cv::Vec3f start_guess = x_0;
+      cv::Vec3f end_guess = x_0 + direction;
+
+      cv::Vec3f start, end;
+      enough_num_inliers =
+          adjustLineUsingInliers(points, start_guess, end_guess, &start, &end);
+
+      line->line = {start[0], start[1], start[2], end[0], end[1], end[2]};
+      line->type = LineType::INTER;
+
+      enough_inliers_around_center =
+          checkIfValidLineUsingInliers(points, start, end);
+      if (enough_num_inliers && enough_inliers_around_center) {
+        return true;
+      } else {
+        return false;
+      }
+    }
+  } else {
+    // If we reach this point, we have a discontinouty. We then try to fit a
+    // line to the set of points that lies closer to the origin (and therefore
+    // closer to the camera). This is in most cases a reasonable assumption,
+    // since the line most of the time belongs to the object that obscures the
+    // background (which causes the discontinouty).
+    // The fitting is done in 3 steps:
+    //  1.  Project the line_guess onto the plane fitted to the point set.
+    //  2.  Find the line parallel to the projected one that goes through the
+    //      point in the set of the points that is nearest to the line.
+    //  3.  From all points in the set: Project them on to the line and choose
+    //      the combination of start/end point that maximizes the line
+    //      distance.
+    cv::Vec3f start_guess(line_guess[0], line_guess[1], line_guess[2]);
+    cv::Vec3f end_guess(line_guess[3], line_guess[4], line_guess[5]);
+
+    const std::vector<cv::Vec3f>* points;
+    int idx;
+    if (cv::norm(mean1) < cv::norm(mean2)) {
+      idx = 0;
+      points = &points1;
+    } else {
+      idx = 1;
+      points = &points2;
+    }
+    line->hessians[abs(idx - 1)] = {0.0f, 0.0f, 0.0f, 0.0f};
+
+    start_guess = projectPointOnPlane(line->hessians[idx], start_guess);
+    end_guess = projectPointOnPlane(line->hessians[idx], end_guess);
+
+    cv::Vec3f direction = end_guess - start_guess;
+    normalizeVector3D(&direction);
+
+    cv::Vec3f nearest_point;
+    getNearestPointToLine(*points, start_guess, end_guess, &nearest_point);
+
+    // Update start point guess of the line as the nearest point
+    start_guess = nearest_point;
+    end_guess = nearest_point + direction;
+
+    cv::Vec3f start, end;
+    enough_num_inliers =
+        adjustLineUsingInliers(*points, start_guess, end_guess, &start, &end);
+
+    line->line = {start[0], start[1], start[2], end[0], end[1], end[2]};
+    line->type = LineType::DISCONT;
+
+    enough_inliers_around_center =
+        checkIfValidLineUsingInliers(*points, start, end);
+    if (enough_num_inliers && enough_inliers_around_center) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+}  // namespace line_detection
 
 bool LineDetector::planeRANSAC(const std::vector<cv::Vec3f>& points,
                                cv::Vec4f* hessian_normal_form) {
@@ -1067,12 +1075,13 @@ void LineDetector::project2Dto3DwithPlanes(
     } else if (!left_found) {
       inliers_left = inliers_right;
     } else {
+      // Both left and right planes are found.
       planes_found = true;
     }
 
     // Find 3D line on planes.
     if (find3DlineOnPlanes(inliers_right, inliers_left, lines3D_cand[i],
-                           &line3D_true, planes_found)) {
+                           planes_found, &line3D_true)) {
       // Only push back the reliably found lines.
       lines3D->push_back(line3D_true);
       lines2D_out->push_back(lines2D[i]);
@@ -1519,6 +1528,26 @@ void LineDetector::shrink2Dlines(const std::vector<cv::Vec4f>& lines2D_in,
   }
 }
 
+void LineDetector::getNearestPointToLine(const std::vector<cv::Vec3f>& points,
+                                         const cv::Vec3f& start,
+                                         const cv::Vec3f& end,
+                                         cv::Vec3f* nearest_point) {
+  CHECK_NOTNULL(nearest_point);
+
+  cv::Vec3f direction = end - start;
+  normalizeVector3D(&direction);
+
+  double min_dist = 1e9;
+  for (size_t i = 0; i < points.size(); ++i) {
+    double dist = distPointToLine(start, end, points[i]);
+
+    if (dist < min_dist) {
+      min_dist = dist;
+      *nearest_point = points[i];
+    }
+  }
+}
+
 double LineDetector::getRatioOfPointsAroundCenter(
     const std::vector<double>& points_distribution) {
   size_t points_number = points_distribution.size();
@@ -1529,6 +1558,73 @@ double LineDetector::getRatioOfPointsAroundCenter(
     }
   }
   return count / static_cast<double>(points_number);
+}
+
+bool LineDetector::adjustLineUsingInliers(const std::vector<cv::Vec3f>& points,
+                                          const cv::Vec3f& start_in,
+                                          const cv::Vec3f& end_in,
+                                          cv::Vec3f* start_out,
+                                          cv::Vec3f* end_out) {
+  CHECK_NOTNULL(start_out);
+  CHECK_NOTNULL(end_out);
+
+  cv::Vec3f direction = end_in - start_in;
+  normalizeVector3D(&direction);
+
+  double dist;
+  double dist_min = 1e9;
+  double dist_max = -1e9;
+  int count_inliers = 0;
+  for (size_t i = 0u; i < points.size(); ++i) {
+    if (distPointToLine(start_in, end_in, points[i]) >
+        params_->max_deviation_inlier_line_check) {
+      continue;
+    }
+    ++count_inliers;
+    dist = direction.dot(points[i] - start_in);
+    if (dist < dist_min) {
+      dist_min = dist;
+    }
+    if (dist > dist_max) {
+      dist_max = dist;
+    }
+  }
+
+  // Update start and end points of the line.
+  *start_out = start_in + direction * dist_min;
+  *end_out = start_in + direction * dist_max;
+
+  // Line is not valid since it is not supported by enough 3D points.
+  if (count_inliers < params_->min_points_in_line) {
+    return false;
+  } else {
+    return true;
+  }
+}
+
+bool LineDetector::checkIfValidLineUsingInliers(
+    const std::vector<cv::Vec3f>& points, const cv::Vec3f& start,
+    const cv::Vec3f& end) {
+  std::vector<double> positions_on_line;
+  double length = cv::norm(start - end);
+  cv::Vec3f direction = end - start;
+  normalizeVector3D(&direction);
+  for (size_t i = 0u; i < points.size(); ++i) {
+    if (distPointToLine(start, end, points[i]) >
+        params_->max_deviation_inlier_line_check) {
+      continue;
+    }
+    double position_on_line = direction.dot(points[i] - start) / length;
+    positions_on_line.push_back(position_on_line);
+  }
+  const double ratio_mid = getRatioOfPointsAroundCenter(positions_on_line);
+  // Most points are near the start and end points, reject this line
+  constexpr double kRatioThreshold = 0.25;
+  if (ratio_mid < kRatioThreshold) {
+    return false;
+  } else {
+    return true;
+  }
 }
 
 }  // namespace line_detection
