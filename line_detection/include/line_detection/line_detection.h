@@ -453,19 +453,19 @@ class LineDetector {
   bool checkIfValidLineDiscont(const cv::Mat& cloud, const cv::Vec4f& line);
 
   // This function does a search for a line with non NaN start and end points in
-  // 3D given a line in 2D. It then computes a number of inliers to this line
-  // model returns the mean error of all inliers.
+  // 3D given a line in 2D. It then computes number of points on this line
+  // and returns the mean error of all points.
   // Input: point_cloud: Point cloud given as CV_32FC3.
   //
   //        line2D:   2D line in pixel coordinates.
   //
   // Output: line3D:  3D line in coordinates of the cloud.
   //
-  //         num_inliers: Number of inliers found.
+  //         num_points: Number of points on the line.
   //
   //         return:      Mean error of all inliers.
   double findAndRate3DLine(const cv::Mat& point_cloud, const cv::Vec4f& line2D,
-                           cv::Vec6f* line3D, int* num_inliers);
+                           cv::Vec6f* line3D, int* num_points);
   // Overload: Same as above, just without number of inliers as output.
   double findAndRate3DLine(const cv::Mat& point_cloud, const cv::Vec4f& line2D,
                            cv::Vec6f* line3D);
@@ -509,6 +509,12 @@ class LineDetector {
   //                        vector. It is stored: (x_s, y_s, z_s, x_e, y_e,
   //                        z_e), wher _s/_e means start resp. end point.
   //
+  //         start:         2D start point that corresponds to start point of
+  //                        the 3D line.
+  //
+  //         end:           2D end point that corresponds to end point of the
+  //                        3D line.
+  //
   // Working principle of the function: It starts at the starting point of the
   // 2D line and looks if the values in the point_cloud are not NaN there. If
   // they are not, this value is stored as the starting point. If they are NaN,
@@ -518,7 +524,8 @@ class LineDetector {
   // found, then the same procedure is redone from the end point. It returns
   // true if a line was found and false otherwise.
   bool find3DLineStartAndEnd(const cv::Mat& point_cloud,
-                             const cv::Vec4f& line2D, cv::Vec6f* line3D);
+                             const cv::Vec4f& line2D, cv::Vec6f* line3D,
+                             cv::Point2f* start, cv::Point2f* end);
 };
 }  // namespace line_detection
 

@@ -447,110 +447,87 @@ void LineDetector::paintLines(const std::vector<cv::Vec4f>& lines,
 
 bool LineDetector::find3DLineStartAndEnd(const cv::Mat& point_cloud,
                                          const cv::Vec4f& line2D,
-                                         cv::Vec6f* line3D) {
+                                         cv::Vec6f* line3D, cv::Point2f* start,
+                                         cv::Point2f* end) {
   CHECK_NOTNULL(line3D);
+  CHECK_NOTNULL(start);
+  CHECK_NOTNULL(end);
   CHECK_EQ(point_cloud.type(), CV_32FC3)
       << "The input matrix point_cloud must be of type CV_32FC3.";
-  cv::Point2f start, end, line;
   // A floating point value that decribes a position in an image is always
   // within the pixel described through the floor operation.
-  start.x = floor(line2D[0]);
-  start.y = floor(line2D[1]);
-  end.x = floor(line2D[2]);
-  end.y = floor(line2D[3]);
+  start->x = floor(line2D[0]);
+  start->y = floor(line2D[1]);
+  end->x = floor(line2D[2]);
+  end->y = floor(line2D[3]);
   // Search for a non NaN value on the line. Effectivly these two while loops
   // just make unit steps (one pixel) from start to end (first loop) and then
   // from end to start (second loop) until a non NaN point is found.
-  while (std::isnan(point_cloud.at<cv::Vec3f>(start)[0])) {
-    line = end - start;
-    start.x += floor(line.x / sqrt(line.x * line.x + line.y * line.y) + 0.5);
-    start.y += floor(line.y / sqrt(line.x * line.x + line.y * line.y) + 0.5);
-    if (start.x == end.x && start.y == end.y) break;
+  cv::LineIterator it_start_end(point_cloud, *(start), *(end), 8);
+  // Search for a non NaN value on the line.
+  while (std::isnan(point_cloud.at<cv::Vec3f>(*(start))[0])) {
+    ++it_start_end;
+    *(start) = it_start_end.pos();
+    if (start->x == end->x && start->y == end->y) break;
   }
-  if (start.x == end.x && start.y == end.y) return false;
-  while (std::isnan(point_cloud.at<cv::Vec3f>(end)[0])) {
-    line = start - end;
-    end.x += floor(line.x / sqrt(line.x * line.x + line.y * line.y) + 0.5);
-    end.y += floor(line.y / sqrt(line.x * line.x + line.y * line.y) + 0.5);
-    if (start.x == end.x && start.y == end.y) break;
+  if (start->x == end->x && start->y == end->y) return false;
+
+  cv::LineIterator it_end_start(point_cloud, *(end), *(start), 8);
+  while (std::isnan(point_cloud.at<cv::Vec3f>(*(end))[0])) {
+    ++it_end_start;
+    *(end) = it_end_start.pos();
+    if (start->x == end->x && start->y == end->y) break;
   }
-  if (start.x == end.x && start.y == end.y) return false;
-  // If a non NaN point was found before end was reached, the line is stored.
-  *line3D = cv::Vec6f(
-      point_cloud.at<cv::Vec3f>(start)[0], point_cloud.at<cv::Vec3f>(start)[1],
-      point_cloud.at<cv::Vec3f>(start)[2], point_cloud.at<cv::Vec3f>(end)[0],
-      point_cloud.at<cv::Vec3f>(end)[1], point_cloud.at<cv::Vec3f>(end)[2]);
+  if (start->x == end->x && start->y == end->y) return false;
+  *line3D = cv::Vec6f(point_cloud.at<cv::Vec3f>(*(start))[0],
+                      point_cloud.at<cv::Vec3f>(*(start))[1],
+                      point_cloud.at<cv::Vec3f>(*(start))[2],
+                      point_cloud.at<cv::Vec3f>(*(end))[0],
+                      point_cloud.at<cv::Vec3f>(*(end))[1],
+                      point_cloud.at<cv::Vec3f>(*(end))[2]);
   return true;
 }
 
 double LineDetector::findAndRate3DLine(const cv::Mat& point_cloud,
                                        const cv::Vec4f& line2D,
-                                       cv::Vec6f* line3D, int* num_inliers) {
+                                       cv::Vec6f* line3D, int* num_points) {
   CHECK_NOTNULL(line3D);
-  CHECK_NOTNULL(num_inliers);
+  CHECK_NOTNULL(num_points);
   CHECK_EQ(point_cloud.type(), CV_32FC3)
       << "The input matrix point_cloud must be of type CV_32FC3.";
-  cv::Point2f start, end, line, rate_it;
-  // A floating point value that decribes a position in an image is always
-  // within the pixel described through the floor operation.
-  start.x = floor(line2D[0]);
-  start.y = floor(line2D[1]);
-  end.x = floor(line2D[2]);
-  end.y = floor(line2D[3]);
-  // Search for a non NaN value on the line.
-  while (std::isnan(point_cloud.at<cv::Vec3f>(start)[0])) {
-    line = end - start;
-    start.x += floor(line.x / sqrt(line.x * line.x + line.y * line.y) + 0.5);
-    start.y += floor(line.y / sqrt(line.x * line.x + line.y * line.y) + 0.5);
-    if (start.x == end.x && start.y == end.y) break;
+  cv::Point2f start, end, rate_it;
+  if (!find3DLineStartAndEnd(point_cloud, line2D, line3D, &start, &end)) {
+    return 1e9;
   }
-  if (start.x == end.x && start.y == end.y) return 1e9;
-  while (std::isnan(point_cloud.at<cv::Vec3f>(end)[0])) {
-    line = start - end;
-    end.x += floor(line.x / sqrt(line.x * line.x + line.y * line.y) + 0.5);
-    end.y += floor(line.y / sqrt(line.x * line.x + line.y * line.y) + 0.5);
-    if (start.x == end.x && start.y == end.y) break;
-  }
-  if (start.x == end.x && start.y == end.y) return 1e9;
-  *line3D = cv::Vec6f(
-      point_cloud.at<cv::Vec3f>(start)[0], point_cloud.at<cv::Vec3f>(start)[1],
-      point_cloud.at<cv::Vec3f>(start)[2], point_cloud.at<cv::Vec3f>(end)[0],
-      point_cloud.at<cv::Vec3f>(end)[1], point_cloud.at<cv::Vec3f>(end)[2]);
 
-  // In addition to find3DLineStartAndEnd, this function also rates the line.
-  // The rating can only be seen as relative to other similar lines, but not
-  // in a global perspective. It bases on the mean error of points that should
-  // (coming from the 2D image) lie on the line.
+  // In addition to find3DLineStartAndEnd, this function also rates the
+  // line. The rating is based on the average distance between 3D line and
+  // 3D points considered as on the 3D line(ie. 2D points lie on the 2D
+  // line)
   double rating = 0.0;
   double rating_temp;
-  double inlier_threshold = 0.01;
-  int min_inliers = 5;
-  *num_inliers = 0;
+  *num_points = 0;
   rate_it = start;
+
+  cv::LineIterator it_start_end_found(point_cloud, start, end, 8);
   while (!(rate_it.x == end.x && rate_it.y == end.y)) {
-    line = end - rate_it;
-    rate_it.x += floor(line.x / sqrt(line.x * line.x + line.y * line.y) + 0.5);
-    rate_it.y += floor(line.y / sqrt(line.x * line.x + line.y * line.y) + 0.5);
     if (std::isnan(point_cloud.at<cv::Vec3f>(rate_it)[0])) continue;
     rating_temp = distPointToLine(point_cloud.at<cv::Vec3f>(start),
                                   point_cloud.at<cv::Vec3f>(end),
                                   point_cloud.at<cv::Vec3f>(rate_it));
-    if (rating_temp < inlier_threshold) {
-      rating += rating_temp;
-      ++(*num_inliers);
-    }
+    ++it_start_end_found;
+    rate_it = it_start_end_found.pos();
+    rating += rating_temp;
+    ++(*num_points);
   }
-  if ((*num_inliers) < min_inliers) {
-    return 1e9;
-  } else {
-    return rating / (*num_inliers);
-  }
+
+  return rating / (*num_points);
 }
 double LineDetector::findAndRate3DLine(const cv::Mat& point_cloud,
                                        const cv::Vec4f& line2D,
                                        cv::Vec6f* line3D) {
-  int num_inliers;
-  return findAndRate3DLine(point_cloud, line2D, line3D, &num_inliers);
+  int num_points;
+  return findAndRate3DLine(point_cloud, line2D, line3D, &num_points);
 }
 
 std::vector<cv::Vec4f> LineDetector::checkLinesInBounds(
@@ -1022,6 +999,8 @@ void LineDetector::project2Dto3DwithPlanes(
 
   // Loop over all 2D lines.
   for (size_t i = 0; i < lines2D.size(); ++i) {
+    // If cannot find valid 3D start and end points for the 2D line.
+    if (rating[i] > max_rating) continue;
     // For both the left and the right side of the line: Find a rectangle
     // defining a patch, find all points within the patch and try to fit a
     // plane to these points.
