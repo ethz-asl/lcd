@@ -206,12 +206,17 @@ class ListenAndPublish {
   cv::Mat cv_cloud_;
   cv::Mat cv_depth_;
   cv::Mat cv_instances_;
-  // std::vector<cv::Vec3b> known_colors_;
+  // To store the color value in the instance image(1 channel). If the instance
+  // image has instead 3 channels, the variable's type should be changed to
+  // std::vector<cv::Vec3b> ;
   std::vector<unsigned short> known_colors_;
 
   pcl::PointCloud<pcl::PointXYZRGB> pcl_cloud_;
+  // all 2D lines detected in the grayscale mage
   std::vector<cv::Vec4f> lines2D_;
-  std::vector<cv::Vec4f> lines2D_kept;
+  // all 2D lines kept(bijection with lines3D_)
+  std::vector<cv::Vec4f> lines2D_kept_;
+  // a temperary variable for storing kept 2D lines
   std::vector<cv::Vec4f> lines2D_kept_tmp_;
   std::vector<cv::Vec<float, 6>> lines3D_;
   std::vector<line_detection::LineWithPlanes> lines3D_temp_wp_;

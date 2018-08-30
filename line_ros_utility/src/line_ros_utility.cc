@@ -3,7 +3,8 @@
 namespace line_ros_utility {
 
 const std::string frame_id = "line_tools_id";
-const bool write_labeled_lines = false;
+const bool write_labeled_lines = true;
+const bool clustering_with_random_forest = false;
 const std::string kWritePath = "../data/train_lines/traj_1";
 
 std::vector<int> clusterLinesAfterClassification(
@@ -127,7 +128,9 @@ ListenAndPublish::ListenAndPublish() : params_(), tree_classifier_() {
   line_detector_ = line_detection::LineDetector(&params_);
   iteration_ = 0;
   // Retrieve trees.
-  // tree_classifier_.getTrees();
+  if (clustering_with_random_forest) {
+    tree_classifier_.getTrees();
+  }
 }
 ListenAndPublish::~ListenAndPublish() { delete sync_; }
 
@@ -181,9 +184,8 @@ void ListenAndPublish::detectLines() {
 void ListenAndPublish::projectTo3D() {
   lines3D_temp_wp_.clear();
   start_time_ = std::chrono::system_clock::now();
-  line_detector_.project2Dto3DwithPlanes(cv_cloud_, cv_image_, lines2D_,
-                                         &lines2D_kept_tmp_, &lines3D_temp_wp_,
-                                         true);
+  line_detector_.project2Dto3DwithPlanes(cv_cloud_, cv_image_, lines2D_, true,
+                                         &lines2D_kept_tmp_, &lines3D_temp_wp_);
   end_time_ = std::chrono::system_clock::now();
   elapsed_seconds_ = end_time_ - start_time_;
   ROS_INFO("Projecting to 3D: %f", elapsed_seconds_.count());
@@ -193,7 +195,7 @@ void ListenAndPublish::checkLines() {
   lines3D_with_planes_.clear();
   start_time_ = std::chrono::system_clock::now();
   line_detector_.runCheckOn3DLines(cv_cloud_, camera_P_, lines2D_kept_tmp_,
-                                   lines3D_temp_wp_, &lines2D_kept,
+                                   lines3D_temp_wp_, &lines2D_kept_,
                                    &lines3D_with_planes_);
   end_time_ = std::chrono::system_clock::now();
   elapsed_seconds_ = end_time_ - start_time_;
@@ -336,13 +338,16 @@ void ListenAndPublish::masterCallback(
   checkLines();
 
   CHECK_EQ(static_cast<int>(lines3D_with_planes_.size()),
-           static_cast<int>(lines2D_kept.size()));
+           static_cast<int>(lines2D_kept_.size()));
 
   printNumberOfLines();
-  // clusterKmeans();
+  clusterKmeans();
   labelLinesWithInstances(lines3D_with_planes_, cv_instances_, camera_info_,
                           &labels_);
-  // clusterKmedoid();
+
+  if (clustering_with_random_forest) {
+    clusterKmedoid();
+  }
 
   if (write_labeled_lines) {
     std::string path = kWritePath + "/lines_with_labels_" +
@@ -357,8 +362,8 @@ void ListenAndPublish::masterCallback(
     // 3D lines data
     printToFile(lines3D_with_planes_, labels_, path);
 
-    // 2D lins kept (bijection with 3D lines above)
-    printToFile(lines2D_kept, path_2D_kept);
+    // 2D lines kept (bijection with 3D lines above)
+    printToFile(lines2D_kept_, path_2D_kept);
 
     // All 2D lines detected
     printToFile(lines2D_, path_2D);
@@ -379,7 +384,6 @@ void ListenAndPublish::labelLinesWithInstances(
     const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info,
     std::vector<int>* labels) {
   CHECK_NOTNULL(labels);
-  // CHECK_EQ(instances.type(), CV_8UC3);
   CHECK_EQ(instances.type(), CV_16UC1);
   labels->resize(lines.size());
   // This class is used to perform the backprojection.
@@ -390,7 +394,6 @@ void ListenAndPublish::labelLinesWithInstances(
   std::vector<int> labels_count;
   // For intermiedate storage.
   cv::Point2f point2D;
-  // cv::Vec3b color;
   unsigned short color;
 
   cv::Vec3f start, end, line, point3D;
@@ -582,6 +585,13 @@ void TreeClassifier::getLineDecisionPath(
     }
     for (size_t j = 0u; j < 3; ++j) {
       service.request.lines.push_back((float)lines[i].colors[1][j]);
+    }
+    if (lines[i].type == line_detection::LineType::DISCONT) {
+      service.request.lines.push_back(0.0);
+    } else if (lines[i].type == line_detection::LineType::PLANE) {
+      service.request.lines.push_back(1.0);
+    } else {
+      service.request.lines.push_back(2.0);
     }
   }
   // Call the service.

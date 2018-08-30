@@ -965,13 +965,121 @@ void LineDetector::project2Dto3DwithPlanes(
     const cv::Mat& cloud, const std::vector<cv::Vec4f>& lines2D,
     std::vector<LineWithPlanes>* lines3D) {
   cv::Mat image;
-  // project2Dto3DwithPlanes(cloud, image, lines2D, lines3D, false);
+  project2Dto3DwithPlanes(cloud, image, lines2D, false, lines3D);
 }
+
 void LineDetector::project2Dto3DwithPlanes(
     const cv::Mat& cloud, const cv::Mat& image,
-    const std::vector<cv::Vec4f>& lines2D_in,
-    std::vector<cv::Vec4f>* lines2D_out, std::vector<LineWithPlanes>* lines3D,
-    bool set_colors) {
+    const std::vector<cv::Vec4f>& lines2D_in, const bool set_colors,
+    std::vector<LineWithPlanes>* lines3D) {
+  CHECK_NOTNULL(lines3D);
+  CHECK_EQ(cloud.type(), CV_32FC3);
+  // Declare all variables before the main loop.
+  std::vector<cv::Point2f> rect_left, rect_right;
+  std::vector<cv::Point2i> points_in_rect;
+  std::vector<cv::Vec3f> plane_point_cand, inliers_left, inliers_right;
+  std::vector<cv::Vec6f> lines3D_cand;
+  std::vector<double> rating;
+  cv::Point2i start, end;
+  LineWithPlanes line3D_true;
+  // Parameter: Fraction of inlier that must be found for the plane model to
+  // be valid.
+  double min_inliers = params_->min_inlier_ransac;
+  double max_rating = params_->max_rating_valid_line;
+  bool right_found, left_found;
+  constexpr size_t min_points_for_ransac = 3;
+  // This is a first guess of the 3D lines. They are used in some cases, where
+  // the lines cannot be found by intersecting planes.
+  std::vector<cv::Vec4f> lines2D =
+      checkLinesInBounds(lines2D_in, cloud.cols, cloud.rows);
+  find3DlinesRated(cloud, lines2D, &lines3D_cand, &rating);
+  // Loop over all 2D lines.
+  for (size_t i = 0; i < lines2D.size(); ++i) {
+    // If the rating is so high, no valid 3d line was found by the
+    // find3DlinesRated function.
+    if (rating[i] > max_rating) continue;
+    // For both the left and the right side of the line: Find a rectangle
+    // defining a patch, find all points within the patch and try to fit a
+    // plane to these points.
+    getRectanglesFromLine(lines2D[i], &rect_left, &rect_right);
+    // Find lines for the left side.
+    findPointsInRectangle(rect_left, &points_in_rect);
+    if (set_colors) {
+      assignColorToLines(image, points_in_rect, &line3D_true);
+    }
+    plane_point_cand.clear();
+    for (size_t j = 0; j < points_in_rect.size(); ++j) {
+      if (points_in_rect[j].x < 0 || points_in_rect[j].x >= cloud.cols ||
+          points_in_rect[j].y < 0 || points_in_rect[j].y >= cloud.rows) {
+        continue;
+      }
+      if (std::isnan(cloud.at<cv::Vec3f>(points_in_rect[j])[0])) continue;
+      plane_point_cand.push_back(cloud.at<cv::Vec3f>(points_in_rect[j]));
+    }
+    left_found = false;
+    if (plane_point_cand.size() > min_points_for_ransac) {
+      planeRANSAC(plane_point_cand, &inliers_left);
+      if (inliers_left.size() >= min_inliers * plane_point_cand.size()) {
+        left_found = true;
+      }
+    }
+    // Find lines for the right side.
+    findPointsInRectangle(rect_right, &points_in_rect);
+    if (set_colors) {
+      assignColorToLines(image, points_in_rect, &line3D_true);
+    }
+    plane_point_cand.clear();
+    for (size_t j = 0; j < points_in_rect.size(); ++j) {
+      if (points_in_rect[j].x < 0 || points_in_rect[j].x >= cloud.cols ||
+          points_in_rect[j].y < 0 || points_in_rect[j].y >= cloud.rows) {
+        continue;
+      }
+      if (std::isnan(cloud.at<cv::Vec3f>(points_in_rect[j])[0])) continue;
+      plane_point_cand.push_back(cloud.at<cv::Vec3f>(points_in_rect[j]));
+    }
+    right_found = false;
+    if (plane_point_cand.size() > min_points_for_ransac) {
+      planeRANSAC(plane_point_cand, &inliers_right);
+      if (inliers_right.size() >= min_inliers * plane_point_cand.size()) {
+        right_found = true;
+      }
+    }
+    // If any of planes were not found, the line is found at a discontinouty.
+    // This is a workaround, more efficiently this would be implemented in the
+    // function find3DlineOnPlanes.
+    bool is_discont = true;
+    if ((!right_found) && (!left_found)) {
+      continue;
+    } else if (!right_found) {
+      inliers_right = inliers_left;
+    } else if (!left_found) {
+      inliers_left = inliers_right;
+    } else {
+      is_discont = false;
+    }
+    // If both planes were found, the inliers are handled to the
+    // find3DlineOnPlanes function, which takes care of different special
+    // cases.
+    if (find3DlineOnPlanes(inliers_right, inliers_left, lines3D_cand[i],
+                           &line3D_true)) {
+      // Only push back the reliably found lines.
+      if (is_discont) {
+        line3D_true.type = LineType::DISCONT;
+        if (right_found) {
+          line3D_true.hessians[1] = {0.0f, 0.0f, 0.0f, 0.0f};
+        } else {
+          line3D_true.hessians[0] = {0.0f, 0.0f, 0.0f, 0.0f};
+        }
+      }
+      lines3D->push_back(line3D_true);
+    }
+  }
+}
+
+void LineDetector::project2Dto3DwithPlanes(
+    const cv::Mat& cloud, const cv::Mat& image,
+    const std::vector<cv::Vec4f>& lines2D_in, const bool set_colors,
+    std::vector<cv::Vec4f>* lines2D_out, std::vector<LineWithPlanes>* lines3D) {
   CHECK_NOTNULL(lines2D_out);
   CHECK_NOTNULL(lines3D);
   CHECK_EQ(cloud.type(), CV_32FC3);

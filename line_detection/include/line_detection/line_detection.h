@@ -25,7 +25,7 @@ constexpr double kPi = 3.141592653589793;
 
 enum class Detector : unsigned int { LSD = 0, EDL = 1, FAST = 2, HOUGH = 3 };
 
-enum class LineType : unsigned int { INTER = 0, DISCONT = 1, PLANE = 2 };
+enum class LineType : unsigned int { DISCONT = 0, PLANE = 1, INTER = 2 };
 
 struct LineWithPlanes {
   cv::Vec6f line;
@@ -295,7 +295,7 @@ class LineDetector {
                           const std::vector<cv::Point2i>& points,
                           LineWithPlanes* line3D);
 
-  // (The two folloewing functions are depreciated.They remain here just for
+  // (The two following functions are depreciated.They remain here just for
   // back compatibility concerns.)
   // Uses two sets of points and fit a line,
   // assuming that the two set of points are from a plane left and right of the
@@ -338,19 +338,37 @@ class LineDetector {
   //
   //        lines2D:  Lines in 2D in pixel coordenates of the cloud.
   //
-  // Output: lines3D:  3D lines that were found.
+  // Output: lines3D:  3D lines found.
   void project2Dto3DwithPlanes(const cv::Mat& cloud,
                                const std::vector<cv::Vec4f>& lines2D,
                                std::vector<cv::Vec6f>* lines3D);
   void project2Dto3DwithPlanes(const cv::Mat& cloud,
                                const std::vector<cv::Vec4f>& lines2D,
                                std::vector<LineWithPlanes>* lines3D);
+
+  // (Depreciated.) Old version of project2Dto3DwithPlanes. It's here for
+  // backcomptability concerns.
+  void project2Dto3DwithPlanes(const cv::Mat& cloud, const cv::Mat& image,
+                               const std::vector<cv::Vec4f>& lines2D_in,
+                               const bool set_colors,
+                               std::vector<LineWithPlanes>* lines3D);
+  // Current version of project2Dto3DwithPlanes.
+  // Input: cloud:    Point cloud of type CV_32FC3.
+  //
+  //        lines2D_in:  Lines in 2D in pixel coordenates of the cloud.
+  //        set_colors: True if assiging color to lines.
+  //
+  // Output:  lines_2D_out: 2D lines that correspond to lines3D
+  //
+  //          lines3D:  3D lines found.
+  //
+  //
   // Overload: Add output lines2D_out that correspond to lines3D
   void project2Dto3DwithPlanes(const cv::Mat& cloud, const cv::Mat& image,
                                const std::vector<cv::Vec4f>& lines2D_in,
+                               const bool set_colors,
                                std::vector<cv::Vec4f>* lines2D_out,
-                               std::vector<LineWithPlanes>* lines3D,
-                               bool set_colors);
+                               std::vector<LineWithPlanes>* lines3D);
 
   // Projects 2D to 3D lines with a shortest is the best approach. Works in
   // general better than naive approach, but lines that lie on surfaces tend to
