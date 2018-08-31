@@ -329,7 +329,7 @@ void ListenAndPublish::masterCallback(
   camera_P_ = cv::Mat(camera_model.projectionMatrix());
   camera_P_.convertTo(camera_P_, CV_32F);
   // Convert image to grayscale. That is needed for the line detection.
-  cvtColor(cv_image_, cv_img_gray_, CV_RGB2GRAY);
+  cv::cvtColor(cv_image_, cv_img_gray_, CV_RGB2GRAY);
 
   ROS_INFO("**** New Image**** Frame %lu****", iteration_);
   detectLines();

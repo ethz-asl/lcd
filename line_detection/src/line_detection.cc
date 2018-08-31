@@ -1445,7 +1445,6 @@ bool LineDetector::checkIfValidLineWith2DInfo(const cv::Mat& cloud,
   }
 
   cv::Vec2f start_2D, end_2D;
-  // cv::Vec3f start_2D_homo, end_2D_homo;
   cv::Mat start_2D_homo = camera_P * cv::Mat(start_3D_homo);
   cv::Mat end_2D_homo = camera_P * cv::Mat(end_3D_homo);
   start_2D = {start_2D_homo.at<float>(0, 0) / start_2D_homo.at<float>(2, 0),
@@ -1456,13 +1455,13 @@ bool LineDetector::checkIfValidLineWith2DInfo(const cv::Mat& cloud,
   cv::Vec2f line_dir_true{line_2D[2] - line_2D[0], line_2D[3] - line_2D[1]};
   cv::Vec2f line_dir{end_2D[0] - start_2D[0], end_2D[1] - start_2D[1]};
 
-  // Check difference of length
+  // Check difference of length.
   constexpr double kLengthDifference = 1.5;
   if (cv::norm(line_dir) / cv::norm(line_dir_true) > kLengthDifference) {
     return false;
   }
 
-  // Check difference of angle
+  // Check difference of angle.
   constexpr double kAngleDifference = 0.95;
   if (fabs(line_dir.dot(line_dir_true) /
            (cv::norm(line_dir) * cv::norm(line_dir_true))) < kAngleDifference) {

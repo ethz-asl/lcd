@@ -51,6 +51,7 @@ std::vector<int> clusterLinesAfterClassification(
 // can be read by the random_forest.py node.
 bool printToFile(const std::vector<line_detection::LineWithPlanes>& lines3D,
                  const std::vector<int>& labels, const std::string& path);
+// Print 2D lines.
 bool printToFile(const std::vector<cv::Vec4f>& lines2D,
                  const std::string& path);
 // Stores lines in marker messages.
