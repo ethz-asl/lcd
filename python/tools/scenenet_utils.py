@@ -12,6 +12,7 @@ class SceneNetCameraModel:
     """
 
     def __init__(self, camera_intrinsics):
+        # camera projection matrix of shape (3,4)
         self.P = camera_intrinsics
         self.cx = camera_intrinsics[0, 2]
         self.cy = camera_intrinsics[1, 2]
@@ -20,6 +21,11 @@ class SceneNetCameraModel:
 
     def project3dToPixel(self, point_3d):
         """Project 3d point to pixel.
+        Args:
+            point_3d: numpy array of shape (3, ). [x, y, z].
+
+        Returns:
+            pixel: numpy array of shape (2, ), of type int. Pixel position corresponding to the 3d point.
         """
         point_coor_homo = np.append(point_3d, [1])
         pixel_homo = self.P.dot(point_coor_homo.T)
@@ -28,12 +34,13 @@ class SceneNetCameraModel:
 
 
 def get_camera_model():
-    """Camera model for SceneNetRGBD dataset"""
+    """Camera model for SceneNetRGBD dataset. Adjusted from https://github.com/ethz-asl/scenenet_ros_tools/blob/master/nodes/scenenet_to_rosbag.py
+    """
     def camera_intrinsic_transform(vfov=45,
                                    hfov=60,
                                    pixel_width=320,
                                    pixel_height=240):
-        """Camera intrinsic matrix for SceneNetRGBD dataset"""
+        """Get camera intrinsics matrix for SceneNetRGBD dataset"""
         camera_intrinsics = np.zeros((3, 4))
         camera_intrinsics[2, 2] = 1
         camera_intrinsics[0, 0] = (
@@ -51,6 +58,13 @@ def get_camera_model():
 
 def project_pcl_to_image(pointcloud, camera_model):
     """Project pointcloud to camera image.
+    Args:
+        pointcloud: numpy array of shape (points_number, 6). [x, y, z, r, g, b].
+        camera_model: camera model class.
+
+    Returns:
+        rbg_image: numpy array of shape (240, 320, 3), dtype=np.uint8
+        depth_image: numpy array of shape (240, 320), dtype=np.float32. The depth unit is mm.
     """
     rgb_image = np.zeros((240, 320, 3), dtype=np.uint8)
     depth_image = np.zeros((240, 320), dtype=np.float32)
@@ -83,6 +97,12 @@ def project_pcl_to_image(pointcloud, camera_model):
 
 def get_origin_virtual_camera(line, distance, debug=False):
     """Get the origin of virtual camera for the line. The origin candidates are determined by the surfaces normals of the line. The virtual camera origin is chosen as the nearest point to real camera origin.
+    Args:
+        line: numpy array of shape (22, ). [start point(3, ), end point(3, ), left plane hessian form(4, ), right plane hessian form(4, ), left color(3, ), right color(3, ), line's type(1, ), instance label(1, )].
+        distance: distance in meter between the origin of the virtual camera and the middle point of the line.
+
+    Returns:
+        origin_virtual_camera: numpy array of shape (3, ). Origin of the virtual camera.
     """
     # x axis is taken as the direction of the line
     x = (line[3:6] - line[:3]) / np.linalg.norm(line[3:6] - line[:3])
@@ -148,6 +168,13 @@ def get_origin_virtual_camera(line, distance, debug=False):
 
 def virtual_camera_pose(line, distance):
     """Get the virtual camera's pose according to the line.
+    Args:
+        line: numpy array of shape (22, ). [start point(3, ), end point(3, ), left plane hessian form(4, ), right plane hessian form(4, ), left color(3, ), right color(3, ), line's type(1, ), instance label(1, )].
+        distance: distance in meter between the origin of the virtual camera and the middle point of the line.
+
+    Returns:
+        T: numpy array of shape (4, 4). Transformation matrix.
+        z: numpy array of shape (3, ). Optical axis of the virtual camera.
     """
     x = (line[3:6] - line[:3]) / np.linalg.norm(line[3:6] - line[:3])
     middle_point = (line[3:6] + line[:3]) / 2
@@ -168,7 +195,13 @@ def virtual_camera_pose(line, distance):
 
 
 def pcl_transform(pointcloud, T):
-    """Transform pointcloud with the transformation matrix.
+    """Transform pointcloud according to the transformation matrix.
+    Args:
+        pointcloud: numpy array of shape (points_number, 6). [x, y, z, r, g, b].
+        T: numpy array of shape (4, 4). Transformation matrix.
+
+    Returns:
+        pcl_new: numpy array of shape (points_number, 6). The pointcloud expressed in new coordiate frame. [x, y, z, r, g, b].
     """
     pcl_xyz = np.hstack((pointcloud[:, :3], np.ones((pointcloud.shape[0], 1))))
     pcl_new_xyz = T.dot(pcl_xyz.T).T
@@ -207,6 +240,13 @@ def rgbd_to_pcl(rgb_image, depth_image, camera_model):
 
 def convert_camera_coordinates_to_world(coor_camera, trajectory, frame):
     """Convert coordinates in camera frame to coordinates in world frame.
+    Args:
+        coor_camera: numpy array of shape (3, ). Coordnates in camera frame. [x, y, z].
+        trajectory: int. A trajectory in SceneNetRGBD datasetself.
+        frame: int. A certain frame of in the trajectory.
+
+    Returns:
+        coor_world: coordinates in world frame.
     """
     trajectories = sn.Trajectories()
     try:
@@ -225,8 +265,9 @@ def convert_camera_coordinates_to_world(coor_camera, trajectory, frame):
     # Homogeneous coordinates
     coor_homo_camera = np.append(coor_camera, [1])
     coor_homo_world = camera_to_world_matrix.dot(coor_homo_camera)
+    coor_world = coor_homo_world[:3]
 
-    return coor_homo_world[:3]
+    return coor_world
 
 
 def euclidean_ray_length_to_z_coordinate(depth_image, camera_model):
