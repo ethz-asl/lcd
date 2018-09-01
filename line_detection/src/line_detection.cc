@@ -102,18 +102,18 @@ void findPointsInRectangle(std::vector<cv::Point2f> corners,
   if (corners[2].y == corners[3].y) some_points_have_equal_height = true;
   // Do the rotation.
   if (some_points_have_equal_height) {
-    constexpr double rot_deg = 0.1;
-    const double rot_rad = degToRad(rot_deg);
-    for (size_t i = 0; i < 4; ++i)
-      corners[i] = {cos(rot_rad) * corners[i].x - sin(rot_rad) * corners[i].y,
-                    cos(rot_rad) * corners[i].x + sin(rot_rad) * corners[i].y};
+    constexpr float kRotationDeg = 0.1;
+    const float rotation_rad = degToRad(kRotationDeg);
+    for (size_t i = 0u; i < 4u; ++i)
+      corners[i] = {
+          cos(rotation_rad) * corners[i].x - sin(rotation_rad) * corners[i].y,
+          cos(rotation_rad) * corners[i].x + sin(rotation_rad) * corners[i].y};
   }
   // The points are set to lowest, highest, most right and most left in this
   // order. It does work because the preprocessing done guarantees that no two
   // points have the same y coordinate.
   cv::Point2f upper, lower, left, right;
   upper = corners[0];
-  int j;
   for (int i = 1; i < 4; ++i) {
     if (upper.y > corners[i].y) {
       upper = corners[i];
@@ -157,7 +157,7 @@ void findPointsInRectangle(std::vector<cv::Point2f> corners,
   // Iterate over all pixels in the rectangle.
   points->clear();
   int x, y;
-  for (int i = 0; i < left_border.size(); ++i) {
+  for (size_t i = 0; i < left_border.size(); ++i) {
     y = floor(upper.y) + i;
     // y = floor(corners[upper].y) + i;
     x = left_border[i];
@@ -318,11 +318,11 @@ bool LineDetector::hessianNormalFormOfPlane(
     return true;
   } else {  // If there are more than 3 points, the solution is approximate.
     cv::Vec3f mean(0.0f, 0.0f, 0.0f);
-    for (size_t i = 0; i < num_points; ++i) {
+    for (int i = 0; i < num_points; ++i) {
       mean += points[i] / num_points;
     }
     cv::Mat A(3, num_points, CV_64FC1);
-    for (size_t i = 0; i < num_points; ++i) {
+    for (size_t i = 0u; i < static_cast<size_t>(num_points); ++i) {
       A.at<double>(0, i) = points[i][0] - mean[0];
       A.at<double>(1, i) = points[i][1] - mean[1];
       A.at<double>(2, i) = points[i][2] - mean[2];
@@ -382,12 +382,12 @@ void LineDetector::fuseLines2D(const std::vector<cv::Vec4f>& lines_in,
   // one line.
   std::vector<cv::Vec4f> line_cluster;
   // Iterate over all lines.
-  for (size_t i = 0; i < lines_in.size(); ++i) {
+  for (size_t i = 0u; i < lines_in.size(); ++i) {
     line_cluster.clear();
     // If this condition does not hold, the line lines_in[i] has already been
     // merged into a new one. If not, the algorithm tries to find lines that
     // are near this line.
-    if (*(line_index.begin()) != i) {
+    if (*(line_index.begin()) != static_cast<int>(i)) {
       continue;
     } else {
       line_cluster.push_back(lines_in[i]);
@@ -434,7 +434,7 @@ void LineDetector::paintLines(const std::vector<cv::Vec4f>& lines,
                               cv::Mat* image, cv::Vec3b color) {
   cv::Point2i p1, p2;
 
-  for (int i = 0; i < lines.size(); i++) {
+  for (size_t i = 0u; i < lines.size(); ++i) {
     p1.x = lines[i][0];
     p1.y = lines[i][1];
     p2.x = lines[i][2];
@@ -539,10 +539,11 @@ std::vector<cv::Vec4f> LineDetector::checkLinesInBounds(
   double x_bound = static_cast<double>(x_max) - 1e-9;
   double y_bound = static_cast<double>(y_max) - 1e-9;
   for (size_t i = 0; i < lines2D.size(); ++i) {
-    new_lines.push_back({checkInBoundary(lines2D[i][0], 0, x_bound),
-                         checkInBoundary(lines2D[i][1], 0, y_bound),
-                         checkInBoundary(lines2D[i][2], 0, x_bound),
-                         checkInBoundary(lines2D[i][3], 0, y_bound)});
+    new_lines.push_back(
+        {static_cast<float>(checkInBoundary(lines2D[i][0], 0.0, x_bound)),
+         static_cast<float>(checkInBoundary(lines2D[i][1], 0.0, y_bound)),
+         static_cast<float>(checkInBoundary(lines2D[i][2], 0.0, x_bound)),
+         static_cast<float>(checkInBoundary(lines2D[i][3], 0.0, y_bound))});
   }
   return new_lines;
 }
@@ -578,6 +579,7 @@ bool LineDetector::getRectanglesFromLine(const cv::Vec4f& line,
   (*rect_right)[1] = start + eff_rect_size / norm * go_right;
   (*rect_right)[2] = end + offset / norm * go_right;
   (*rect_right)[3] = end + eff_rect_size / norm * go_right;
+  // TODO(ff): Check if function needs to be of non void return type.
 }
 
 void LineDetector::assignColorToLines(const cv::Mat& image,
@@ -596,7 +598,9 @@ void LineDetector::assignColorToLines(const cv::Mat& image,
     x2 += image.at<cv::Vec3b>(points[i])[1];
     x3 += image.at<cv::Vec3b>(points[i])[2];
   }
-  line3D->colors.push_back({x1 / num_points, x2 / num_points, x3 / num_points});
+  line3D->colors.push_back({static_cast<unsigned char>(x1 / num_points),
+                            static_cast<unsigned char>(x2 / num_points),
+                            static_cast<unsigned char>(x3 / num_points)});
 }
 
 bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
@@ -1224,7 +1228,7 @@ void LineDetector::find3DlinesByShortest(const cv::Mat& cloud,
   cv::Vec3f start, end;
   correspondeces->clear();
   lines3D->clear();
-  for (size_t i; i < lines2D.size(); ++i) {
+  for (size_t i = 0u; i < lines2D.size(); ++i) {
     dist_opt = 1e20;
     x_opt_start = lines2D[i][0];
     y_opt_start = lines2D[i][1];
@@ -1492,7 +1496,11 @@ bool LineDetector::checkIfValidLineBruteForce(const cv::Mat& cloud,
   double max_deviation = params_->max_deviation_inlier_line_check;
   // This point density measures the where the points lie on the line. It is
   // used to truncate the line on the ends, if one end lies in empty space.
-  int point_density[num_of_points_required] = {0};
+  int point_density[num_of_points_required];
+  for (int i = 0; i < num_of_points_required; ++i) {
+    point_density[i] = 0;
+  }
+
   double dist;
   cv::Vec3f start, end, point;
   start = {(*line)[0], (*line)[1], (*line)[2]};
@@ -1546,8 +1554,8 @@ bool LineDetector::checkIfValidLineDiscont(const cv::Mat& cloud,
                                            const cv::Vec4f& line) {
   CHECK_EQ(cloud.type(), CV_32FC3);
   cv::Point2i start, end, dir;
-  start = {floor(line[0]), floor(line[1])};
-  end = {floor(line[2]), floor(line[3])};
+  start = {static_cast<int>(floor(line[0])), static_cast<int>(floor(line[1]))};
+  end = {static_cast<int>(floor(line[2])), static_cast<int>(floor(line[3]))};
   int patch_size = 1;
   // The patch is restricted to be within the rectangle that is spawned by
   // start and end. This has two positive effects: We never try to acces a
@@ -1681,7 +1689,7 @@ bool LineDetector::adjustLineUsingInliers(const std::vector<cv::Vec3f>& points,
   double dist;
   double dist_min = 1e9;
   double dist_max = -1e9;
-  int count_inliers = 0;
+  size_t count_inliers = 0u;
   for (size_t i = 0u; i < points.size(); ++i) {
     if (distPointToLine(start_in, end_in, points[i]) >
         params_->max_deviation_inlier_line_check) {

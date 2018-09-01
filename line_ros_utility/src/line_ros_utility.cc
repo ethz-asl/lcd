@@ -407,7 +407,7 @@ void ListenAndPublish::labelLinesWithInstances(
     // Set the labels size equal to the known_colors size and initialize them
     // with 0;
     labels_count = std::vector<int>(known_colors_.size(), 0);
-    for (int k = 0; k <= num_checks; ++k) {
+    for (size_t k = 0u; k <= num_checks; ++k) {
       // Compute a point on a line.
       point3D = start + line * (k / (double)num_checks);
       // Compute its reprojection.
@@ -479,7 +479,7 @@ void DisplayClusters::setClusters(
   CHECK(frame_id_set_) << "line_clustering::DisplayClusters::setClusters: You "
                           "need to set the frame_id before setting the "
                           "clusters.";
-  size_t N = 0;
+  size_t N = 0u;
   line_clusters_.clear();
   for (size_t i = 0u; i < lines3D.size(); ++i) {
     // This if-clause sets the number of clusters. This works well as long the
@@ -489,8 +489,8 @@ void DisplayClusters::setClusters(
     // higher than the number of colors defined in the constructor (which
     // defines the number of labels that can be displayed), some clusters might
     // not be displayed.
-    if (labels[i] >= N) {
-      N = 1 + labels[i];
+    if (static_cast<size_t>(labels[i]) >= N) {
+      N = 1u + labels[i];
       line_clusters_.resize(N);
     }
     CHECK(labels[i] >= 0) << "line_clustering::DisplayClusters::setClusters: "
@@ -555,7 +555,7 @@ void TreeClassifier::getTrees() {
         cv_bridge::toCvCopy(tree_service.response.trees[i], "64FC1");
     trees_[i].children_left.clear();
     trees_[i].children_right.clear();
-    for (size_t j = 0u; j < cv_ptr_->image.cols; ++j) {
+    for (size_t j = 0u; j < static_cast<size_t>(cv_ptr_->image.cols); ++j) {
       trees_[i].children_left.push_back(cv_ptr_->image.at<double>(0, j));
       trees_[i].children_right.push_back(cv_ptr_->image.at<double>(1, j));
     }
@@ -610,7 +610,7 @@ void TreeClassifier::getLineDecisionPath(
     decision_paths_[i].release();
     int size[2] = {(int)num_lines_, 60000};
     decision_paths_[i].create(2, size, CV_8U);
-    for (size_t j = 0u; j < cv_ptr_->image.cols; ++j) {
+    for (size_t j = 0u; j < static_cast<size_t>(cv_ptr_->image.cols); ++j) {
       decision_paths_[i].ref<unsigned char>(
           cv_ptr_->image.at<double>(0, j), cv_ptr_->image.at<double>(1, j)) = 1;
     }
@@ -705,8 +705,11 @@ void EvalData::createHeatMap(const cv::Mat& image, const cv::Mat& dist_mat,
       color[2] = static_cast<unsigned char>(255 * red);
     }
 
-    cv::line(heat_map_, {lines2D_[i][0], lines2D_[i][1]},
-             {lines2D_[i][2], lines2D_[i][3]}, color, 2);
+    cv::line(
+        heat_map_,
+        {static_cast<int>(lines2D_[i][0]), static_cast<int>(lines2D_[i][1])},
+        {static_cast<int>(lines2D_[i][2]), static_cast<int>(lines2D_[i][3])},
+        color, 2);
   }
 }
 
