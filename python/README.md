@@ -69,3 +69,8 @@ python train.py
 
 ## Notebooks
 Notebooks provide better comprehension of the codes as well as some visualizations. One can check them in `examples`.
+
+## Possible improvements
+1. The virtual image for line is taken with the same camera as the SceneNetRGBD dataset's one. The camera's distance to the line is set to 3 meters, which introduce some occlusions for certain lines. As an alternative, one might consider using strange cameras, eg. omnidirectional camera. Thus we can put the "camera" near the line and project the pointcloud(or points near the line) to get virtual image for that line.
+
+2. For an intersection line, there is just one instance label associated to it. It's probably better to associate it with two virtual images and two labels using the left&right sides planes of the line. This can be done in the `line_detection` library similarly to the function `LineDetector::assignColorToLines`.
