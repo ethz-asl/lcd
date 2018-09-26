@@ -33,3 +33,7 @@
 data/
 tmp
 python/
+line_clustering/cmake-build/
+line_description/cmake-build/
+line_detection/cmake-build/
+line_ros_utility/cmake-build/

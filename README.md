@@ -32,13 +32,28 @@ $ catkin init
 * opencv3_catkin
 * pcl_catkin
 * scenenet_ros_tools
+* vision_opencv
 
-You also need to modify the following two lines of `CMakeLists.txt` in `opencv3_catkin` directory:
+You also need to edit the file `CMakeLists.txt` in the `opencv3_catkin` directory by:
+- modifying the following three lines:
 ```
+-DBUILD_opencv_python3=ON
+...
 -DBUILD_opencv_line_descriptor=ON
 ...
 -DBUILD_opencv_ximgproc=ON
 ```
+- adding the following line:
+```
+-DBUILD_opencv_nonfree=OFF
+```
+- adding the following two libraries in the list under `cs_export`:
+```
+opencv_line_descriptor
+opencv_ximgproc
+```
+
+(For a safer operation, just make sure that opencv3_catkin points to commit c57f763 on branch line_tools).
 
 Build them (it could take 1 hour for the first time):
 ```
