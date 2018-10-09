@@ -3,7 +3,8 @@
 #include <line_detection/line_detection.h>
 
 #include <cv_bridge/cv_bridge.h>
-#include <image_transport/image_transport.h>
+//TODO(fmilano): check, not used?
+//#include <image_transport/image_transport.h>
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
@@ -29,7 +30,7 @@ int main(int argc, char** argv) {
   } else {
     path = argv[1];
   }
-  // Initialie the node.
+  // Initialize the node.
   ros::init(argc, argv, "send_image");
   ros::NodeHandle node_handle;
   ros::ServiceClient client =

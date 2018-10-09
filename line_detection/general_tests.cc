@@ -51,7 +51,7 @@ int main(int argc, char** argv) {
   ROS_INFO("Number of new lines: %d", (int)lines2D_fused.size());
 
   cv::Mat image_new = image.clone();
-  line_detector.paintLines(lines2D, &image);
+  line_detector.paintLines(lines2D, &image, cv::Vec3b(0, 255, 0));
   line_detector.paintLines(lines2D_fused, &image_new, cv::Vec3b(0, 255, 0));
   cv::imshow("original lines", image);
   cv::imshow("fused lines", image_new);

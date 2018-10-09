@@ -16,10 +16,4 @@
     name="detect_cluster_show"
     output="screen"
  ></node>
- <node
-   pkg="scenenet_ros_tools"
-   type="pointcloud_publisher.py"
-   name="pointcloud_publisher"
-   output="screen"
- ></node>
 </launch>

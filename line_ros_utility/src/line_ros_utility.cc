@@ -3,14 +3,14 @@
 namespace line_ros_utility {
 
 const std::string frame_id = "line_tools_id";
-const bool write_labeled_lines = false;
-const std::string kWritePath =
-    "/home/dominik/catkin_ws/src/3d_line_toolbox/data/traj_50";
+const bool write_labeled_lines = true;
+const bool clustering_with_random_forest = false;
+const std::string kWritePath = "/home/francesco/catkin_extended_ws/src/line_tools/data/train_lines/traj_1";
 
 std::vector<int> clusterLinesAfterClassification(
     const std::vector<line_detection::LineWithPlanes>& lines) {
   std::vector<int> label;
-  for (size_t i = 0; i < lines.size(); ++i) {
+  for (size_t i = 0u; i < lines.size(); ++i) {
     if (lines[i].type == line_detection::LineType::DISCONT) {
       label.push_back(0);
     } else if (lines[i].type == line_detection::LineType::PLANE) {
@@ -41,7 +41,7 @@ void storeLines3DinMarkerMsg(const std::vector<cv::Vec6f>& lines3D,
   // is the start and the second is the end of the line. The third is then again
   // the start of the next line, and so on.
   geometry_msgs::Point p;
-  for (size_t i = 0; i < lines3D.size(); ++i) {
+  for (size_t i = 0u; i < lines3D.size(); ++i) {
     p.x = lines3D[i][0];
     p.y = lines3D[i][1];
     p.z = lines3D[i][2];
@@ -58,13 +58,40 @@ bool printToFile(const std::vector<line_detection::LineWithPlanes>& lines3D,
   CHECK(labels.size() == lines3D.size());
   std::ofstream file(path);
   if (file.is_open()) {
-    for (size_t i = 0; i < lines3D.size(); ++i) {
+    for (size_t i = 0u; i < lines3D.size(); ++i) {
       for (int j = 0; j < 6; ++j) file << lines3D[i].line[j] << " ";
       for (int j = 0; j < 4; ++j) file << lines3D[i].hessians[0][j] << " ";
       for (int j = 0; j < 4; ++j) file << lines3D[i].hessians[1][j] << " ";
       for (int j = 0; j < 3; ++j) file << (int)lines3D[i].colors[0][j] << " ";
       for (int j = 0; j < 3; ++j) file << (int)lines3D[i].colors[1][j] << " ";
+
+      if (lines3D[i].type == line_detection::LineType::DISCONT) {
+        file << 0 << " ";
+      } else if (lines3D[i].type == line_detection::LineType::PLANE) {
+        file << 1 << " ";
+      } else {
+        file << 2 << " ";
+      }
       file << labels[i] << std::endl;
+    }
+    file.close();
+    return true;
+  } else {
+    LOG(WARNING) << "LineDetector::printToFile: File could not be opened.";
+    file.close();
+    return false;
+  }
+}
+
+bool printToFile(const std::vector<cv::Vec4f>& lines2D,
+                 const std::string& path) {
+  std::ofstream file(path);
+  if (file.is_open()) {
+    for (size_t i = 0u; i < lines2D.size(); ++i) {
+      for (size_t j = 0u; j < 3; ++j) {
+        file << lines2D[i][j] << " ";
+      }
+      file << lines2D[i][3] << std::endl;
     }
     file.close();
     return true;
@@ -96,11 +123,14 @@ ListenAndPublish::ListenAndPublish() : params_(), tree_classifier_() {
   dynamic_rcf_callback_ =
       boost::bind(&ListenAndPublish::reconfigureCallback, this, _1, _2);
   dynamic_rcf_server_.setCallback(dynamic_rcf_callback_);
+
   // Add the parameters utility to line_detection.
   line_detector_ = line_detection::LineDetector(&params_);
   iteration_ = 0;
   // Retrieve trees.
-  tree_classifier_.getTrees();
+  if (clustering_with_random_forest) {
+    tree_classifier_.getTrees();
+  }
 }
 ListenAndPublish::~ListenAndPublish() { delete sync_; }
 
@@ -116,8 +146,8 @@ void ListenAndPublish::writeMatToPclCloud(
   const size_t height = cv_cloud.rows;
   pcl_cloud->points.resize(width * height);
   pcl::PointXYZRGB point;
-  for (size_t i = 0; i < height; ++i) {
-    for (size_t j = 0; j < width; ++j) {
+  for (size_t i = 0u; i < height; ++i) {
+    for (size_t j = 0u; j < width; ++j) {
       point.x = cv_cloud.at<cv::Vec3f>(i, j)[0];
       point.y = cv_cloud.at<cv::Vec3f>(i, j)[1];
       point.z = cv_cloud.at<cv::Vec3f>(i, j)[2];
@@ -131,8 +161,8 @@ void ListenAndPublish::writeMatToPclCloud(
 
 void ListenAndPublish::start() {
   // The exact time synchronizer makes it possible to have a single callback
-  // that recieves messages of all five topics above synchronized. This means
-  // every call of the callback function recieves three messages that have the
+  // that receives messages of all five topics above synchronized. This means
+  // every call of the callback function receives three messages that have the
   // same timestamp.
   sync_ = new message_filters::Synchronizer<MySyncPolicy>(
       MySyncPolicy(10), image_sub_, depth_sub_, instances_sub_, info_sub_,
@@ -154,8 +184,8 @@ void ListenAndPublish::detectLines() {
 void ListenAndPublish::projectTo3D() {
   lines3D_temp_wp_.clear();
   start_time_ = std::chrono::system_clock::now();
-  line_detector_.project2Dto3DwithPlanes(cv_cloud_, cv_image_, lines2D_,
-                                         &lines3D_temp_wp_, true);
+  line_detector_.project2Dto3DwithPlanes(cv_cloud_, cv_image_, lines2D_, true,
+                                         &lines2D_kept_tmp_, &lines3D_temp_wp_);
   end_time_ = std::chrono::system_clock::now();
   elapsed_seconds_ = end_time_ - start_time_;
   ROS_INFO("Projecting to 3D: %f", elapsed_seconds_.count());
@@ -164,7 +194,8 @@ void ListenAndPublish::projectTo3D() {
 void ListenAndPublish::checkLines() {
   lines3D_with_planes_.clear();
   start_time_ = std::chrono::system_clock::now();
-  line_detector_.runCheckOn3DLines(cv_cloud_, lines3D_temp_wp_,
+  line_detector_.runCheckOn3DLines(cv_cloud_, camera_P_, lines2D_kept_tmp_,
+                                   lines3D_temp_wp_, &lines2D_kept_,
                                    &lines3D_with_planes_);
   end_time_ = std::chrono::system_clock::now();
   elapsed_seconds_ = end_time_ - start_time_;
@@ -200,7 +231,7 @@ void ListenAndPublish::clusterKmedoid() {
   ROS_INFO("Cluster on distance matrix: %f", elapsed_seconds_.count());
   std::vector<size_t> labels = kmedoids_cluster_.getLabels();
   labels_rf_kmedoids_.clear();
-  for (size_t i = 0; i < labels.size(); ++i) {
+  for (size_t i = 0u; i < labels.size(); ++i) {
     labels_rf_kmedoids_.push_back(labels[i]);
   }
 }
@@ -232,7 +263,7 @@ void ListenAndPublish::publish() {
 }
 
 void ListenAndPublish::printNumberOfLines() {
-  ROS_INFO("Lines kept after projection: %d/%d", lines3D_with_planes_.size(),
+  ROS_INFO("Lines kept after projection: %lu/%lu", lines3D_with_planes_.size(),
            lines2D_.size());
 }
 
@@ -262,6 +293,7 @@ void ListenAndPublish::reconfigureCallback(
   params_.hough_detector_threshold = config.hough_detector_threshold;
   params_.hough_detector_minLineLength = config.hough_detector_minLineLength;
   params_.hough_detector_maxLineGap = config.hough_detector_maxLineGap;
+
   detector_method_ = config.detector;
   number_of_clusters_ = config.number_of_clusters;
   show_lines_or_clusters_ = config.clustering;
@@ -291,25 +323,50 @@ void ListenAndPublish::masterCallback(
   cv_instances_ = cv_instances_ptr->image;
   // Store camera message.
   camera_info_ = rosmsg_info;
-
+  // Get camera projection matrix
+  image_geometry::PinholeCameraModel camera_model;
+  camera_model.fromCameraInfo(camera_info_);
+  camera_P_ = cv::Mat(camera_model.projectionMatrix());
+  camera_P_.convertTo(camera_P_, CV_32F);
   // Convert image to grayscale. That is needed for the line detection.
-  cvtColor(cv_image_, cv_img_gray_, CV_RGB2GRAY);
+  cv::cvtColor(cv_image_, cv_img_gray_, CV_RGB2GRAY);
 
-  ROS_INFO("**** New Image ******");
+  ROS_INFO("**** New Image**** Frame %lu****", iteration_);
   detectLines();
   projectTo3D();
-  ROS_INFO("Kept lines: %d/%d", lines3D_temp_wp_.size(), lines2D_.size());
+  ROS_INFO("Kept lines: %lu/%lu", lines3D_temp_wp_.size(), lines2D_.size());
   checkLines();
+
+  CHECK_EQ(static_cast<int>(lines3D_with_planes_.size()),
+           static_cast<int>(lines2D_kept_.size()));
+
   printNumberOfLines();
   clusterKmeans();
   labelLinesWithInstances(lines3D_with_planes_, cv_instances_, camera_info_,
                           &labels_);
-  clusterKmedoid();
+
+  if (clustering_with_random_forest) {
+    clusterKmedoid();
+  }
 
   if (write_labeled_lines) {
     std::string path = kWritePath + "/lines_with_labels_" +
                        std::to_string(iteration_) + ".txt";
+
+    std::string path_2D_kept =
+        kWritePath + "/lines_2D_kept_" + std::to_string(iteration_) + ".txt";
+
+    std::string path_2D =
+        kWritePath + "/lines_2D_" + std::to_string(iteration_) + ".txt";
+
+    // 3D lines data
     printToFile(lines3D_with_planes_, labels_, path);
+
+    // 2D lines kept (bijection with 3D lines above)
+    printToFile(lines2D_kept_, path_2D_kept);
+
+    // All 2D lines detected
+    printToFile(lines2D_, path_2D);
   }
   initDisplay();
   writeMatToPclCloud(cv_cloud_, cv_image_, &pcl_cloud_);
@@ -327,7 +384,7 @@ void ListenAndPublish::labelLinesWithInstances(
     const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info,
     std::vector<int>* labels) {
   CHECK_NOTNULL(labels);
-  CHECK_EQ(instances.type(), CV_8UC3);
+  //CHECK_EQ(instances.type(), CV_16UC1);
   labels->resize(lines.size());
   // This class is used to perform the backprojection.
   image_geometry::PinholeCameraModel camera_model;
@@ -335,21 +392,22 @@ void ListenAndPublish::labelLinesWithInstances(
   // This is a voting vector, where all points on a line vote for one label and
   // the one with the highest votes wins.
   std::vector<int> labels_count;
-  // For intermiedate storage.
+  // For intermediate storage.
   cv::Point2f point2D;
-  cv::Vec3b color;
+  unsigned short color;
+
   cv::Vec3f start, end, line, point3D;
   // num_checks + 1 points are reprojected onto the image.
   constexpr size_t num_checks = 10;
   // Iterate over all lines.
-  for (size_t i = 0; i < lines.size(); ++i) {
+  for (size_t i = 0u; i < lines.size(); ++i) {
     start = {lines[i].line[0], lines[i].line[1], lines[i].line[2]};
     end = {lines[i].line[3], lines[i].line[4], lines[i].line[5]};
     line = end - start;
     // Set the labels size equal to the known_colors size and initialize them
     // with 0;
     labels_count = std::vector<int>(known_colors_.size(), 0);
-    for (int k = 0; k <= num_checks; ++k) {
+    for (size_t k = 0u; k <= num_checks; ++k) {
       // Compute a point on a line.
       point3D = start + line * (k / (double)num_checks);
       // Compute its reprojection.
@@ -361,7 +419,9 @@ void ListenAndPublish::labelLinesWithInstances(
       point2D.y = line_detection::checkInBoundary(floor(point2D.y), 0,
                                                   instances.rows - 1);
       // Get the color of the pixel.
-      color = instances.at<cv::Vec3b>(point2D);
+      // color = instances.at<cv::Vec3b>(point2D);
+      color = instances.at<unsigned short>(point2D);
+
       // Find the index of the color in the known_colors vector
       size_t j = 0;
       for (; j < known_colors_.size(); ++j) {
@@ -384,7 +444,7 @@ void ListenAndPublish::labelLinesWithInstances(
         best_guess = j;
       }
     }
-    (*labels)[i] = best_guess;
+    labels->at(i) = known_colors_[best_guess];
   }
 }
 
@@ -419,9 +479,9 @@ void DisplayClusters::setClusters(
   CHECK(frame_id_set_) << "line_clustering::DisplayClusters::setClusters: You "
                           "need to set the frame_id before setting the "
                           "clusters.";
-  size_t N = 0;
+  size_t N = 0u;
   line_clusters_.clear();
-  for (size_t i = 0; i < lines3D.size(); ++i) {
+  for (size_t i = 0u; i < lines3D.size(); ++i) {
     // This if-clause sets the number of clusters. This works well as long the
     // clusters are indexed as an array (0,1,2,3). In any other case, it creates
     // to many clusters (which is not that bad, because empty clusters do not
@@ -429,8 +489,8 @@ void DisplayClusters::setClusters(
     // higher than the number of colors defined in the constructor (which
     // defines the number of labels that can be displayed), some clusters might
     // not be displayed.
-    if (labels[i] >= N) {
-      N = 1 + labels[i];
+    if (static_cast<size_t>(labels[i]) >= N) {
+      N = 1u + labels[i];
       line_clusters_.resize(N);
     }
     CHECK(labels[i] >= 0) << "line_clustering::DisplayClusters::setClusters: "
@@ -438,9 +498,9 @@ void DisplayClusters::setClusters(
     line_clusters_[labels[i]].push_back(lines3D[i].line);
   }
   marker_lines_.resize(line_clusters_.size());
-  size_t n;
-  for (size_t i = 0; i < line_clusters_.size(); ++i) {
-    n = i % colors_.size();
+
+  for (size_t i = 0u; i < line_clusters_.size(); ++i) {
+    size_t n = i % colors_.size();
     storeLines3DinMarkerMsg(line_clusters_[i], &marker_lines_[i], colors_[n]);
     marker_lines_[i].header.frame_id = frame_id_;
     marker_lines_[i].lifetime = ros::Duration(1.1);
@@ -450,7 +510,7 @@ void DisplayClusters::setClusters(
 
 void DisplayClusters::initPublishing(ros::NodeHandle& node_handle) {
   pub_.resize(colors_.size());
-  for (size_t i = 0; i < colors_.size(); ++i) {
+  for (size_t i = 0u; i < colors_.size(); ++i) {
     std::stringstream topic;
     topic << "/visualization_marker_" << i;
     pub_[i] =
@@ -464,9 +524,9 @@ void DisplayClusters::publish() {
       << "You need to call initPublishing to advertise before publishing.";
   CHECK(frame_id_set_) << "You need to set the frame_id before publishing.";
   CHECK(clusters_set_) << "You need to set the clusters before publishing.";
-  size_t n;
-  for (size_t i = 0; i < marker_lines_.size(); ++i) {
-    n = i % pub_.size();
+
+  for (size_t i = 0u; i < marker_lines_.size(); ++i) {
+    size_t n = i % pub_.size();
     pub_[n].publish(marker_lines_[i]);
   }
 }
@@ -490,12 +550,12 @@ void TreeClassifier::getTrees() {
     ros::shutdown();
   }
   trees_.resize(tree_service.response.trees.size());
-  for (size_t i = 0; i < tree_service.response.trees.size(); ++i) {
+  for (size_t i = 0u; i < tree_service.response.trees.size(); ++i) {
     cv_bridge::CvImagePtr cv_ptr_ =
         cv_bridge::toCvCopy(tree_service.response.trees[i], "64FC1");
     trees_[i].children_left.clear();
     trees_[i].children_right.clear();
-    for (size_t j = 0; j < cv_ptr_->image.cols; ++j) {
+    for (size_t j = 0u; j < static_cast<size_t>(cv_ptr_->image.cols); ++j) {
       trees_[i].children_left.push_back(cv_ptr_->image.at<double>(0, j));
       trees_[i].children_right.push_back(cv_ptr_->image.at<double>(1, j));
     }
@@ -510,21 +570,28 @@ void TreeClassifier::getLineDecisionPath(
     return;
   }
   // Fill in the line.
-  for (size_t i = 0; i < num_lines_; ++i) {
-    for (size_t j = 0; j < 6; ++j) {
+  for (size_t i = 0u; i < num_lines_; ++i) {
+    for (size_t j = 0u; j < 6; ++j) {
       service.request.lines.push_back(lines[i].line[j]);
     }
-    for (size_t j = 0; j < 4; ++j) {
+    for (size_t j = 0u; j < 4; ++j) {
       service.request.lines.push_back(lines[i].hessians[0][j]);
     }
-    for (size_t j = 0; j < 4; ++j) {
+    for (size_t j = 0u; j < 4; ++j) {
       service.request.lines.push_back(lines[i].hessians[1][j]);
     }
-    for (size_t j = 0; j < 3; ++j) {
+    for (size_t j = 0u; j < 3; ++j) {
       service.request.lines.push_back((float)lines[i].colors[0][j]);
     }
-    for (size_t j = 0; j < 3; ++j) {
+    for (size_t j = 0u; j < 3; ++j) {
       service.request.lines.push_back((float)lines[i].colors[1][j]);
+    }
+    if (lines[i].type == line_detection::LineType::DISCONT) {
+      service.request.lines.push_back(0.0);
+    } else if (lines[i].type == line_detection::LineType::PLANE) {
+      service.request.lines.push_back(1.0);
+    } else {
+      service.request.lines.push_back(2.0);
     }
   }
   // Call the service.
@@ -532,18 +599,18 @@ void TreeClassifier::getLineDecisionPath(
     ROS_ERROR("Call was not succesfull. Check if random_forest.py is running.");
     ros::shutdown();
   }
-  // Make sure the data recieved fits the stored trees_.
+  // Make sure the data received fits the stored trees_.
   CHECK_EQ(service.response.decision_paths.size(), trees_.size());
   decision_paths_.resize(trees_.size());
   // For every tree, fill in the decision paths
-  for (size_t i = 0; i < trees_.size(); ++i) {
+  for (size_t i = 0u; i < trees_.size(); ++i) {
     cv_bridge::CvImagePtr cv_ptr_ =
         cv_bridge::toCvCopy(service.response.decision_paths[i], "64FC1");
     CHECK_EQ(cv_ptr_->image.rows, 2);
     decision_paths_[i].release();
     int size[2] = {(int)num_lines_, 60000};
     decision_paths_[i].create(2, size, CV_8U);
-    for (size_t j = 0; j < cv_ptr_->image.cols; ++j) {
+    for (size_t j = 0u; j < static_cast<size_t>(cv_ptr_->image.cols); ++j) {
       decision_paths_[i].ref<unsigned char>(
           cv_ptr_->image.at<double>(0, j), cv_ptr_->image.at<double>(1, j)) = 1;
     }
@@ -556,7 +623,7 @@ double TreeClassifier::computeDistance(const SearchTree& tree,
                                        size_t idx) {
   if (path.value<double>(line_idx1, idx) != 0 &&
       path.value<double>(line_idx2, idx) != 0) {
-    if (tree.children_right[idx] == tree.children_left[idx]) {  // at leave
+    if (tree.children_right[idx] == tree.children_left[idx]) {  // at leaves
       return 0.0;
     } else {
       return computeDistance(tree, path, line_idx1, line_idx2,
@@ -583,10 +650,10 @@ double TreeClassifier::computeDistance(const SearchTree& tree,
 void TreeClassifier::computeDistanceMatrix() {
   dist_matrix_ = cv::Mat(num_lines_, num_lines_, CV_32FC1, 0.0f);
   float dummy;
-  for (size_t i = 0; i < num_lines_; ++i) {
+  for (size_t i = 0u; i < num_lines_; ++i) {
     for (size_t j = i + 1; j < num_lines_; ++j) {
       dummy = 0;
-      for (size_t k = 0; k < trees_.size(); ++k) {
+      for (size_t k = 0u; k < trees_.size(); ++k) {
         dummy += computeDistance(trees_[k], decision_paths_[k], i, j, 0);
       }
       dist_matrix_.at<float>(i, j) = dummy / (double)trees_.size();
@@ -598,7 +665,7 @@ cv::Mat TreeClassifier::getDistanceMatrix() { return dist_matrix_; }
 
 EvalData::EvalData(const std::vector<line_detection::LineWithPlanes>& lines3D) {
   lines3D_.clear();
-  for (size_t i = 0; i < lines3D.size(); ++i) {
+  for (size_t i = 0u; i < lines3D.size(); ++i) {
     lines3D_.push_back(lines3D[i].line);
   }
 }
@@ -619,10 +686,10 @@ void EvalData::createHeatMap(const cv::Mat& image, const cv::Mat& dist_mat,
   CHECK_EQ(image.type(), CV_8UC3);
   size_t num_lines = lines2D_.size();
   cv::Vec3b color;
-  float max_dist, temp_dist;
+  float max_dist;
   float red, green, blue;
   max_dist = -1;
-  for (size_t i = 0; i < num_lines; ++i) {
+  for (size_t i = 0u; i < num_lines; ++i) {
     if (dist(dist_mat, i, idx) > max_dist) {
       max_dist = dist(dist_mat, i, idx);
     }
@@ -638,15 +705,18 @@ void EvalData::createHeatMap(const cv::Mat& image, const cv::Mat& dist_mat,
       color[2] = static_cast<unsigned char>(255 * red);
     }
 
-    cv::line(heat_map_, {lines2D_[i][0], lines2D_[i][1]},
-             {lines2D_[i][2], lines2D_[i][3]}, color, 2);
+    cv::line(
+        heat_map_,
+        {static_cast<int>(lines2D_[i][0]), static_cast<int>(lines2D_[i][1])},
+        {static_cast<int>(lines2D_[i][2]), static_cast<int>(lines2D_[i][3])},
+        color, 2);
   }
 }
 
 void EvalData::storeHeatMaps(const cv::Mat& image, const cv::Mat& dist_mat,
                              const std::string& path) {
   size_t num_lines = lines2D_.size();
-  for (size_t i = 0; i < num_lines; ++i) {
+  for (size_t i = 0u; i < num_lines; ++i) {
     createHeatMap(image, dist_mat, i);
     std::string store_path = path + "_" + std::to_string(i) + ".jpg";
     cv::imwrite(store_path, heat_map_);
@@ -659,7 +729,7 @@ void EvalData::projectLinesTo2D(
   image_geometry::PinholeCameraModel camera_model;
   camera_model.fromCameraInfo(camera_info);
   lines2D_.clear();
-  for (size_t i = 0; i < lines3D_.size(); ++i) {
+  for (size_t i = 0u; i < lines3D_.size(); ++i) {
     p1 = camera_model.project3dToPixel(
         {lines3D_[i][0], lines3D_[i][1], lines3D_[i][2]});
     p2 = camera_model.project3dToPixel(
@@ -724,9 +794,9 @@ void EvalData::writeHeatMapColorBar(const std::string& path) {
   constexpr size_t width = 10;
   cv::Mat colorbar(height, width, CV_8UC3);
   float red, green, blue;
-  for (size_t i = 0; i < height; ++i) {
+  for (size_t i = 0u; i < height; ++i) {
     getHeatMapColor(i / (double)height, &red, &green, &blue);
-    for (size_t j = 0; j < width; ++j) {
+    for (size_t j = 0u; j < width; ++j) {
       colorbar.at<cv::Vec3b>(i, j) = {static_cast<unsigned char>(255 * blue),
                                       static_cast<unsigned char>(255 * green),
                                       static_cast<unsigned char>(255 * red)};

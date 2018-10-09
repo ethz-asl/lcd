@@ -51,8 +51,8 @@ class KMeansCluster {
   double mean_;
   std::vector<cv::Vec3f> line_means_;
   std::vector<cv::Vec6f> lines_;
-  std::vector<cv::Vec<float, 8> > hessians_;
-  std::vector<cv::Vec<float, 14> > lines_and_hessians_;
+  std::vector<cv::Vec<float, 8>> hessians_;
+  std::vector<cv::Vec<float, 14>> lines_and_hessians_;
 };
 
 // A class that performs clustering of features based on the kmediods algorithm.
@@ -88,7 +88,7 @@ class KMedoidsCluster {
   // based.
   std::vector<size_t> labels_;
   // Stores the clusters.
-  std::vector<std::vector<size_t> > clusters_;
+  std::vector<std::vector<size_t>> clusters_;
   // Number of clusters.
   size_t K_;
   // Distance matrix. dist_mat(i, j) denotes the distance between node i and j.

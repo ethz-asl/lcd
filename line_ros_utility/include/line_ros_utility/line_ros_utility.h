@@ -51,7 +51,9 @@ std::vector<int> clusterLinesAfterClassification(
 // can be read by the random_forest.py node.
 bool printToFile(const std::vector<line_detection::LineWithPlanes>& lines3D,
                  const std::vector<int>& labels, const std::string& path);
-
+// Print 2D lines.
+bool printToFile(const std::vector<cv::Vec4f>& lines2D,
+                 const std::string& path);
 // Stores lines in marker messages.
 void storeLines3DinMarkerMsg(const std::vector<cv::Vec6f>& lines3D,
                              visualization_msgs::Marker* disp_lines,
@@ -87,7 +89,7 @@ class DisplayClusters {
  private:
   bool frame_id_set_, clusters_set_, initialized_;
   std::vector<visualization_msgs::Marker> marker_lines_;
-  std::vector<std::vector<cv::Vec<float, 6> > > line_clusters_;
+  std::vector<std::vector<cv::Vec<float, 6>>> line_clusters_;
   std::vector<ros::Publisher> pub_;
   std::string frame_id_;
   std::vector<cv::Vec3f> colors_;
@@ -160,7 +162,7 @@ class ListenAndPublish {
   // that it can be displayed with rviz.
   void writeMatToPclCloud(const cv::Mat& cv_cloud, const cv::Mat& image,
                           pcl::PointCloud<pcl::PointXYZRGB>* pcl_cloud);
-  // These functions perform the actuall work. They are only here to make the
+  // These functions perform the actual work. They are only here to make the
   // masterCallback more readable.
   void detectLines();
   void projectTo3D();
@@ -205,15 +207,27 @@ class ListenAndPublish {
   cv::Mat cv_cloud_;
   cv::Mat cv_depth_;
   cv::Mat cv_instances_;
-  std::vector<cv::Vec3b> known_colors_;
+  // To store the color value in the instance image(1 channel). If the instance
+  // image has instead 3 channels, the variable's type should be changed to
+  // std::vector<cv::Vec3b> ;
+  std::vector<unsigned short> known_colors_;
+
   pcl::PointCloud<pcl::PointXYZRGB> pcl_cloud_;
+  // all 2D lines detected in the grayscale mage
   std::vector<cv::Vec4f> lines2D_;
-  std::vector<cv::Vec<float, 6> > lines3D_;
+  // all 2D lines kept(bijection with lines3D_)
+  std::vector<cv::Vec4f> lines2D_kept_;
+  // a temperary variable for storing kept 2D lines
+  std::vector<cv::Vec4f> lines2D_kept_tmp_;
+  std::vector<cv::Vec<float, 6>> lines3D_;
   std::vector<line_detection::LineWithPlanes> lines3D_temp_wp_;
   std::vector<line_detection::LineWithPlanes> lines3D_with_planes_;
   std::vector<int> labels_;
+  std::vector<std::vector<int>> labels_left_right;
   std::vector<int> labels_rf_kmedoids_;
   sensor_msgs::CameraInfoConstPtr camera_info_;
+  // Camera projection matrix
+  cv::Mat camera_P_;
   // Publishers and Subscribers.
   tf::TransformBroadcaster broad_caster_;
   tf::Transform transform_;
