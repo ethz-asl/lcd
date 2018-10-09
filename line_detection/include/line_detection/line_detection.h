@@ -180,27 +180,26 @@ inline cv::Vec3f computeMean(const std::vector<cv::Vec3f>& points) {
 // Returns the projection of a point on the plane given defined by the hessian.
 cv::Vec3f projectPointOnPlane(const cv::Vec4f& hessian, const cv::Vec3f& point);
 
-// Finds the y-coordinates of a line between two points.
+// Finds the x-coordinates of a line between two points.
 // Input: start:      Starting point of line.
-//        end:        End point of line. Note that start.x < end.x must
-//        hold. left_side:  For the special case for a near to horizontal
-//        line. If
-//                    true, it gives back the most left y value of the line,
+//        end:        End point of line. Note that start.y < end.y must
+//                    hold.
+//        left_side:  For the special case for a near to horizontal line. If
+//                    true, it gives back the most left x value of the line,
 //                    otherwise the most right.
 //
-// Output: y_coord    The y coordinates ordered from top to bottom. Example:
-// If
-//                    the line spans 3 rows of pixel (so 2 < |end.x -
-//                    start.x| < 3), 3 values are stored in y_coord, where
-//                    the first corresponds to the lowest x (most upper in
-//                    image coordinates).
+// Output: x_coord    The x coordinates ordered from top to bottom. Example:
+//                    If the line spans 3 rows of pixel (so 2 < |end.y -
+//                    start.y| < 3), 3 values are stored in x_coord, where
+//                    the first corresponds to the x coordinate of the point
+//                    with the lowest y (most upper in image coordinates).
 void findXCoordOfPixelsOnVector(const cv::Point2f& start,
                                 const cv::Point2f& end, bool left_side,
-                                std::vector<int>* y_coord);
+                                std::vector<int>* x_coord);
 
 // Returns all pixels that are within or on the border of a rectangle.
 // Input: corners:  These corners define the rectangle. It must contain
-//                  only 4 points.The points must be the cornerpoints of an
+//                  only 4 points.The points must be the cornerpoints of a
 //                  parallelogram. If that is not given, the outcome of the
 //                  function depends on the ordering of the corner point and
 //                  might be wrong.
@@ -295,7 +294,7 @@ class LineDetector {
                           const std::vector<cv::Point2i>& points,
                           LineWithPlanes* line3D);
 
-  // (The two following functions are depreciated.They remain here just for
+  // (The two following functions are deprecated.They remain here just for
   // back compatibility concerns.)
   // Uses two sets of points and fit a line,
   // assuming that the two set of points are from a plane left and right of the
@@ -346,7 +345,7 @@ class LineDetector {
                                const std::vector<cv::Vec4f>& lines2D,
                                std::vector<LineWithPlanes>* lines3D);
 
-  // (Depreciated.) Old version of project2Dto3DwithPlanes. It's here for
+  // (Deprecated.) Old version of project2Dto3DwithPlanes. It's here for
   // backcomptability concerns.
   void project2Dto3DwithPlanes(const cv::Mat& cloud, const cv::Mat& image,
                                const std::vector<cv::Vec4f>& lines2D_in,
@@ -355,8 +354,8 @@ class LineDetector {
   // Current version of project2Dto3DwithPlanes.
   // Input: cloud:    Point cloud of type CV_32FC3.
   //
-  //        lines2D_in:  Lines in 2D in pixel coordenates of the cloud.
-  //        set_colors: True if assiging color to lines.
+  //        lines2D_in:  Lines in 2D in pixel coordinates of the cloud.
+  //        set_colors: True if assigning color to lines.
   //
   // Output:  lines_2D_out: 2D lines that correspond to lines3D
   //
@@ -381,14 +380,14 @@ class LineDetector {
   //
   // Output: lines3D: A vector with the lines found in 3D.
   //
-  //         correspondeces: The i-th element of this vector is the index of the
-  //                         element in lines2D that corresponds to the i-th
-  //                         element in lines3D.
+  //         correspondencies: The i-th element of this vector is the index of
+  //                           the element in lines2D that corresponds to the
+  //                           i-th element in lines3D.
   void find3DlinesByShortest(const cv::Mat& cloud,
                              const std::vector<cv::Vec4f>& lines2D,
                              std::vector<cv::Vec6f>* lines3D,
-                             std::vector<int>* correspondeces);
-  // Overload: without correspondeces
+                             std::vector<int>* correspondencies);
+  // Overload: without correspondencies
   void find3DlinesByShortest(const cv::Mat& cloud,
                              const std::vector<cv::Vec4f>& lines2D,
                              std::vector<cv::Vec6f>* lines3D);
@@ -416,10 +415,9 @@ class LineDetector {
                         const std::vector<cv::Vec4f>& lines2D,
                         std::vector<cv::Vec6f>* lines3D);
 
-  // Does a check by applying checkIfValidLineBruteForce to every line ( using
+  // Does a check by applying checkIfValidLineBruteForce to every line (using
   // checkIfValidLineBruteForce function to check).
-  // Input: cloud:      Point cloud in the
-  // format CV_32FC3.
+  // Input: cloud:      Point cloud in the format CV_32FC3.
   //
   //        lines3D_in: 3D lines to be checked.
   //
@@ -517,7 +515,7 @@ class LineDetector {
                      const double shrink_coff, const double min_length,
                      std::vector<cv::Vec4f>* lines2D_out);
 
-  // Get the neares point to the 3D line.
+  // Get the nearest point to the 3D line.
   // Input:  points: A set of points.
   //
   //         start: Start point of the line.
@@ -531,13 +529,13 @@ class LineDetector {
 
   // Get the fraction of points that are around the line's center
   // Input: samples: Points distance to line start point divided by the line
-  // length.
+  //                 length.
   //
   // Return: Fraction of points that are around center. A sample i is "Around
-  // center" means that samples[i] belongs to [0.25, 0.75].
+  //         center" means that samples[i] belongs to [0.25, 0.75].
   double getRatioOfPointsAroundCenter(const std::vector<double>& samples);
 
-  // Adjust the start and end points of 3D line using the inliers of the line.
+  // Adjusts the start and end points of 3D line using the inliers of the line.
   // All points considered as inliers of the line are projected onto the
   // line and then the pair of points that maximizes the distance of
   // the line are chosen.
@@ -559,8 +557,8 @@ class LineDetector {
                               const cv::Vec3f& end_in, cv::Vec3f* start_out,
                               cv::Vec3f* end_out);
 
-  // Check if a line is valid using the inliers of the line. If the ratio of the
-  // inliers that lie around the center of the line is smaller than the
+  // Checks if a line is valid using the inliers of the line. If the ratio of
+  // the inliers that lie around the center of the line is smaller than the
   // threshold kRatioThreshold, the line is not valid.
   //
   // Input: points: A set of points.

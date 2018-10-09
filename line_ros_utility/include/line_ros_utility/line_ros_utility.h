@@ -162,7 +162,7 @@ class ListenAndPublish {
   // that it can be displayed with rviz.
   void writeMatToPclCloud(const cv::Mat& cv_cloud, const cv::Mat& image,
                           pcl::PointCloud<pcl::PointXYZRGB>* pcl_cloud);
-  // These functions perform the actuall work. They are only here to make the
+  // These functions perform the actual work. They are only here to make the
   // masterCallback more readable.
   void detectLines();
   void projectTo3D();

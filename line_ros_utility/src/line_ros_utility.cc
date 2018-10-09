@@ -5,7 +5,7 @@ namespace line_ros_utility {
 const std::string frame_id = "line_tools_id";
 const bool write_labeled_lines = true;
 const bool clustering_with_random_forest = false;
-const std::string kWritePath = "../data/train_lines/traj_1";
+const std::string kWritePath = "/home/francesco/catkin_extended_ws/src/line_tools/data/train_lines/traj_1";
 
 std::vector<int> clusterLinesAfterClassification(
     const std::vector<line_detection::LineWithPlanes>& lines) {
@@ -161,8 +161,8 @@ void ListenAndPublish::writeMatToPclCloud(
 
 void ListenAndPublish::start() {
   // The exact time synchronizer makes it possible to have a single callback
-  // that recieves messages of all five topics above synchronized. This means
-  // every call of the callback function recieves three messages that have the
+  // that receives messages of all five topics above synchronized. This means
+  // every call of the callback function receives three messages that have the
   // same timestamp.
   sync_ = new message_filters::Synchronizer<MySyncPolicy>(
       MySyncPolicy(10), image_sub_, depth_sub_, instances_sub_, info_sub_,
@@ -384,7 +384,7 @@ void ListenAndPublish::labelLinesWithInstances(
     const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info,
     std::vector<int>* labels) {
   CHECK_NOTNULL(labels);
-  CHECK_EQ(instances.type(), CV_16UC1);
+  //CHECK_EQ(instances.type(), CV_16UC1);
   labels->resize(lines.size());
   // This class is used to perform the backprojection.
   image_geometry::PinholeCameraModel camera_model;
@@ -392,7 +392,7 @@ void ListenAndPublish::labelLinesWithInstances(
   // This is a voting vector, where all points on a line vote for one label and
   // the one with the highest votes wins.
   std::vector<int> labels_count;
-  // For intermiedate storage.
+  // For intermediate storage.
   cv::Point2f point2D;
   unsigned short color;
 
@@ -599,7 +599,7 @@ void TreeClassifier::getLineDecisionPath(
     ROS_ERROR("Call was not succesfull. Check if random_forest.py is running.");
     ros::shutdown();
   }
-  // Make sure the data recieved fits the stored trees_.
+  // Make sure the data received fits the stored trees_.
   CHECK_EQ(service.response.decision_paths.size(), trees_.size());
   decision_paths_.resize(trees_.size());
   // For every tree, fill in the decision paths
@@ -623,7 +623,7 @@ double TreeClassifier::computeDistance(const SearchTree& tree,
                                        size_t idx) {
   if (path.value<double>(line_idx1, idx) != 0 &&
       path.value<double>(line_idx2, idx) != 0) {
-    if (tree.children_right[idx] == tree.children_left[idx]) {  // at leave
+    if (tree.children_right[idx] == tree.children_left[idx]) {  // at leaves
       return 0.0;
     } else {
       return computeDistance(tree, path, line_idx1, line_idx2,

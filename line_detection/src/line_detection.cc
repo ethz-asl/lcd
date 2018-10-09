@@ -20,14 +20,16 @@ cv::Vec3f projectPointOnPlane(const cv::Vec4f& hessian,
 
 bool areLinesEqual2D(const cv::Vec4f line1, const cv::Vec4f line2) {
   // First compute the difference in angle. For easier computation not the
-  // actual difference in angle, but cos(theta)^2 is computed.
+  // actual difference in angle, but cos(theta)^2 is computed, using the
+  // definition of dot product.
   float vx1 = line1[0] - line1[2];
   float vx2 = line2[0] - line2[2];
   float vy1 = line1[1] - line1[3];
   float vy2 = line2[1] - line2[3];
 
-  float angle_difference = pow((vx1 * vx2 + vy1 * vy2), 2) /
-                           ((vx1 * vx1 + vy1 * vy1) * (vx2 * vx2 + vy2 * vy2));
+  float cos_sq_angle_difference = pow((vx1 * vx2 + vy1 * vy2), 2) /
+                                  ((vx1 * vx1 + vy1 * vy1) *
+                                  (vx2 * vx2 + vy2 * vy2));
   // Then compute the distance of the two lines. All distances between both
   // end and start points are computed and the lowest is kept.
   float dist[4], min_dist;
@@ -41,10 +43,12 @@ bool areLinesEqual2D(const cv::Vec4f line1, const cv::Vec4f line2) {
   }
 
   // If angle difference and minimum distance are less than the thresholds,
-  // return true
-  constexpr double kAngleDifference = 0.95;
+  // return true. Note that since we want angle_difference ~= 0 it must hold
+  // that cos(angle_difference) ~= 1 => cos^2(angle_difference) ~= 1.
+  constexpr double kCosSqAngleDifference = 0.95;
   constexpr double kMinDistance = 0.5;
-  if (angle_difference > kAngleDifference && min_dist < kMinDistance) {
+  if (cos_sq_angle_difference > kCosSqAngleDifference &&
+      min_dist < kMinDistance) {
     return true;
   } else {
     return false;
@@ -85,21 +89,22 @@ void findPointsInRectangle(std::vector<cv::Point2f> corners,
   // Find the relative positions of the points.
   // int upper, lower, left, right, store_i;
   std::vector<int> idx{0, 1, 2, 3};
-  // This part finds out if two of the points have equal x values. This may
+  // This part finds out if two of the points have equal y values. This may
   // not be very likely for some data, but if it happens it can produce
-  // unpredictibale outcome. If this is the case, the rectangle is rotated by
-  // 0.1 degree. This should not make a difference, becaues the pixels have
+  // unpredictable outcome. If this is the case, the rectangle is rotated by
+  // 0.1 degree. This should not make a difference, because the pixels have
   // integer values anyway (so a corner point of 100.1 and 100.2 gives the
   // same result).
   bool some_points_have_equal_height = false;
-  // Check all x values against all others.
-  for (size_t i = 1; i < 4; ++i) {
-    if (corners[0].y == corners[i].y) some_points_have_equal_height = true;
+  // Check all y values against all others.
+  for (size_t i = 0; i < 4; ++i) {
+    for(size_t j = i+1; j < 4; ++j) {
+      if (corners[i].y == corners[j].y){
+        some_points_have_equal_height = true;
+        break;
+      }
+    }
   }
-  for (size_t i = 2; i < 4; ++i) {
-    if (corners[1].y == corners[i].y) some_points_have_equal_height = true;
-  }
-  if (corners[2].y == corners[3].y) some_points_have_equal_height = true;
   // Do the rotation.
   if (some_points_have_equal_height) {
     constexpr float kRotationDeg = 0.1;
@@ -460,18 +465,19 @@ bool LineDetector::find3DLineStartAndEnd(const cv::Mat& point_cloud,
   start->y = floor(line2D[1]);
   end->x = floor(line2D[2]);
   end->y = floor(line2D[3]);
-  // Search for a non NaN value on the line. Effectivly these two while loops
+  // Search for a non NaN value on the line. Effectively these two while loops
   // just make unit steps (one pixel) from start to end (first loop) and then
   // from end to start (second loop) until a non NaN point is found.
   cv::LineIterator it_start_end(point_cloud, *(start), *(end), 8);
   // Search for a non NaN value on the line.
+  // From starting point
   while (std::isnan(point_cloud.at<cv::Vec3f>(*(start))[0])) {
     ++it_start_end;
     *(start) = it_start_end.pos();
     if (start->x == end->x && start->y == end->y) break;
   }
   if (start->x == end->x && start->y == end->y) return false;
-
+  // From ending point
   cv::LineIterator it_end_start(point_cloud, *(end), *(start), 8);
   while (std::isnan(point_cloud.at<cv::Vec3f>(*(end))[0])) {
     ++it_end_start;
@@ -502,7 +508,7 @@ double LineDetector::findAndRate3DLine(const cv::Mat& point_cloud,
 
   // In addition to find3DLineStartAndEnd, this function also rates the
   // line. The rating is based on the average distance between 3D line and
-  // 3D points considered as on the 3D line(ie. 2D points lie on the 2D
+  // 3D points considered as on the 3D line (i.e., 2D points lie on the 2D
   // line)
   double rating = 0.0;
   double rating_temp;
@@ -683,7 +689,7 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       return true;
     }
   } else {
-    // If we reach this point, we have a discontinouty. We then try to fit a
+    // If we reach this point, we have a discontinuity. We then try to fit a
     // line to the set of points that lies closer to the origin (and therefore
     // closer to the camera). This is in most cases a reasonable assumption,
     // since the line most of the time belongs to the object that obscures the
@@ -834,7 +840,7 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       }
     }
   } else {
-    // If we reach this point, we have a discontinouty. We then try to fit a
+    // If we reach this point, we have a discontinuity. We then try to fit a
     // line to the set of points that lies closer to the origin (and therefore
     // closer to the camera). This is in most cases a reasonable assumption,
     // since the line most of the time belongs to the object that obscures the
@@ -909,7 +915,6 @@ void LineDetector::planeRANSAC(const std::vector<cv::Vec3f>& points,
   // Set parameters and do a sanity check.
   const int N = points.size();
   inliers->clear();
-  // ROS_INFO("N = %d", N);
   const int max_it = params_->num_iter_ransac;
   constexpr int number_of_model_params = 3;
   double max_deviation = params_->max_error_inlier_ransac;
@@ -924,7 +929,7 @@ void LineDetector::planeRANSAC(const std::vector<cv::Vec3f>& points,
   std::default_random_engine generator(seed);
   // Start RANSAC.
   for (int iter = 0; iter < max_it; ++iter) {
-    // Get number_of_model_params unique elements from poitns.
+    // Get number_of_model_params unique elements from points.
     getNUniqueRandomElements(points, number_of_model_params, &generator,
                              &random_points);
     // It might happen that the randomly chosen points lie on a line. In this
@@ -1204,15 +1209,15 @@ void LineDetector::project2Dto3DwithPlanes(
 void LineDetector::find3DlinesByShortest(const cv::Mat& cloud,
                                          const std::vector<cv::Vec4f>& lines2D,
                                          std::vector<cv::Vec6f>* lines3D) {
-  std::vector<int> correspondeces;
-  find3DlinesByShortest(cloud, lines2D, lines3D, &correspondeces);
+  std::vector<int> correspondencies;
+  find3DlinesByShortest(cloud, lines2D, lines3D, &correspondencies);
 }
 void LineDetector::find3DlinesByShortest(const cv::Mat& cloud,
                                          const std::vector<cv::Vec4f>& lines2D,
                                          std::vector<cv::Vec6f>* lines3D,
-                                         std::vector<int>* correspondeces) {
+                                         std::vector<int>* correspondencies) {
   CHECK_NOTNULL(lines3D);
-  CHECK_NOTNULL(correspondeces);
+  CHECK_NOTNULL(correspondencies);
   CHECK_EQ(cloud.type(), CV_32FC3);
   int cols = cloud.cols;
   int rows = cloud.rows;
@@ -1226,7 +1231,7 @@ void LineDetector::find3DlinesByShortest(const cv::Mat& cloud,
       y_max_end;
   float dist, dist_opt;
   cv::Vec3f start, end;
-  correspondeces->clear();
+  correspondencies->clear();
   lines3D->clear();
   for (size_t i = 0u; i < lines2D.size(); ++i) {
     dist_opt = 1e20;
@@ -1280,7 +1285,7 @@ void LineDetector::find3DlinesByShortest(const cv::Mat& cloud,
     end = cloud.at<cv::Vec3f>(y_opt_end, x_opt_end);
     lines3D->push_back(
         cv::Vec6f(start[0], start[1], start[2], end[0], end[1], end[2]));
-    correspondeces->push_back(i);
+    correspondencies->push_back(i);
   }
 }
 

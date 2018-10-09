@@ -33,7 +33,7 @@ class RandomForestDistanceMeasure():
         self.cvbridge = CvBridge()
 
     def return_trees(self, req):
-        print 'Recieved tree request.'
+        print 'Received tree request.'
         image_list = []
         for i in range(len(self.random_forest.estimators_)):
             image_list.append(self.cvbridge.cv2_to_imgmsg(
