@@ -2,6 +2,8 @@ import numpy as np
 import sys
 
 import pathconfig
+
+sys.path.append('/home/francesco/catkin_ws/src/pySceneNetRGBD/')
 import scenenet_pb2 as sn
 
 from camera_pose_and_intrinsics_example import camera_to_world_with_pose, interpolate_poses

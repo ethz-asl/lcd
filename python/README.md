@@ -41,6 +41,15 @@ You can create subdirectories in `../data/train` to store the images data we wil
 ```bash
 ./create_data_dir.sh
 ```
+Note that the above bash script also accepts the number of the trajectory as an
+argument (1 by default).
+
+Since the indices associated with the trajectories do not correspond to the
+names of the folder in which the images are located in the dataset (e.g. trajectory with index 1 could map to the folder 0/784 in the data/train folder),
+it is necessary to generate a text file containing the correspondences between trajectory numbers and the so called 'render path'. Do so by running `get_render_paths.py`.
+```bash
+python get_render_paths.py
+```
 
 Run `get_virtual_camera_images.py` to get the virtual camera image associated to each line for every frame in trajectory 1.
 ```bash

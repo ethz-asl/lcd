@@ -3,6 +3,9 @@ import open3d
 import numpy as np
 import pandas as pd
 import pathconfig
+
+import sys
+sys.path.append('/home/francesco/catkin_ws/src/pySceneNetRGBD/')
 import scenenet_pb2 as sn
 import matplotlib.pyplot as plt
 
@@ -27,6 +30,9 @@ def get_lines_world_coordinates_with_instances(trajectory, frames):
     lines_world = {}
     frames_count = {}
     lines_total = 0
+
+    frames_with_lines = []
+
     for frame_id in frames:
         # View data for current frame
         view = trajectories.trajectories[trajectory].views[frame_id]
@@ -40,7 +46,7 @@ def get_lines_world_coordinates_with_instances(trajectory, frames):
                                      'lines_with_labels_{0}.txt'.format(frame_id))
         try:
             data_lines = pd.read_csv(path_to_lines, sep=" ", header=None)
-        except IOError:
+        except (IOError, pd.io.common.EmptyDataError):
             print('No line detected for frame {}'.format(frame_id))
             continue
         data_lines = data_lines.values
@@ -70,8 +76,14 @@ def get_lines_world_coordinates_with_instances(trajectory, frames):
             line_idx += 1
 
         lines_world[frame_id] = lines_world_with_instances
+        frames_with_lines.append(frame_id)
 
-    data_lines_world = np.vstack([lines_world[k] for k in frames])
+    print('Length of lines_world is ' + str(len(lines_world)))
+    print('Range:')
+    print range(len(lines_world))
+    print('Lines world')
+    print lines_world
+    data_lines_world = np.vstack([lines_world[k] for k in frames_with_lines])
     print('Total number of lines: {}'.format(data_lines_world.shape[0]))
 
     instances_total = np.unique(data_lines_world[:, -1]).shape[0]

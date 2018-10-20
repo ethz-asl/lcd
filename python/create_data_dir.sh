@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-
+# Get trajectory number as first argument,
+# 1 by default
+TRAJ_NUM=${1:-1}
 cd ../data
-mkdir -p train/traj_1 train/traj_1_inpaint
-cd train/traj_1
+mkdir -p train/traj_${TRAJ_NUM} train/traj_${TRAJ_NUM}_inpaint
+cd train/traj_${TRAJ_NUM}
 frame="frame_"
 rgb="rgb"
 depth="depth"

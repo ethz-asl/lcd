@@ -6,7 +6,8 @@ import os
 
 file_dir = os.path.dirname(os.path.abspath(__file__))
 
-pySceneNetRGBD_root = os.path.join(file_dir, '../../../pySceneNetRGBD/')
+#pySceneNetRGBD_root = os.path.join(file_dir, '../../../pySceneNetRGBD/')
+pySceneNetRGBD_root = os.path.join(file_dir, '/media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/')
 sys.path.insert(0, pySceneNetRGBD_root)
 
 protobuf_path = os.path.join(

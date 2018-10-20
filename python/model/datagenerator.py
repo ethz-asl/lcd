@@ -101,6 +101,9 @@ class ImageDataGenerator:
                 # bgr-d image
                 img = np.dstack([img_bgr, img_depth])
 
+            print('Here img_path is :')
+            print(paths[i])
+
             # flip image at random if flag is selected
             if self.horizontal_flip and np.random.random() < 0.5:
                 img = cv2.flip(img, 1)

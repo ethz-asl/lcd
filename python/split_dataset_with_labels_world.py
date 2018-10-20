@@ -35,7 +35,7 @@ except OSError:
     pass
 
 traj = 1
-frames_total = 300
+frames_total = 299
 train = []
 val = []
 test = []
