@@ -21,6 +21,11 @@ python -m ipykernel install --user --name line_tools
 Tensorflow cpu version is used here. If you want to use gpu, change `requirements.txt` accordingly.
 
 ## Usage
+[Please note that the entire process of generating the bag files, obtaining the
+lines data and performing the subsequent steps explained below can be
+automatically executed by launching `roscore` and then running the script `generate_and_upload_to_share.sh` or separately the two scripts `generate_trajectory_files.sh` and `split_all_trajectories.sh`. Please look at
+the content of the scripts for a more detailed explanation.]
+
 Before reaching to this repository, make sure that you have followed the instructions for the ros packages and get the lines data in `../data/train_lines`.
 
 Here we use the trajectory 1 in the [train_0](https://robotvault.bitbucket.io/scenenet-rgbd.html) dataset of `SceneNetRGBD` as an example. You first need to clone the repository [pySceneNetRGBD](https://github.com/jmccormac/pySceneNetRGBD), download the dataset as well as the protobuf to `pySceneNetRGBD/data`. Set `pySceneNetRGBD_root` in `tools/pathconfig.py` properly.
@@ -51,9 +56,9 @@ it is necessary to generate a text file containing the correspondences between t
 python get_render_paths.py
 ```
 
-Run `get_virtual_camera_images.py` to get the virtual camera image associated to each line for every frame in trajectory 1.
+Run `get_virtual_camera_images.py` to get the virtual camera image associated to each line for every frame in the input trajectory (1 by default).
 ```bash
-python get_virtual_camera_images.py
+python get_virtual_camera_images.py -trajectory 1
 ```
 
 Notice that these images data are reprojection of the pointcloud from a different viewpoint and there are black parts in the images that have no data. We can further more inpaint these images to fill in the "small" black parts. To inpaint, check the notebook `examples/00-Go_through_our_data.ipynb`.

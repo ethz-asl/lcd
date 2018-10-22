@@ -5,7 +5,7 @@ namespace line_ros_utility {
 const std::string frame_id = "line_tools_id";
 const bool write_labeled_lines = true;
 const bool clustering_with_random_forest = false;
-const std::string kWritePath = "/home/francesco/catkin_extended_ws/src/line_tools/data/train_lines/traj_1";
+const std::string kWritePath = "/home/francesco/catkin_extended_ws/src/line_tools/data/train_lines";
 
 std::vector<int> clusterLinesAfterClassification(
     const std::vector<line_detection::LineWithPlanes>& lines) {
@@ -102,7 +102,8 @@ bool printToFile(const std::vector<cv::Vec4f>& lines2D,
   }
 }
 
-ListenAndPublish::ListenAndPublish() : params_(), tree_classifier_() {
+ListenAndPublish::ListenAndPublish(int trajectory_number) : params_(),
+    tree_classifier_(), trajectory_number_(trajectory_number){
   ros::NodeHandle node_handle_;
   // The Pointcloud publisher and transformation for RVIZ.
   pcl_pub_ = node_handle_.advertise<pcl::PointCloud<pcl::PointXYZRGB> >(
@@ -119,6 +120,7 @@ ListenAndPublish::ListenAndPublish() : params_(), tree_classifier_() {
   info_sub_.subscribe(node_handle_, "/line_tools/camera_info", 1);
   cloud_sub_.subscribe(node_handle_, "/line_tools/point_cloud", 1);
   instances_sub_.subscribe(node_handle_, "/line_tools/image/instances", 1);
+
   // Connect the dynamic reconfigure callback.
   dynamic_rcf_callback_ =
       boost::bind(&ListenAndPublish::reconfigureCallback, this, _1, _2);
@@ -126,7 +128,9 @@ ListenAndPublish::ListenAndPublish() : params_(), tree_classifier_() {
 
   // Add the parameters utility to line_detection.
   line_detector_ = line_detection::LineDetector(&params_);
-  iteration_ = 0;
+  //TODO: set iteration_ back to 0 if the problem of the message for the first
+  //frame not being detected gets solved.
+  iteration_ = 1;
   // Retrieve trees.
   if (clustering_with_random_forest) {
     tree_classifier_.getTrees();
@@ -350,14 +354,20 @@ void ListenAndPublish::masterCallback(
   }
 
   if (write_labeled_lines) {
-    std::string path = kWritePath + "/lines_with_labels_" +
-                       std::to_string(iteration_) + ".txt";
+    std::string path =
+        kWritePath + "/traj_" + std::to_string(trajectory_number_) +
+        "/lines_with_labels_" + std::to_string(iteration_) + ".txt";
+    ROS_INFO("path is %s", path.c_str());
 
     std::string path_2D_kept =
-        kWritePath + "/lines_2D_kept_" + std::to_string(iteration_) + ".txt";
+        kWritePath + "/traj_" + std::to_string(trajectory_number_) +
+        "/lines_2D_kept_" + std::to_string(iteration_) + ".txt";
+    ROS_INFO("path_2D_kept is %s", path_2D_kept.c_str());
 
     std::string path_2D =
-        kWritePath + "/lines_2D_" + std::to_string(iteration_) + ".txt";
+        kWritePath + "/traj_" + std::to_string(trajectory_number_) +
+        "/lines_2D_" + std::to_string(iteration_) + ".txt";
+    ROS_INFO("path_2D is %s", path_2D.c_str());
 
     // 3D lines data
     printToFile(lines3D_with_planes_, labels_, path);

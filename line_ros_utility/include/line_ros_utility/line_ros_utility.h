@@ -152,7 +152,7 @@ class EvalData {
 // and line_ros_utility implemented. Fully functional in a ros node.
 class ListenAndPublish {
  public:
-  ListenAndPublish();
+  ListenAndPublish(int trajectory_number);
   ~ListenAndPublish();
 
   void start();
@@ -258,6 +258,8 @@ class ListenAndPublish {
   // For random forest clustering
   TreeClassifier tree_classifier_;
   line_clustering::KMedoidsCluster kmedoids_cluster_;
+  // To handle trajectories with a general index (not necessarily 1)
+  int trajectory_number_;
 };
 
 }  // namespace line_ros_utility
