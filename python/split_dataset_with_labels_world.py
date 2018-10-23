@@ -42,9 +42,7 @@ def split_dataset():
   val = []
   test = []
 
-  for frame_id in range(1, frames_total):  # Start from 1, as frame 0 is
-                                           # currently invalid. TODO(): set
-                                           # start back to 0.
+  for frame_id in range(frames_total):
       if frame_id % 5 == 1:
           val.append(frame_id)
           continue
@@ -59,8 +57,7 @@ def split_dataset():
   dataset['train'] = train
   dataset['val'] = val
   dataset['test'] = test
-  # Start from 1, as frame 0 is currently invalid. TODO(): set start back to 0.
-  dataset['all_lines'] = [i for i in range(1, frames_total)]
+  dataset['all_lines'] = [i for i in range(frames_total)]
 
   for key, frames in dataset.iteritems():
       for frame_id in frames:

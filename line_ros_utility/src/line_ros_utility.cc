@@ -128,9 +128,7 @@ ListenAndPublish::ListenAndPublish(int trajectory_number) : params_(),
 
   // Add the parameters utility to line_detection.
   line_detector_ = line_detection::LineDetector(&params_);
-  //TODO: set iteration_ back to 0 if the problem of the message for the first
-  //frame not being detected gets solved.
-  iteration_ = 1;
+  iteration_ = 0;
   // Retrieve trees.
   if (clustering_with_random_forest) {
     tree_classifier_.getTrees();
