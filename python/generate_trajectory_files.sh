@@ -79,7 +79,7 @@ rm traj_${TRAJ_NUM}.tar.gz;
 echo -e "\n*** Extracting archive for trajectory ${TRAJ_NUM} ****\n";
 #tar -xzf ${SHARE_PATH}/traj_${TRAJ_NUM}.tar.gz -C ${SHARE_PATH};
 #rm ${SHARE_PATH}/traj_${TRAJ_NUM}.tar.gz;
-ssh ${EULER_ADDRESS} "tar -xvzf traj_${TRAJ_NUM}.tar.gz && traj_${TRAJ_NUM}.tar.gz"
+ssh ${EULER_ADDRESS} "tar -xvzf traj_${TRAJ_NUM}.tar.gz && rm traj_${TRAJ_NUM}.tar.gz"
 # Delete lines files and virtual camera images
 echo -e "\n**** Delete lines files for trajectory ${TRAJ_NUM} ****\n";
 rm ${PYTHONSCRIPTS_PATH}/VALID_LINES_FILES_${TRAJ_NUM};
