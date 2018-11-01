@@ -42,15 +42,35 @@ def pickle_images(input_text_file, output_pickle_file):
             img = cv2.imread(line_path, cv2.IMREAD_UNCHANGED)
         except cv2.error as e:
             print('Trying to open image {0} resulted in error {1}'.format(line_path, e))
+        else:
+            if img is None:
+                print('Image {0} returns None'.format(line_path))
+            else:
+                # Create entry for image in dictionary
+                data_dict[trajectory_number][frame_number][image_type][line_number]['img'] = img
+                # Create entry for labels in dictionary
+                data_dict[trajectory_number][frame_number][image_type][line_number]['labels'] = \
+                  [float(i) for i in split_line[1:]]
 
-        if img is None:
-            print('Image {0} returns None'.format(line_path))
+        # Current version of lines files only include paths for rbg images. The
+        # following is to also load depth images
+        if image_type == 'rgb':
+            line_path_depth = line_path.replace('rgb', 'depth')
+            # Get image
+            try:
+                img = cv2.imread(line_path_depth, cv2.IMREAD_UNCHANGED)
+            except cv2.error as e:
+                print('Trying to open image {0} resulted in error {1}'.format(line_path_depth, e))
+            else:
+                if img is None:
+                    print('Image {0} returns None'.format(line_path_depth))
+                else:
+                    # Create entry for image in dictionary
+                    data_dict[trajectory_number][frame_number]['depth'][line_number]['img'] = img
+                    # Create entry for labels in dictionary
+                    data_dict[trajectory_number][frame_number]['depth'][line_number]['labels'] = \
+                    [float(i) for i in split_line[1:]]
 
-        # Create entry for image in dictionary
-        data_dict[trajectory_number][frame_number][image_type][line_number]['img'] = img
-        # Create entry for labels in dictionary
-        data_dict[trajectory_number][frame_number][image_type][line_number]['labels'] = \
-            [float(i) for i in split_line[1:]]
 
 
     # Convert defualtdict to dicts
@@ -64,4 +84,4 @@ def pickle_images(input_text_file, output_pickle_file):
     data_dict = defaultdict_to_dict(data_dict)
 
     # Write to file
-    joblib.dump(data_dict, output_pickle_file)
+    joblib.dump(data_dict, output_pickle_file, compress=3)

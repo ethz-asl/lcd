@@ -51,10 +51,14 @@ class ImageDataGenerator:
                         # Append image
                         if image_type == 'rgb':
                             self.pickled_images_bgr.append(line_number_dict['img'])
+                            # Append label
+                            self.pickled_labels.append(line_number_dict['labels'])
                         elif image_type == 'depth':
                             self.pickled_images_depth.append(line_number_dict['img'])
-                        # Append label
-                        self.pickled_labels.append(line_number_dict['labels'])
+        # store total number of data
+        self.data_size = len(self.pickled_labels)
+        print('Just set data_size to be {0}'.format(self.data_size))
+
 
     def read_class_list_as_path_and_labels(self, class_list):
         """
@@ -76,17 +80,17 @@ class ImageDataGenerator:
         """
         Random shuffle the images and labels
         """
-        # create list of permutated index and shuffle data accoding to list
-        idx = np.random.permutation(len(labels))
 
         if self.read_as_pickle:
             # Indices that encode the order the dataset is accessed
+            idx = np.random.permutation(len(self.pickled_labels))
             self.access_indices = idx
         else:
             images = list(self.images)
             labels = list(self.labels)
             self.images = []
             self.labels = []
+            idx = np.random.permutation(len(labels))
 
             for i in idx:
                 self.images.append(images[i])
@@ -125,8 +129,9 @@ class ImageDataGenerator:
         if self.read_as_pickle:
             labels = []
             # Get next batch of image (path) and labels
-            for i in range(self.pointer:self.pointer + batch_size):
+            for i in range(self.pointer, self.pointer + batch_size):
                 idx = self.access_indices[i]
+                #print('idx is {0}'.format(idx))
                 if self.image_type == 'bgr':
                     # bgr image
                     img = self.pickled_images_bgr[idx]
@@ -143,7 +148,7 @@ class ImageDataGenerator:
                 # subtract mean
                 img -= self.mean
 
-                images[i] = img
+                images[i-self.pointer] = img
                 labels.append(self.pickled_labels[idx])
         else:
             # Get next batch of image (path) and labels

@@ -116,17 +116,20 @@ saver = tf.train.Saver()
 
 # Generator for image data
 train_generator = ImageDataGenerator(
-    train_file, horizontal_flip=False, shuffle=True, image_type=image_type, mean=train_set_mean)
+    train_file, horizontal_flip=False, shuffle=True, image_type=image_type, mean=train_set_mean, read_as_pickle=True)
 val_generator = ImageDataGenerator(
-    val_file, shuffle=False, image_type=image_type, mean=train_set_mean)
+    val_file, shuffle=False, image_type=image_type, mean=train_set_mean, read_as_pickle=True)
 test_generator = ImageDataGenerator(
-    test_file, shuffle=False, image_type=image_type, mean=train_set_mean)
+    test_file, shuffle=False, image_type=image_type, mean=train_set_mean, read_as_pickle=True)
+
 
 # Get the number of training/validation steps per epoch
 train_batches_per_epoch = np.floor(
     train_generator.data_size / batch_size).astype(np.int16)
 val_batches_per_epoch = np.floor(
     val_generator.data_size / batch_size).astype(np.int16)
+
+#config = tf.ConfigProto(device_count={"CPU": 24}, log_device_placement=True)
 
 
 with tf.Session() as sess:
