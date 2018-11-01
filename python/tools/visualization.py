@@ -9,10 +9,12 @@ sys.path.append('/home/francesco/catkin_ws/src/pySceneNetRGBD/')
 import scenenet_pb2 as sn
 import matplotlib.pyplot as plt
 
+from mpl_toolkits.mplot3d import Axes3D
 from camera_pose_and_intrinsics_example import camera_to_world_with_pose, interpolate_poses
 
 path_to_lines_root = pathconfig.path_to_lines_root
 protobuf_path = pathconfig.protobuf_path
+
 
 trajectories = sn.Trajectories()
 try:
@@ -25,7 +27,7 @@ except IOError:
 
 
 def get_lines_world_coordinates_with_instances(trajectory, frames):
-    """For some frames in a trajectory, get lines start and end points world coordianates and the instance labels assigned to lines.
+    """For some frames in a trajectory, get lines start and end points world coordinates and the instance labels assigned to lines.
     """
     lines_world = {}
     frames_count = {}
@@ -36,14 +38,15 @@ def get_lines_world_coordinates_with_instances(trajectory, frames):
     for frame_id in frames:
         # View data for current frame
         view = trajectories.trajectories[trajectory].views[frame_id]
-        # Get ground true pose of camera
+        # Get ground truth pose of camera
         ground_truth_pose = interpolate_poses(
             view.shutter_open, view.shutter_close, 0.5)
         # Transformation matrix from camera coordinate to world coordinate
         camera_to_world_matrix = camera_to_world_with_pose(ground_truth_pose)
 
         path_to_lines = os.path.join(path_to_lines_root,
-                                     'lines_with_labels_{0}.txt'.format(frame_id))
+                                     '../traj_{0}/lines_with_labels_{1}.txt'.format(trajectory, frame_id))
+        print('path_to_lines is {0}'.format(path_to_lines))
         try:
             data_lines = pd.read_csv(path_to_lines, sep=" ", header=None)
         except (IOError, pd.io.common.EmptyDataError):
@@ -71,6 +74,8 @@ def get_lines_world_coordinates_with_instances(trajectory, frames):
                                        :3] = line_start_point_world[:3]
             lines_world_with_instances[line_idx,
                                        3:6] = line_end_point_world[:3]
+            # Instance is last value of the line (cf. virtual_camera_pose in
+            # scenenet_utils.py)
             lines_world_with_instances[line_idx, 6] = line[-1]
 
             line_idx += 1
@@ -92,9 +97,13 @@ def get_lines_world_coordinates_with_instances(trajectory, frames):
     return data_lines_world
 
 
-def pcl_lines_for_plot(data_lines, lines_color):
-    """Get points on the lines for 3D visualization in open3d.
+def pcl_lines_for_plot(data_lines, lines_color, visualizer):
+    """Get points on the lines for 3D visualization in open3d or matplotlib.
     """
+    if visualizer != 'open3d' and visualizer != 'matplotlib':
+        print('Invalid visualizer. Valid options are \'open3d\', \'matplotlib\'.')
+        return
+
     lines_number = data_lines.shape[0]
     pcl_lines = [[] for n in range(lines_number)]
 
@@ -118,10 +127,30 @@ def pcl_lines_for_plot(data_lines, lines_color):
                 rgb = np.array([[0, 0, 1]])
         rgbs = np.vstack((rgb for n in interpolate))
 
-        pcl_lines[i] = open3d.PointCloud()
-        pcl_lines[i].points = open3d.Vector3dVector(points)
-        pcl_lines[i].colors = open3d.Vector3dVector(rgbs)
+        if visualizer == 'open3d':
+            pcl_lines[i] = open3d.PointCloud()
+            pcl_lines[i].points = open3d.Vector3dVector(points)
+            pcl_lines[i].colors = open3d.Vector3dVector(rgbs)
+        elif visualizer == 'matplotlib':
+            pcl_lines[i] = {}
+            pcl_lines[i]['points'] = points
+            pcl_lines[i]['color'] = tuple(rgb[0])
     return pcl_lines
+
+def plot_lines_with_matplotlib(pcl_lines):
+    """ Plots a set of lines (in the format outputted by pcl_lines_for_plot) in
+        matplotlib
+    """
+    num_lines = len(pcl_lines)
+
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    for i in range(num_lines):
+        x = pcl_lines[i]['points'][:,0]
+        y = pcl_lines[i]['points'][:,1]
+        z = pcl_lines[i]['points'][:,2]
+        ax.plot(x, y, z, color=pcl_lines[i]['color'])
+    plt.show()
 
 
 def vis_square(data):

@@ -57,6 +57,7 @@ class ImageDataGenerator:
                             self.pickled_images_depth.append(line_number_dict['img'])
         # store total number of data
         self.data_size = len(self.pickled_labels)
+        self.access_indices = np.array(range(self.data_size))
         print('Just set data_size to be {0}'.format(self.data_size))
 
 
