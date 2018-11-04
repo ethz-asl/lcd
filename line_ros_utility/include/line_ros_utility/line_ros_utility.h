@@ -2,6 +2,7 @@
 #define LINE_ROS_UTILITY_lINE_ROS_UTILITY_H_
 
 #include <iostream>
+#include <string>
 
 #include <ros/ros.h>
 
@@ -58,6 +59,22 @@ bool printToFile(const std::vector<cv::Vec4f>& lines2D,
 void storeLines3DinMarkerMsg(const std::vector<cv::Vec6f>& lines3D,
                              visualization_msgs::Marker* disp_lines,
                              cv::Vec3f color);
+// This functions are used to retrieve the default values for the paths and
+// variables defined in the package, in case some arguments are not specified.
+// Please see the script python/config_paths_and_variables.sh for a list of
+// the paths and variables used and their meaning.
+// Input: path_or_variable_name:   Name of the path or variable to retrieve.
+//                                 Valid names are listed in
+//                                 python/config_paths_and_variables.sh
+//
+// Output: path_or_variable_value: Value (either a string or an integer
+//                                 depending on the variable) corresponding to
+//                                 the input variable.
+// Return value: true if variable is successfully retrieved, false otherwise.
+bool getDefaultPathsAndVariables(const std::string& path_or_variable_name,
+                                std::string* path_or_variable_value);
+bool getDefaultPathsAndVariables(const std::string& path_or_variable_name,
+                                int* path_or_variable_value);
 
 // This class helps publishing several different clusters of lines in
 // different colors, so that they are visualized by rviz. IMPORTANT: This
@@ -152,7 +169,7 @@ class EvalData {
 // and line_ros_utility implemented. Fully functional in a ros node.
 class ListenAndPublish {
  public:
-  ListenAndPublish(int trajectory_number);
+  ListenAndPublish(int trajectory_number, std::string write_path);
   ~ListenAndPublish();
 
   void start();
@@ -260,6 +277,8 @@ class ListenAndPublish {
   line_clustering::KMedoidsCluster kmedoids_cluster_;
   // To handle trajectories with a general index (not necessarily 1)
   int trajectory_number_;
+  // Path where to write the lines files
+  const std::string kWritePath_;
 };
 
 }  // namespace line_ros_utility

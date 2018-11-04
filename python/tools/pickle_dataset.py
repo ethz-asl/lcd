@@ -3,16 +3,12 @@ import cv2
 from collections import defaultdict
 from sklearn.externals import joblib
 
-def pickle_entire_dataset(train_file, test_file, val_file, output_folder='..'):
-    """ Creates pickle files for all sets (train, test, val) in the dataset """
-    pickle_images(train_file, os.path.join(output_folder,'/train.pkl'))
-    pickle_images(test_file, os.path.join(output_folder,'/test.pkl'))
-    pickle_images(val_file, os.path.join(output_folder,'/val.pkl'))
 
-def pickle_images(input_text_file, output_pickle_file):
+def pickle_images(input_text_file, output_pickle_file, scenenetdataset_type):
     """ Creates a pickle file containing a nested dictionary with images in
-    correspondence with trajectory number, frame number, image type (rgb or
-    depth) and line number """
+    correspondence with scenenetdataset_type (i.e., whether the data being
+    pickled comes from the train or val dataset of pySceneNetRGBD), trajectory
+    number, frame number, image type (rgb or depth) and line number """
     nested_dict = lambda: defaultdict(nested_dict)
     data_dict = nested_dict()
 
@@ -26,31 +22,34 @@ def pickle_images(input_text_file, output_pickle_file):
         line_path_split = line_path.split('/')
         for word in line_path_split:
             # Get trajectory number
-            if word.find('traj_')!=-1:
+            if word.find('traj_') != -1:
                 trajectory_number = int(word.split('traj_')[1])
             # Get frame number
-            if word.find('frame_')!=-1:
+            if word.find('frame_') != -1:
                 frame_number = int(word.split('frame_')[1])
             # Get image type
-            if word.find('rgb')!=-1 or word.find('depth')!=-1:
+            if word.find('rgb') != -1 or word.find('depth') != -1:
                 image_type = word
             # Get line number
-            if word.find('.png')!=-1:
+            if word.find('.png') != -1:
                 line_number = int(word.split('.png')[0])
         # Get image
         try:
             img = cv2.imread(line_path, cv2.IMREAD_UNCHANGED)
         except cv2.error as e:
-            print('Trying to open image {0} resulted in error {1}'.format(line_path, e))
+            print('Trying to open image {0} resulted in error {1}'.format(
+                line_path, e))
         else:
             if img is None:
                 print('Image {0} returns None'.format(line_path))
             else:
                 # Create entry for image in dictionary
-                data_dict[trajectory_number][frame_number][image_type][line_number]['img'] = img
+                data_dict[scenenetdataset_type][trajectory_number][
+                    frame_number][image_type][line_number]['img'] = img
                 # Create entry for labels in dictionary
-                data_dict[trajectory_number][frame_number][image_type][line_number]['labels'] = \
-                  [float(i) for i in split_line[1:]]
+                data_dict[scenenetdataset_type][trajectory_number][
+                    frame_number][image_type][line_number]['labels'] = \
+                    [float(i) for i in split_line[1:]]
 
         # Current version of lines files only include paths for rbg images. The
         # following is to also load depth images
@@ -60,28 +59,63 @@ def pickle_images(input_text_file, output_pickle_file):
             try:
                 img = cv2.imread(line_path_depth, cv2.IMREAD_UNCHANGED)
             except cv2.error as e:
-                print('Trying to open image {0} resulted in error {1}'.format(line_path_depth, e))
+                print('Trying to open image {0} resulted in error {1}'.format(
+                    line_path_depth, e))
             else:
                 if img is None:
                     print('Image {0} returns None'.format(line_path_depth))
                 else:
                     # Create entry for image in dictionary
-                    data_dict[trajectory_number][frame_number]['depth'][line_number]['img'] = img
+                    data_dict[scenenetdataset_type][trajectory_number][
+                        frame_number]['depth'][line_number]['img'] = img
                     # Create entry for labels in dictionary
-                    data_dict[trajectory_number][frame_number]['depth'][line_number]['labels'] = \
-                    [float(i) for i in split_line[1:]]
-
-
-
+                    data_dict[scenenetdataset_type][trajectory_number][
+                        frame_number]['depth'][line_number]['labels'] = \
+                        [float(i) for i in split_line[1:]]
     # Convert defualtdict to dicts
     def defaultdict_to_dict(dictionary):
         # Found image
-        if (not isinstance(dictionary, dict)) and (not isinstance(dictionary, defaultdict)):
+        if (not isinstance(dictionary, dict)) and (not isinstance(
+                dictionary, defaultdict)):
             return dictionary
         # Higher level -> keep going down
         if isinstance(dictionary, defaultdict):
-            return dict((key, defaultdict_to_dict(value)) for key, value in dictionary.items())
+            return dict((key, defaultdict_to_dict(value))
+                        for key, value in dictionary.items())
+
     data_dict = defaultdict_to_dict(data_dict)
 
     # Write to file
     joblib.dump(data_dict, output_pickle_file, compress=3)
+
+
+def merge_pickled_dictionaries(dict_to_update, dict_to_add):
+    """ Merge pickled dictionary dict_to_add in pickled dictionary
+    dict_to_update, therefore modifying dict_to_update. Values from
+    dict_to_update are overwritten only if dict_to_add contains an entry which
+    has same scenenetdataset_type, trajectory_number and frame_number, i.e., if
+    both dictionary contain the images and labels associated to frame
+    frame_number in trajectory trajectory_number from the pySceneNetRGBD dataset
+    scenenetdataset_type. In all other cases, dictionaries are simply merged.
+    """
+    for dataset_type_dict_to_add in dict_to_add.keys():
+        if dataset_type_dict_to_add in dict_to_update.keys():
+            # Dataset type already in dict_to_update, check trajectory number.
+            for traj_num_dict_to_add in dict_to_add[
+                    dataset_type_dict_to_add].keys():
+                if traj_num_dict_to_add in dict_to_update[
+                        dataset_type_dict_to_add].keys():
+                    # Same dataset type and trajectory_number already in
+                    # dict_to_update, merge all frames.
+                    dict_to_update[dataset_type_dict_to_add][
+                        traj_num_dict_to_add].update(dict_to_add[
+                            dataset_type_dict_to_add][traj_num_dict_to_add])
+                else:
+                    # Trajectory number not in dict_to_update, simply add it.
+                    dict_to_update[dataset_type_dict_to_add][
+                        traj_num_dict_to_add] = dict_to_add[
+                            dataset_type_dict_to_add][traj_num_dict_to_add]
+        else:
+            # Dataset tupe not in dict_to_update, simply add it.
+            dict_to_update[dataset_type_dict_to_add] = dict_to_add[
+                dataset_type_dict_to_add]

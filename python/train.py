@@ -8,19 +8,29 @@ from model.datagenerator import ImageDataGenerator
 from model.alexnet import AlexNet
 from model.triplet_loss import batch_all_triplet_loss, batch_hardest_triplet_loss
 from tools.train_set_mean import get_train_set_mean
+from tools import pathconfig
 
 # Set a seed for numpy
 np.random.seed(1)
 
+# Set this to True to interpret the train/test/val files below as pickle files,
+# False to interpret them as regular text files with the format outputted by
+# split_dataset_with_labels_world.py
+read_as_pickle = True
+pickleandsplit_path = pathconfig.obtain_paths_and_variables(
+    "PICKLEANDSPLIT_PATH")
+
 # Configuration settings
 # Path to the textfiles for the trainings and validation set
-train_file = './train.txt'
-val_file = './val.txt'
-test_file = './test.txt'
+train_files = os.path.join(pickleandsplit_path,
+                           'train/traj_1/pickled_train.pkl')
+test_files = os.path.join(pickleandsplit_path, 'train/traj_1/pickled_test.pkl')
+val_files = os.path.join(pickleandsplit_path, 'train/traj_1/pickled_val.pkl')
 
 image_type = 'bgr-d'
-train_set_mean = np.array([22.4536157, 20.11461999, 5.61416132, 605.87199598])
-# train_set_mean = get_train_set_mean(train_file, image_type)
+#train_set_mean = np.array([22.4536157, 20.11461999, 5.61416132, 605.87199598])
+train_set_mean = get_train_set_mean(
+    train_files, image_type, read_as_pickle=read_as_pickle)
 print("Mean of train set: {}".format(train_set_mean))
 
 # Learning params
@@ -63,8 +73,10 @@ model = AlexNet(x, keep_prob, skip_layers, image_type)
 embeddings = tf.nn.l2_normalize(model.fc8, axis=1)
 
 # List of trainable variables of the layers we want to train
-var_list = [v for v in tf.trainable_variables() if v.name.split('/')
-            [0] not in no_train_layers]
+var_list = [
+    v for v in tf.trainable_variables()
+    if v.name.split('/')[0] not in no_train_layers
+]
 
 with tf.name_scope("triplet_loss"):
     if triplet_strategy == "batch_all":
@@ -116,21 +128,32 @@ saver = tf.train.Saver()
 
 # Generator for image data
 train_generator = ImageDataGenerator(
-    train_file, horizontal_flip=False, shuffle=True, image_type=image_type, mean=train_set_mean, read_as_pickle=True)
+    train_files,
+    horizontal_flip=False,
+    shuffle=True,
+    image_type=image_type,
+    mean=train_set_mean,
+    read_as_pickle=read_as_pickle)
 val_generator = ImageDataGenerator(
-    val_file, shuffle=False, image_type=image_type, mean=train_set_mean, read_as_pickle=True)
+    val_files,
+    shuffle=False,
+    image_type=image_type,
+    mean=train_set_mean,
+    read_as_pickle=read_as_pickle)
 test_generator = ImageDataGenerator(
-    test_file, shuffle=False, image_type=image_type, mean=train_set_mean, read_as_pickle=True)
-
+    test_files,
+    shuffle=False,
+    image_type=image_type,
+    mean=train_set_mean,
+    read_as_pickle=read_as_pickle)
 
 # Get the number of training/validation steps per epoch
 train_batches_per_epoch = np.floor(
     train_generator.data_size / batch_size).astype(np.int16)
-val_batches_per_epoch = np.floor(
-    val_generator.data_size / batch_size).astype(np.int16)
+val_batches_per_epoch = np.floor(val_generator.data_size / batch_size).astype(
+    np.int16)
 
 #config = tf.ConfigProto(device_count={"CPU": 24}, log_device_placement=True)
-
 
 with tf.Session() as sess:
     # Initialize all variables
@@ -143,7 +166,8 @@ with tf.Session() as sess:
     model.load_initial_weights(sess)
 
     print("{} Start training...".format(datetime.now()))
-    print("{} Open Tensorboard at --logdir {}".format(datetime.now(), filewriter_path))
+    print("{} Open Tensorboard at --logdir {}".format(datetime.now(),
+                                                      filewriter_path))
 
     # Loop over number of epochs
     for epoch in range(num_epochs):
@@ -159,13 +183,23 @@ with tf.Session() as sess:
                 batch_size)
 
             # And run the training op
-            sess.run(train_op, feed_dict={
-                     x: batch_x_train, labels: batch_labels_train, keep_prob: dropout_rate})
+            sess.run(
+                train_op,
+                feed_dict={
+                    x: batch_x_train,
+                    labels: batch_labels_train,
+                    keep_prob: dropout_rate
+                })
 
             # Generate summary with the current batch of data and write to file
             if step % display_step == 0:
-                s = sess.run(merged_summary, feed_dict={
-                             x: batch_x_train, labels: batch_labels_train, keep_prob: 1.})
+                s = sess.run(
+                    merged_summary,
+                    feed_dict={
+                        x: batch_x_train,
+                        labels: batch_labels_train,
+                        keep_prob: 1.
+                    })
                 writer.add_summary(s, epoch * train_batches_per_epoch + step)
 
             step += 1
@@ -177,7 +211,11 @@ with tf.Session() as sess:
         for _ in range(val_batches_per_epoch):
             batch_tx, batch_ty = val_generator.next_batch(batch_size)
             loss_current = sess.run(
-                loss, feed_dict={x: batch_tx, labels: batch_ty, keep_prob: 1.})
+                loss, feed_dict={
+                    x: batch_tx,
+                    labels: batch_ty,
+                    keep_prob: 1.
+                })
             loss_val += loss_current
             test_count += 1
         loss_val = loss_val / test_count
@@ -191,8 +229,9 @@ with tf.Session() as sess:
         print("{} Saving checkpoint of model...".format(datetime.now()))
         # save checkpoint of the model
         checkpoint_name = os.path.join(
-            checkpoint_path, image_type + '_model_epoch' + str(epoch + 1) + '.ckpt')
+            checkpoint_path,
+            image_type + '_model_epoch' + str(epoch + 1) + '.ckpt')
         save_path = saver.save(sess, checkpoint_name)
 
-        print("{} Model checkpoint saved at {}".format(
-            datetime.now(), checkpoint_name))
+        print("{} Model checkpoint saved at {}".format(datetime.now(),
+                                                       checkpoint_name))

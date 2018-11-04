@@ -1,6 +1,15 @@
 import numpy as np
 import cv2
+import os
+import sys
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(os.path.join(parent_dir, 'tools'))
+from pickle_dataset import merge_pickled_dictionaries
+
 from sklearn.externals import joblib
+
 
 """
 Adapted from https://github.com/kratzert/finetune_alexnet_with_tensorflow/blob/master/datagenerator.py
@@ -36,26 +45,32 @@ class ImageDataGenerator:
         """
         Load images and labels to memory from the joblib file
         """
-        pickled_dict = joblib.load(class_list)
+        pickled_dict = {}
+        # Merge dictionaries extracted from all the pickle files in class_list
+        for file_ in class_list:
+            temp_dict = joblib.load(file_)
+            merge_pickled_dictionaries(pickled_dict, temp_dict)
         self.pickled_images_bgr = []
         self.pickled_images_depth = []
         self.pickled_labels = []
-        for trajectory_number in pickled_dict.keys():
-            trajectory_number_dict = pickled_dict[trajectory_number]
-            for frame_number in trajectory_number_dict.keys():
-                frame_number_dict = trajectory_number_dict[frame_number]
-                for image_type in frame_number_dict.keys():
-                    image_type_dict = frame_number_dict[image_type]
-                    for line_number in image_type_dict.keys():
-                        line_number_dict = image_type_dict[line_number]
-                        # Append image
-                        if image_type == 'rgb':
-                            self.pickled_images_bgr.append(line_number_dict['img'])
-                            # Append label
-                            self.pickled_labels.append(line_number_dict['labels'])
-                        elif image_type == 'depth':
-                            self.pickled_images_depth.append(line_number_dict['img'])
-        # store total number of data
+        for scenenetdataset_type in pickled_dict.keys():
+            scenenetdataset_type_dict = pickled_dict[scenenetdataset_type]
+            for trajectory_number in scenenetdataset_type_dict.keys():
+                trajectory_number_dict = scenenetdataset_type_dict[trajectory_number]
+                for frame_number in trajectory_number_dict.keys():
+                    frame_number_dict = trajectory_number_dict[frame_number]
+                    for image_type in frame_number_dict.keys():
+                        image_type_dict = frame_number_dict[image_type]
+                        for line_number in image_type_dict.keys():
+                            line_number_dict = image_type_dict[line_number]
+                            # Append image
+                            if image_type == 'rgb':
+                                self.pickled_images_bgr.append(line_number_dict['img'])
+                                # Append label
+                                self.pickled_labels.append(line_number_dict['labels'])
+                            elif image_type == 'depth':
+                                self.pickled_images_depth.append(line_number_dict['img'])
+            # store total number of data
         self.data_size = len(self.pickled_labels)
         self.access_indices = np.array(range(self.data_size))
         print('Just set data_size to be {0}'.format(self.data_size))
@@ -65,7 +80,8 @@ class ImageDataGenerator:
         """
         Scan the image file and get the image paths and labels
         """
-        with open(class_list) as f:
+        # In non-pickle mode read only first file in the list
+        with open(class_list[0]) as f:
             lines = f.readlines()
             self.images = []
             self.labels = []

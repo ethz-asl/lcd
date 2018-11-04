@@ -3,18 +3,35 @@ To config path variables.
 """
 import sys
 import os
+import subprocess
 
 file_dir = os.path.dirname(os.path.abspath(__file__))
 
-#pySceneNetRGBD_root = os.path.join(file_dir, '../../../pySceneNetRGBD/')
-pySceneNetRGBD_root = os.path.join(file_dir, '/media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/')
-sys.path.insert(0, pySceneNetRGBD_root)
 
-protobuf_path = os.path.join(
-    pySceneNetRGBD_root, 'data/train_protobufs/scenenet_rgbd_train_0.pb')
-
-# Path to lines data in the trajectory
-path_to_lines_root = os.path.join(file_dir, '../../data/train_lines/traj_1')
-
-# Path to the virtual camera images of lines
-path_to_lines_image = os.path.join(file_dir, '../../data/train/traj_1/')
+def obtain_paths_and_variables(name, verbose=False):
+    """ Reads the current paths and variables from the package and returns the
+        value of the path/variable 'name' if present.
+    """
+    # Execute script that produces the paths_and_variables.txt file
+    subprocess.call(
+        os.path.abspath(
+            os.path.join(file_dir, '../print_paths_and_variables_to_file.sh')))
+    # Read file
+    with open(
+            os.path.abspath(
+                os.path.join(file_dir, '../../paths_and_variables.txt'))) as f:
+        file_lines = f.readlines()
+    for line in file_lines:
+        line_split = line.split(" ", 1)
+        variable_name = line_split[0]
+        variable_value = line_split[1].split('\n')[0]
+        if verbose:
+            print('Found variable {0} with value {1}.'.format(
+                variable_name, variable_value))
+        if variable_name == name:
+            if name == "TRAJ_NUM":
+                return int(variable_value)
+            else:
+                return variable_value
+    print("Variable {} not found.".format(name) + " Please check list of valid "
+          "variables in '../generate_trajectory_files.sh'")

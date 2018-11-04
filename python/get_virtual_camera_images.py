@@ -11,36 +11,24 @@ import argparse
 from tools import scenenet_utils
 from tools import pathconfig
 
+
 def get_virtual_camera_images():
-    # Get render path associated to the trajectory
+    trajectories = sn.Trajectories()
     try:
-        with open(renderpaths_path, 'r') as f:
-            lines = f.readlines()
-        trajectories = dict()
-        for line in lines:
-            traj_data = line.split()
-            traj_num = int(traj_data[0])
-            traj_renderpath = traj_data[1]
-            trajectories[traj_num] = traj_renderpath
+        with open(protobuf_path, 'rb') as f:
+            trajectories.ParseFromString(f.read())
     except IOError:
-        print('Render path file not found at location {0}.\nPlease generate '
-        'a render_path file by running the script get_render_paths.py or '
-        'specify a valid path for the render_path text file by using the '
-        'argument -renderpath_paths.'.format(renderpaths_path))
-        return
-    try:
-        traj_renderpath = trajectories[trajectory]
-    except KeyError:
-        print('Error: not able to find a trajectory with index {0}'.format(
-            trajectory))
-        return
+        print('Scenenet protobuf data not found at location:{0}'.format(
+            protobuf_path))
+        print('Please ensure you have copied the pb file to the data directory')
+    traj_renderpath = trajectories.trajectories[trajectory].render_path
 
-    path_to_photos = os.path.join(
-    pathconfig.pySceneNetRGBD_root, 'data/train/', traj_renderpath)
+    path_to_photos = os.path.join(dataset_path, traj_renderpath)
 
-    print('Path to photos is' + path_to_photos)
+    print('Path to photos is {}'.format(path_to_photos))
 
-    path_to_lines_root = '../data/train_lines/traj_' + str(trajectory) + '/'
+    path_to_lines_root = os.path.join(linesfiles_path,
+                                      'traj_{0}/'.format(trajectory))
 
     print('Path_to_lines_root is {0}'.format(path_to_lines_root))
 
@@ -82,34 +70,76 @@ def get_virtual_camera_images():
                                                     camera_model)
 
             cv2.imwrite(
-                '../data/train/traj_{0}/frame_{1}/rgb/{2}.png'.format(
-                trajectory, frame_id, i), rgb_image_from_line_view)
+                os.path.join(
+                    output_path, 'traj_{0}/frame_{1}/rgb/{2}.png'.format(
+                        trajectory, frame_id, i)), rgb_image_from_line_view)
             cv2.imwrite(
-                '../data/train/traj_{0}/frame_{1}/depth/{2}.png'.format(
-                trajectory, frame_id, i),
+                os.path.join(output_path,
+                             'traj_{0}/frame_{1}/depth/{2}.png'.format(
+                                 trajectory, frame_id, i)),
                 depth_image_from_line_view.astype(np.uint16))
 
-        print('frame {0} finished processing'.format(frame_id))
+        print('Generated virtual camera images for frame {0}'.format(frame_id))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Get virtual camera image for each line in the input '
-                    'trajectory.')
+        'trajectory.')
+    parser.add_argument("-trajectory", help="Trajectory number.")
     parser.add_argument(
-        "-trajectory",
-        default=1,
-        help="Trajectory number.")
+        "-scenenetscripts_path",
+        help="Path to folder containing the scripts from pySceneNetRGBD, in "
+        "particular scenenet_pb2.py (e.g. scenenetscripts_path="
+        "'pySceneNetRGBD/').")
+    parser.add_argument("-protobuf_path", help="Path to the protobuf file.")
     parser.add_argument(
-        "-renderpaths_path",
-        default="render_paths.txt",
-        help="Path to file containing correspondences between render paths and "
-             "number of the trajectory.")
+        "-dataset_path",
+        help="Path to folder containing the different image files from the "
+        "dataset. The path should be such that concatenating the render path "
+        "to it gives a folder with folders 'depth', 'instances' and 'photo' "
+        "inside (e.g. dataset_path='pySceneNetRGBD/data/train/').")
+    parser.add_argument(
+        "-linesfiles_path",
+        help="Path to folder containing text lines files (e.g. "
+        "'data/train_lines').")
+    parser.add_argument(
+        "-output_path",
+        help="Data folder where to store the virtual camera images (e.g. "
+        "'data/train').")
 
     args = parser.parse_args()
-    if args.trajectory:
+    if (args.trajectory and args.scenenetscripts_path and args.protobuf_path and
+            args.dataset_path and args.linesfiles_path and
+            args.output_path):  # All arguments passed
         trajectory = int(args.trajectory)
-    if args.renderpaths_path:
-        renderpaths_path = args.renderpaths_path
+        scenenetscripts_path = args.scenenetscripts_path
+        protobuf_path = args.protobuf_path
+        dataset_path = args.dataset_path
+        linesfiles_path = args.linesfiles_path
+        output_path = args.output_path
+    else:
+        print("Some arguments are missing. Using default ones in "
+              "config_paths_and_variables.sh.")
+        # Obtain paths and variables
+        scenenet_dataset_path = pathconfig.obtain_paths_and_variables(
+            "SCENENET_DATASET_PATH")
+        scenenetscripts_path = pathconfig.obtain_paths_and_variables(
+            "SCENENET_SCRIPTS_PATH")
+        protobuf_path = pathconfig.obtain_paths_and_variables("PROTOBUF_PATH")
+        outputdata_path = pathconfig.obtain_paths_and_variables(
+            "OUTPUTDATA_PATH")
+        trajectory = pathconfig.obtain_paths_and_variables("TRAJ_NUM")
+        dataset_type = pathconfig.obtain_paths_and_variables("DATASET_TYPE")
+        # Compose script arguments if necessary
+        dataset_path = os.path.join(scenenet_dataset_path, 'data/',
+                                    dataset_type)
+        linesfiles_path = os.path.join(outputdata_path,
+                                       '{}_lines'.format(dataset_type))
+        output_path = os.path.join(outputdata_path, dataset_type)
+
+    # Include the pySceneNetRGBD folder to the path and import its modules.
+    sys.path.append(scenenetscripts_path)
+    import scenenet_pb2 as sn
 
     get_virtual_camera_images()

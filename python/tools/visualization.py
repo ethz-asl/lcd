@@ -3,18 +3,26 @@ import open3d
 import numpy as np
 import pandas as pd
 import pathconfig
-
 import sys
-sys.path.append('/home/francesco/catkin_ws/src/pySceneNetRGBD/')
-import scenenet_pb2 as sn
 import matplotlib.pyplot as plt
+
+# Retrieve scenenetscripts_path and protobuf path from config file.
+print('visualization.py: Using values in config_paths_and_variables.sh '
+      'for SCENENET_SCRIPTS_PATH and PROTOBUF_PATH.')
+scenenetscripts_path = pathconfig.obtain_paths_and_variables(
+    "SCENENET_SCRIPTS_PATH")
+protobuf_path = pathconfig.obtain_paths_and_variables("PROTOBUF_PATH")
+outputdata_path = pathconfig.obtain_paths_and_variables("OUTPUTDATA_PATH")
+dataset_type = pathconfig.obtain_paths_and_variables("DATASET_TYPE")
+
+sys.path.append(scenenetscripts_path)
+import scenenet_pb2 as sn
 
 from mpl_toolkits.mplot3d import Axes3D
 from camera_pose_and_intrinsics_example import camera_to_world_with_pose, interpolate_poses
 
-path_to_lines_root = pathconfig.path_to_lines_root
-protobuf_path = pathconfig.protobuf_path
-
+path_to_lines_root = os.path.join(outputdata_path,
+                                  '{}_lines/'.format(dataset_type))
 
 trajectories = sn.Trajectories()
 try:
@@ -39,13 +47,14 @@ def get_lines_world_coordinates_with_instances(trajectory, frames):
         # View data for current frame
         view = trajectories.trajectories[trajectory].views[frame_id]
         # Get ground truth pose of camera
-        ground_truth_pose = interpolate_poses(
-            view.shutter_open, view.shutter_close, 0.5)
+        ground_truth_pose = interpolate_poses(view.shutter_open,
+                                              view.shutter_close, 0.5)
         # Transformation matrix from camera coordinate to world coordinate
         camera_to_world_matrix = camera_to_world_with_pose(ground_truth_pose)
 
-        path_to_lines = os.path.join(path_to_lines_root,
-                                     '../traj_{0}/lines_with_labels_{1}.txt'.format(trajectory, frame_id))
+        path_to_lines = os.path.join(
+            path_to_lines_root, 'traj_{0}/lines_with_labels_{1}.txt'.format(
+                trajectory, frame_id))
         print('path_to_lines is {0}'.format(path_to_lines))
         try:
             data_lines = pd.read_csv(path_to_lines, sep=" ", header=None)
@@ -70,10 +79,9 @@ def get_lines_world_coordinates_with_instances(trajectory, frames):
             line_end_point_world = camera_to_world_matrix.dot(
                 line_end_point_camera)
 
-            lines_world_with_instances[line_idx,
-                                       :3] = line_start_point_world[:3]
-            lines_world_with_instances[line_idx,
-                                       3:6] = line_end_point_world[:3]
+            lines_world_with_instances[line_idx, :3] = line_start_point_world[:
+                                                                              3]
+            lines_world_with_instances[line_idx, 3:6] = line_end_point_world[:3]
             # Instance is last value of the line (cf. virtual_camera_pose in
             # scenenet_utils.py)
             lines_world_with_instances[line_idx, 6] = line[-1]
@@ -92,7 +100,8 @@ def get_lines_world_coordinates_with_instances(trajectory, frames):
     print('Total number of lines: {}'.format(data_lines_world.shape[0]))
 
     instances_total = np.unique(data_lines_world[:, -1]).shape[0]
-    print('Number of unique instance labels for lines: {}'.format(instances_total))
+    print('Number of unique instance labels for lines: {}'.format(
+        instances_total))
 
     return data_lines_world
 
@@ -101,7 +110,8 @@ def pcl_lines_for_plot(data_lines, lines_color, visualizer):
     """Get points on the lines for 3D visualization in open3d or matplotlib.
     """
     if visualizer != 'open3d' and visualizer != 'matplotlib':
-        print('Invalid visualizer. Valid options are \'open3d\', \'matplotlib\'.')
+        print(
+            'Invalid visualizer. Valid options are \'open3d\', \'matplotlib\'.')
         return
 
     lines_number = data_lines.shape[0]
@@ -137,6 +147,7 @@ def pcl_lines_for_plot(data_lines, lines_color, visualizer):
             pcl_lines[i]['color'] = tuple(rgb[0])
     return pcl_lines
 
+
 def plot_lines_with_matplotlib(pcl_lines):
     """ Plots a set of lines (in the format outputted by pcl_lines_for_plot) in
         matplotlib
@@ -146,9 +157,9 @@ def plot_lines_with_matplotlib(pcl_lines):
     fig = plt.figure()
     ax = fig.gca(projection='3d')
     for i in range(num_lines):
-        x = pcl_lines[i]['points'][:,0]
-        y = pcl_lines[i]['points'][:,1]
-        z = pcl_lines[i]['points'][:,2]
+        x = pcl_lines[i]['points'][:, 0]
+        y = pcl_lines[i]['points'][:, 1]
+        z = pcl_lines[i]['points'][:, 2]
         ax.plot(x, y, z, color=pcl_lines[i]['color'])
     plt.show()
 
@@ -164,15 +175,16 @@ def vis_square(data):
     # force the number of filters to be square
     n = int(np.ceil(np.sqrt(data.shape[0])))
     # add some space between filters
-    padding = (((0, n ** 2 - data.shape[0]),
-                (0, 1), (0, 1)) + ((0, 0),) * (data.ndim - 3))  # don't pad the last dimension (if there is one)
-    data = np.pad(data, padding, mode='constant',
-                  constant_values=1)  # pad with ones (white)
+    padding = (
+        ((0, n**2 - data.shape[0]), (0, 1), (0, 1)) + ((0, 0),) *
+        (data.ndim - 3))  # don't pad the last dimension (if there is one)
+    data = np.pad(
+        data, padding, mode='constant',
+        constant_values=1)  # pad with ones (white)
 
     # tile the filters into an image
-    data = data.reshape(
-        (n, n) + data.shape[1:]).transpose((0, 2, 1, 3) + tuple(range(4, data.ndim + 1)))
-    data = data.reshape(
-        (n * data.shape[1], n * data.shape[3]) + data.shape[4:])
+    data = data.reshape((n, n) + data.shape[1:]).transpose(
+        (0, 2, 1, 3) + tuple(range(4, data.ndim + 1)))
+    data = data.reshape((n * data.shape[1], n * data.shape[3]) + data.shape[4:])
     plt.imshow(data)
     plt.axis('off')

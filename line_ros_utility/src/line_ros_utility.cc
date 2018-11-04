@@ -1,11 +1,17 @@
 #include "line_ros_utility/line_ros_utility.h"
 
+#include <fstream>
+#include <sstream>
+#include <cstdlib>
+
 namespace line_ros_utility {
 
 const std::string frame_id = "line_tools_id";
 const bool write_labeled_lines = true;
 const bool clustering_with_random_forest = false;
-const std::string kWritePath = "/home/francesco/catkin_extended_ws/src/line_tools/data/train_lines";
+// The following path should point to the root folder of line_tools (e.g.
+// ~/catkin_extended_ws/src/line_tools/)
+const std::string kLineToolsRootPath = "/home/francesco/catkin_extended_ws/src/line_tools/";
 
 std::vector<int> clusterLinesAfterClassification(
     const std::vector<line_detection::LineWithPlanes>& lines) {
@@ -102,8 +108,9 @@ bool printToFile(const std::vector<cv::Vec4f>& lines2D,
   }
 }
 
-ListenAndPublish::ListenAndPublish(int trajectory_number) : params_(),
-    tree_classifier_(), trajectory_number_(trajectory_number){
+ListenAndPublish::ListenAndPublish(int trajectory_number, std::string write_path) :
+    params_(),  tree_classifier_(), trajectory_number_(trajectory_number),
+    kWritePath_(write_path) {
   ros::NodeHandle node_handle_;
   // The Pointcloud publisher and transformation for RVIZ.
   pcl_pub_ = node_handle_.advertise<pcl::PointCloud<pcl::PointXYZRGB> >(
@@ -353,17 +360,17 @@ void ListenAndPublish::masterCallback(
 
   if (write_labeled_lines) {
     std::string path =
-        kWritePath + "/traj_" + std::to_string(trajectory_number_) +
+        kWritePath_ + "/traj_" + std::to_string(trajectory_number_) +
         "/lines_with_labels_" + std::to_string(iteration_) + ".txt";
     ROS_INFO("path is %s", path.c_str());
 
     std::string path_2D_kept =
-        kWritePath + "/traj_" + std::to_string(trajectory_number_) +
+        kWritePath_ + "/traj_" + std::to_string(trajectory_number_) +
         "/lines_2D_kept_" + std::to_string(iteration_) + ".txt";
     ROS_INFO("path_2D_kept is %s", path_2D_kept.c_str());
 
     std::string path_2D =
-        kWritePath + "/traj_" + std::to_string(trajectory_number_) +
+        kWritePath_ + "/traj_" + std::to_string(trajectory_number_) +
         "/lines_2D_" + std::to_string(iteration_) + ".txt";
     ROS_INFO("path_2D is %s", path_2D.c_str());
 
@@ -392,7 +399,7 @@ void ListenAndPublish::labelLinesWithInstances(
     const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info,
     std::vector<int>* labels) {
   CHECK_NOTNULL(labels);
-  //CHECK_EQ(instances.type(), CV_16UC1);
+  CHECK_EQ(instances.type(), CV_16UC1);
   labels->resize(lines.size());
   // This class is used to perform the backprojection.
   image_geometry::PinholeCameraModel camera_model;
@@ -455,6 +462,80 @@ void ListenAndPublish::labelLinesWithInstances(
     labels->at(i) = known_colors_[best_guess];
   }
 }
+
+bool getDefaultPathsAndVariables(const std::string& path_or_variable_name,
+                                 std::string* path_or_variable_value) {
+  if (path_or_variable_name == "TRAJ_NUM") {
+    LOG(WARNING) << "Wrong expected variable type for variable TRAJ_NUM. "
+                 << "Expected output type is integer, given string.";
+    return false;
+  }
+  // Run script to generate the paths_and_variables file
+  std::string generating_script_path = kLineToolsRootPath +
+      "/python/print_paths_and_variables_to_file.sh";
+  system(generating_script_path.c_str());
+  // Read paths_and_variables file
+  std::ifstream paths_and_variables_file(kLineToolsRootPath +
+                                         "paths_and_variables.txt");
+  if (!paths_and_variables_file) {
+    // Error during file open
+    LOG(WARNING) << "Error in opening file " << kLineToolsRootPath
+                 << "paths_and_variables.txt. Exiting.";
+    return false;
+  }
+  std::string line;
+  std::string name, value;
+  std::size_t space_pos;
+  while (std::getline(paths_and_variables_file, line)) {
+    space_pos = line.find(" ");
+    name = line.substr(0, space_pos);
+    value = line.substr(space_pos + 1);
+    if (name == path_or_variable_name) {  // Path/variable found
+      *path_or_variable_value = value;
+      return true;
+    }
+  }
+  return false;
+}
+
+bool getDefaultPathsAndVariables(const std::string& path_or_variable_name,
+                                 int* path_or_variable_value) {
+  if (path_or_variable_name != "TRAJ_NUM") {
+    LOG(WARNING) << "Wrong variable name for given output variable type "
+                 << "(integer). Valid variable names with an integer value "
+                 << "are: TRAJ_NUM.";
+    return false;
+  }
+  // Run script to generate the paths_and_variables file
+  std::string generating_script_path = kLineToolsRootPath +
+      "/python/print_paths_and_variables_to_file.sh";
+  system(generating_script_path.c_str());
+  // Read paths_and_variables file
+  std::ifstream paths_and_variables_file(kLineToolsRootPath +
+                                         "paths_and_variables.txt");
+  if (!paths_and_variables_file) {
+    // Error during file open
+    LOG(WARNING) << "Error in opening file " << kLineToolsRootPath
+                 << "paths_and_variables.txt. Exiting. Error: "
+                 << strerror(errno);
+    return false;
+  }
+  std::string line;
+  std::string name, value;
+  std::size_t space_pos;
+  while (std::getline(paths_and_variables_file, line)) {
+    space_pos = line.find(" ");
+    name = line.substr(0, space_pos);
+    value = line.substr(space_pos + 1);
+    if (name == path_or_variable_name) {  // Path/variable found
+      LOG(INFO) << path_or_variable_name << " found.";
+      *path_or_variable_value = std::stoi(value);
+      return true;
+    }
+  }
+  return false;
+}
+
 
 DisplayClusters::DisplayClusters() {
   colors_.push_back({1, 0, 0});

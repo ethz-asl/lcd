@@ -20,12 +20,7 @@ python -m ipykernel install --user --name line_tools
 
 Tensorflow cpu version is used here. If you want to use gpu, change `requirements.txt` accordingly.
 
-## Usage
-[Please note that the entire process of generating the bag files, obtaining the
-lines data and performing the subsequent steps explained below can be
-automatically executed by launching `roscore` and then running the script `generate_and_upload_to_share.sh` or separately the two scripts `generate_trajectory_files.sh` and `split_all_trajectories.sh`. Please look at
-the content of the scripts for a more detailed explanation.]
-
+## Dataset
 Before reaching to this repository, make sure that you have followed the instructions for the ros packages and get the lines data in `../data/train_lines`.
 
 Here we use the trajectory 1 in the [train_0](https://robotvault.bitbucket.io/scenenet-rgbd.html) dataset of `SceneNetRGBD` as an example. You first need to clone the repository [pySceneNetRGBD](https://github.com/jmccormac/pySceneNetRGBD), download the dataset as well as the protobuf to `pySceneNetRGBD/data`. Set `pySceneNetRGBD_root` in `tools/pathconfig.py` properly.
@@ -42,19 +37,21 @@ cd .. && make
 
 If you want to try other trajectories, change the variables `path_to_photos` and `path_to_lines` accordingly.
 
+
+## Usage
+Please note that the entire process of generating the bag files, obtaining the
+lines data and performing the subsequent steps explained below can be
+automatically executed by launching `roscore` and then running `generate_trajectory_files.sh`. Before generating the data, the variables in the configuration file `config_paths_and_variables.sh` should be set as indicated in the description in the script itself.
+
+If you want to separately run each Python script in the pipeline without using the bash script `config_paths_and_variables.sh`, please note that they all accept arguments that should be comply to a specific format. However, to make things easier, you can avoid passing any argument and simply set the paths and variables in `config_paths_and_variables.py`. By default, the scripts will read those values and combine them in the right format.
+
+
 You can create subdirectories in `../data/train` to store the images data we will use for training.
 ```bash
 ./create_data_dir.sh
 ```
 Note that the above bash script also accepts the number of the trajectory as an
 argument (1 by default).
-
-Since the indices associated with the trajectories do not correspond to the
-names of the folder in which the images are located in the dataset (e.g. trajectory with index 1 could map to the folder 0/784 in the data/train folder),
-it is necessary to generate a text file containing the correspondences between trajectory numbers and the so called 'render path'. Do so by running `get_render_paths.py`.
-```bash
-python get_render_paths.py
-```
 
 Run `get_virtual_camera_images.py` to get the virtual camera image associated to each line for every frame in the input trajectory (1 by default).
 ```bash

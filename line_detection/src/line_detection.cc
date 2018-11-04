@@ -1053,7 +1053,7 @@ void LineDetector::project2Dto3DwithPlanes(
         right_found = true;
       }
     }
-    // If any of planes were not found, the line is found at a discontinouty.
+    // If any of planes were not found, the line is found at a discontinuity.
     // This is a workaround, more efficiently this would be implemented in the
     // function find3DlineOnPlanes.
     bool is_discont = true;

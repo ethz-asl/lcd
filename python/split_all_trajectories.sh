@@ -1,3 +1,4 @@
+echo "********OLD SCRIPT!!! TODO: FIX********"
 NUM_OF_TRAJ=$1;
 LINE_PATH=${2:-'/media/line_tools/fmilano/data/'}
 for i in $(seq 1 $NUM_OF_TRAJ); do

@@ -1,4 +1,8 @@
 #!/bin/bash
+# NOTE: this is just a test to show that running all the scripts with no
+# arguments - therefore letting them read the paths and variables values from
+# the config file - should produce the exact same result as when passing the
+# argument, e.g., when running the script generate_trajectory_files.sh
 source ~/catkin_ws/devel/setup.bash
 source ~/catkin_extended_ws/devel/setup.bash
 source ~/.virtualenvs/line_tools/bin/activate
@@ -84,7 +88,7 @@ then
 else
    # Generate virtual camera images
    echo -e "\n**** Generating virtual camera images for trajectory ${TRAJ_NUM} in ${DATASET_TYPE} set ****\n";
-   python "$PYTHONSCRIPTS_PATH"/get_virtual_camera_images.py -trajectory ${TRAJ_NUM} -scenenetscripts_path "$SCENENET_SCRIPTS_PATH" -protobuf_path "$PROTOBUF_PATH" -dataset_path "$SCENENET_DATASET_PATH"/data/${DATASET_TYPE}/ -linesfiles_path "$OUTPUTDATA_PATH"/${DATASET_TYPE}_lines/ -output_path "$OUTPUTDATA_PATH"/${DATASET_TYPE}/;
+   python "$PYTHONSCRIPTS_PATH"/get_virtual_camera_images.py;
    # Creates a file to say that virtual camera images have been generated, to
    # avoid creating them again if reexecuting the script before moving files
    touch "$OUTPUTDATA_PATH"/VALID_VIRTUAL_CAMERA_IMAGES_${TRAJ_NUM}_${DATASET_TYPE};
@@ -93,14 +97,13 @@ fi
 # Create archive
 echo -e "\n**** Zipping files for trajectory ${TRAJ_NUM} in ${DATASET_TYPE} set ****\n";
 cd "$OUTPUTDATA_PATH";
-# (the --no-name option is to prevent gzip to insert time info in the header, so that two archives containing the exact same files can in fact have same md5 hash)
 tar -cf - ${DATASET_TYPE}/traj_${TRAJ_NUM} ${DATASET_TYPE}_lines/traj_${TRAJ_NUM} | gzip --no-name > "$TARFILES_PATH"/${DATASET_TYPE}/traj_${TRAJ_NUM}.tar.gz
 
 # Split dataset
 echo -e "\n**** Splitting dataset for trajectory ${TRAJ_NUM} in ${DATASET_TYPE} set ****\n";
-python "$PYTHONSCRIPTS_PATH"/split_dataset_with_labels_world.py -trajectory ${TRAJ_NUM} -protobuf_path "$PROTOBUF_PATH" -path_to_linesfiles "$OUTPUTDATA_PATH"/${DATASET_TYPE}_lines/ -path_to_virtualcameraimages "$OUTPUTDATA_PATH"/${DATASET_TYPE}/ -output_path "$OUTPUTDATA_PATH" -scenenetscripts_path "$SCENENET_SCRIPTS_PATH"
+python "$PYTHONSCRIPTS_PATH"/split_dataset_with_labels_world.py;
 echo -e "\n**** Pickling files for trajectory ${TRAJ_NUM} in ${DATASET_TYPE} set ****\n";
-python "$PYTHONSCRIPTS_PATH"/pickle_files.py -splittingfiles_path "$OUTPUTDATA_PATH" -output_path "$PICKLEANDSPLIT_PATH"/${DATASET_TYPE}/traj_${TRAJ_NUM}/ -scenenetdataset_type ${DATASET_TYPE}
+python "$PYTHONSCRIPTS_PATH"/pickle_files.py;
 for word in test train val all_lines; do
   # NOTE: These files include absolute paths w.r.t to the machine where the
   # data was generated. Still, they are included as a reference to how pickled

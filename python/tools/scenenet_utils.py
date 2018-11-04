@@ -1,9 +1,15 @@
 import numpy as np
 import sys
 
+# Retrieve scenenetscripts_path and protobuf path from config file.
+print('scenenet_utils.py: Using values in config_paths_and_variables.sh '
+      'for SCENENET_SCRIPTS_PATH and PROTOBUF_PATH.')
 import pathconfig
+scenenetscripts_path = pathconfig.obtain_paths_and_variables(
+    "SCENENET_SCRIPTS_PATH")
+protobuf_path = pathconfig.obtain_paths_and_variables("PROTOBUF_PATH")
 
-sys.path.append('/home/francesco/catkin_ws/src/pySceneNetRGBD/')
+sys.path.append(scenenetscripts_path)
 import scenenet_pb2 as sn
 
 from camera_pose_and_intrinsics_example import camera_to_world_with_pose, interpolate_poses
@@ -38,6 +44,7 @@ class SceneNetCameraModel:
 def get_camera_model():
     """Camera model for SceneNetRGBD dataset. Adjusted from https://github.com/ethz-asl/scenenet_ros_tools/blob/master/nodes/scenenet_to_rosbag.py
     """
+
     def camera_intrinsic_transform(vfov=45,
                                    hfov=60,
                                    pixel_width=320,
@@ -72,14 +79,15 @@ def project_pcl_to_image(pointcloud, camera_model):
     depth_image = np.zeros((240, 320), dtype=np.float32)
 
     pcl_inside_view = pointcloud[pointcloud[:, 2] > 0, :]
-    pcl_inside_view_xyz = np.hstack(
-        (pcl_inside_view[:, :3], np.ones((pcl_inside_view.shape[0], 1))))
+    pcl_inside_view_xyz = np.hstack((pcl_inside_view[:, :3],
+                                     np.ones((pcl_inside_view.shape[0], 1))))
 
     pcl_projected = np.array(camera_model.P).dot(pcl_inside_view_xyz.T)
     pixel = np.rint(pcl_projected / pcl_projected[2, :]).astype(int)[:2, :]
 
-    index_bool = np.logical_and(np.logical_and(0 <= pixel[0], pixel[0] < 320),
-                                np.logical_and(0 <= pixel[1], pixel[1] < 240))
+    index_bool = np.logical_and(
+        np.logical_and(0 <= pixel[0], pixel[0] < 320),
+        np.logical_and(0 <= pixel[1], pixel[1] < 240))
     pixel = pixel[:, index_bool]
 
     pcl_inside_view = pcl_inside_view[index_bool, :]
@@ -225,8 +233,8 @@ def rgbd_to_pcl(rgb_image, depth_image, camera_model):
         [(u - center_y) * constant_y for u in range(0, depth_image.shape[0])])
 
     # euclidean_ray_length_to_z_coordinate
-    depth_image = euclidean_ray_length_to_z_coordinate(
-        depth_image, camera_model)
+    depth_image = euclidean_ray_length_to_z_coordinate(depth_image,
+                                                       camera_model)
     # Convert depth from cm to m.
     depth_image = depth_image / 1000.0
 
@@ -243,16 +251,17 @@ def rgbd_to_pcl(rgb_image, depth_image, camera_model):
 def convert_camera_coordinates_to_world(coor_camera, trajectory, frame):
     """Convert coordinates in camera frame to coordinates in world frame.
     Args:
-        coor_camera: numpy array of shape (3, ). Coordnates in camera frame. [x, y, z].
-        trajectory: int. A trajectory in SceneNetRGBD datasetself.
+        coor_camera: numpy array of shape (3, ). Coordinates in camera frame. [x, y, z].
+        trajectory: int. A trajectory in SceneNetRGBD dataset.
         frame: int. A certain frame of in the trajectory.
 
     Returns:
         coor_world: coordinates in world frame.
     """
+
     trajectories = sn.Trajectories()
     try:
-        with open(pathconfig.protobuf_path, 'rb') as f:
+        with open(protobuf_path, 'rb') as f:
             trajectories.ParseFromString(f.read())
     except IOError:
         print('Scenenet protobuf data not found at location:{0}'.format(
@@ -260,8 +269,8 @@ def convert_camera_coordinates_to_world(coor_camera, trajectory, frame):
         print('Please ensure you have copied the pb file to the data directory')
 
     view = trajectories.trajectories[trajectory].views[frame]
-    ground_truth_pose = interpolate_poses(
-        view.shutter_open, view.shutter_close, 0.5)
+    ground_truth_pose = interpolate_poses(view.shutter_open, view.shutter_close,
+                                          0.5)
     camera_to_world_matrix = camera_to_world_with_pose(ground_truth_pose)
 
     # Homogeneous coordinates
@@ -285,4 +294,7 @@ def euclidean_ray_length_to_z_coordinate(depth_image, camera_model):
     us = np.array(
         [(u - center_y) * constant_y for u in range(0, depth_image.shape[0])])
 
-    return (np.sqrt(np.square(depth_image / 1000.0) / (1 + np.square(vs[np.newaxis, :]) + np.square(us[:, np.newaxis]))) * 1000.0).astype(np.uint16)
+    return (np.sqrt(
+        np.square(depth_image / 1000.0) /
+        (1 + np.square(vs[np.newaxis, :]) + np.square(us[:, np.newaxis]))) *
+            1000.0).astype(np.uint16)

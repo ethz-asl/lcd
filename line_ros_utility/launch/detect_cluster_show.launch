@@ -1,5 +1,6 @@
 <launch>
   <arg name="trajectory" default ="1" />
+  <arg name="write_path" />
   <node
     pkg="rqt_reconfigure"
     type="rqt_reconfigure"
@@ -15,7 +16,7 @@
     pkg="line_ros_utility"
     type="detect_cluster_show"
     name="detect_cluster_show"
-    args="$(arg trajectory)"
+    args="$(arg trajectory) $(arg write_path)"
     output="screen"
  ></node>
 </launch>

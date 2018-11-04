@@ -36,6 +36,9 @@ tmp/
 # Data
 data/
 
+# C-Make builds
+cmake-build/
+
 # Jupyter Notebook
 .ipynb_checkpoints
 
