@@ -4,9 +4,9 @@ from collections import defaultdict
 from sklearn.externals import joblib
 
 
-def pickle_images(input_text_file, output_pickle_file, scenenetdataset_type):
+def pickle_images(input_text_file, output_pickle_file, dataset_name):
     """ Creates a pickle file containing a nested dictionary with images in
-    correspondence with scenenetdataset_type (i.e., whether the data being
+    correspondence with dataset_name (i.e., whether the data being
     pickled comes from the train or val dataset of pySceneNetRGBD), trajectory
     number, frame number, image type (rgb or depth) and line number """
     nested_dict = lambda: defaultdict(nested_dict)
@@ -44,10 +44,10 @@ def pickle_images(input_text_file, output_pickle_file, scenenetdataset_type):
                 print('Image {0} returns None'.format(line_path))
             else:
                 # Create entry for image in dictionary
-                data_dict[scenenetdataset_type][trajectory_number][
+                data_dict[dataset_name][trajectory_number][
                     frame_number][image_type][line_number]['img'] = img
                 # Create entry for labels in dictionary
-                data_dict[scenenetdataset_type][trajectory_number][
+                data_dict[dataset_name][trajectory_number][
                     frame_number][image_type][line_number]['labels'] = \
                     [float(i) for i in split_line[1:]]
 
@@ -66,10 +66,10 @@ def pickle_images(input_text_file, output_pickle_file, scenenetdataset_type):
                     print('Image {0} returns None'.format(line_path_depth))
                 else:
                     # Create entry for image in dictionary
-                    data_dict[scenenetdataset_type][trajectory_number][
+                    data_dict[dataset_name][trajectory_number][
                         frame_number]['depth'][line_number]['img'] = img
                     # Create entry for labels in dictionary
-                    data_dict[scenenetdataset_type][trajectory_number][
+                    data_dict[dataset_name][trajectory_number][
                         frame_number]['depth'][line_number]['labels'] = \
                         [float(i) for i in split_line[1:]]
     # Convert defualtdict to dicts
@@ -93,29 +93,29 @@ def merge_pickled_dictionaries(dict_to_update, dict_to_add):
     """ Merge pickled dictionary dict_to_add in pickled dictionary
     dict_to_update, therefore modifying dict_to_update. Values from
     dict_to_update are overwritten only if dict_to_add contains an entry which
-    has same scenenetdataset_type, trajectory_number and frame_number, i.e., if
-    both dictionary contain the images and labels associated to frame
-    frame_number in trajectory trajectory_number from the pySceneNetRGBD dataset
-    scenenetdataset_type. In all other cases, dictionaries are simply merged.
+    has same dataset_name, trajectory_number and frame_number, i.e., if both
+    dictionaries contain the images and labels associated to frame frame_number
+    in trajectory trajectory_number from the pySceneNetRGBD dataset
+    dataset_name. In all other cases, dictionaries are simply merged.
     """
-    for dataset_type_dict_to_add in dict_to_add.keys():
-        if dataset_type_dict_to_add in dict_to_update.keys():
+    for dataset_name_dict_to_add in dict_to_add.keys():
+        if dataset_name_dict_to_add in dict_to_update.keys():
             # Dataset type already in dict_to_update, check trajectory number.
             for traj_num_dict_to_add in dict_to_add[
-                    dataset_type_dict_to_add].keys():
+                    dataset_name_dict_to_add].keys():
                 if traj_num_dict_to_add in dict_to_update[
-                        dataset_type_dict_to_add].keys():
+                        dataset_name_dict_to_add].keys():
                     # Same dataset type and trajectory_number already in
                     # dict_to_update, merge all frames.
-                    dict_to_update[dataset_type_dict_to_add][
+                    dict_to_update[dataset_name_dict_to_add][
                         traj_num_dict_to_add].update(dict_to_add[
-                            dataset_type_dict_to_add][traj_num_dict_to_add])
+                            dataset_name_dict_to_add][traj_num_dict_to_add])
                 else:
                     # Trajectory number not in dict_to_update, simply add it.
-                    dict_to_update[dataset_type_dict_to_add][
+                    dict_to_update[dataset_name_dict_to_add][
                         traj_num_dict_to_add] = dict_to_add[
-                            dataset_type_dict_to_add][traj_num_dict_to_add]
+                            dataset_name_dict_to_add][traj_num_dict_to_add]
         else:
             # Dataset tupe not in dict_to_update, simply add it.
-            dict_to_update[dataset_type_dict_to_add] = dict_to_add[
-                dataset_type_dict_to_add]
+            dict_to_update[dataset_name_dict_to_add] = dict_to_add[
+                dataset_name_dict_to_add]

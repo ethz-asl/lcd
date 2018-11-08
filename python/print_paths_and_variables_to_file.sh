@@ -27,4 +27,4 @@ echo "PYTHONSCRIPTS_PATH $PYTHONSCRIPTS_PATH" >> paths_and_variables.txt
 echo "TARFILES_PATH $TARFILES_PATH" >> paths_and_variables.txt
 echo "PICKLEANDSPLIT_PATH $PICKLEANDSPLIT_PATH" >> paths_and_variables.txt
 echo "TRAJ_NUM $TRAJ_NUM" >> paths_and_variables.txt
-echo "DATASET_TYPE $DATASET_TYPE" >> paths_and_variables.txt
+echo "DATASET_NAME $DATASET_NAME" >> paths_and_variables.txt

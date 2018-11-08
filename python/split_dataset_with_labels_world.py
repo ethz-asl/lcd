@@ -140,12 +140,12 @@ if __name__ == '__main__':
         outputdata_path = pathconfig.obtain_paths_and_variables(
             "OUTPUTDATA_PATH")
         trajectory = pathconfig.obtain_paths_and_variables("TRAJ_NUM")
-        dataset_type = pathconfig.obtain_paths_and_variables("DATASET_TYPE")
+        dataset_name = pathconfig.obtain_paths_and_variables("DATASET_NAME")
         # Compose script arguments if necessary
         path_to_linesfiles = os.path.join(outputdata_path,
-                                          '{}_lines'.format(dataset_type))
+                                          '{}_lines'.format(dataset_name))
         path_to_virtualcameraimages = os.path.join(outputdata_path,
-                                                   dataset_type)
+                                                   dataset_name)
         output_path = os.path.join(outputdata_path)
 
     path_to_linesfiles = os.path.join(path_to_linesfiles,

@@ -130,13 +130,13 @@ if __name__ == '__main__':
         outputdata_path = pathconfig.obtain_paths_and_variables(
             "OUTPUTDATA_PATH")
         trajectory = pathconfig.obtain_paths_and_variables("TRAJ_NUM")
-        dataset_type = pathconfig.obtain_paths_and_variables("DATASET_TYPE")
+        dataset_name = pathconfig.obtain_paths_and_variables("DATASET_NAME")
         # Compose script arguments if necessary
         dataset_path = os.path.join(scenenet_dataset_path, 'data/',
-                                    dataset_type)
+                                    dataset_name)
         linesfiles_path = os.path.join(outputdata_path,
-                                       '{}_lines'.format(dataset_type))
-        output_path = os.path.join(outputdata_path, dataset_type)
+                                       '{}_lines'.format(dataset_name))
+        output_path = os.path.join(outputdata_path, dataset_name)
 
     # Include the pySceneNetRGBD folder to the path and import its modules.
     sys.path.append(scenenetscripts_path)

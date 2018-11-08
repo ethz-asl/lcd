@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
   } else {
     ROS_INFO("Not enough arguments. Using default paths and variables in "
               "python/config_paths_and_variables.sh.");
-    std::string outputdata_path, dataset_type;
+    std::string outputdata_path, dataset_name;
     if (!line_ros_utility::getDefaultPathsAndVariables("TRAJ_NUM", &traj_num)) {
       ROS_ERROR("Error in retrieving default argument TRAJ_NUM. Exiting."
                 "Got TRAJ_NUM=%d", traj_num);
@@ -35,12 +35,12 @@ int main(int argc, char** argv) {
                 "Exiting.");
       return -1;
     }
-    if (!line_ros_utility::getDefaultPathsAndVariables("DATASET_TYPE",
-                                                  &dataset_type)){
-      ROS_ERROR("Error in retrieving default argument DATASET_TYPE. Exiting.");
+    if (!line_ros_utility::getDefaultPathsAndVariables("DATASET_NAME",
+                                                  &dataset_name)){
+      ROS_ERROR("Error in retrieving default argument DATASET_NAME. Exiting.");
       return -1;
     }
-    write_path = outputdata_path + "/" + dataset_type + "_lines/";
+    write_path = outputdata_path + "/" + dataset_name + "_lines/";
     ROS_INFO("traj_num is %d, write_path is %s", traj_num, write_path.c_str());
   }
   line_ros_utility::ListenAndPublish ls(traj_num, write_path);

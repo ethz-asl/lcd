@@ -8,12 +8,12 @@ import matplotlib.pyplot as plt
 
 # Retrieve scenenetscripts_path and protobuf path from config file.
 print('visualization.py: Using values in config_paths_and_variables.sh '
-      'for SCENENET_SCRIPTS_PATH and PROTOBUF_PATH.')
+      'for SCENENET_SCRIPTS_PATH, PROTOBUF_PATH, OUTPUTDATA_PATH and DATASET_NAME.')
 scenenetscripts_path = pathconfig.obtain_paths_and_variables(
     "SCENENET_SCRIPTS_PATH")
 protobuf_path = pathconfig.obtain_paths_and_variables("PROTOBUF_PATH")
 outputdata_path = pathconfig.obtain_paths_and_variables("OUTPUTDATA_PATH")
-dataset_type = pathconfig.obtain_paths_and_variables("DATASET_TYPE")
+dataset_name = pathconfig.obtain_paths_and_variables("DATASET_NAME")
 
 sys.path.append(scenenetscripts_path)
 import scenenet_pb2 as sn
@@ -22,7 +22,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from camera_pose_and_intrinsics_example import camera_to_world_with_pose, interpolate_poses
 
 path_to_lines_root = os.path.join(outputdata_path,
-                                  '{}_lines/'.format(dataset_type))
+                                  '{}_lines/'.format(dataset_name))
 
 trajectories = sn.Trajectories()
 try:

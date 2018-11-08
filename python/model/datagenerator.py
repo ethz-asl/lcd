@@ -53,10 +53,10 @@ class ImageDataGenerator:
         self.pickled_images_bgr = []
         self.pickled_images_depth = []
         self.pickled_labels = []
-        for scenenetdataset_type in pickled_dict.keys():
-            scenenetdataset_type_dict = pickled_dict[scenenetdataset_type]
-            for trajectory_number in scenenetdataset_type_dict.keys():
-                trajectory_number_dict = scenenetdataset_type_dict[trajectory_number]
+        for dataset_name in pickled_dict.keys():
+            dataset_name_dict = pickled_dict[dataset_name]
+            for trajectory_number in dataset_name_dict.keys():
+                trajectory_number_dict = dataset_name_dict[trajectory_number]
                 for frame_number in trajectory_number_dict.keys():
                     frame_number_dict = trajectory_number_dict[frame_number]
                     for image_type in frame_number_dict.keys():
