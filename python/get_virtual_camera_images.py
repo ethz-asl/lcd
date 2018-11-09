@@ -19,8 +19,8 @@ def get_virtual_camera_images():
         with open(protobuf_path, 'rb') as f:
             trajectories.ParseFromString(f.read())
     except IOError:
-        print('Scenenet protobuf data not found at location:{0}'.format(
-            protobuf_path))
+        print('get_virtual_camera_images.py: Scenenet protobuf data not found '
+              'at location:{0}'.format(protobuf_path))
         print('Please ensure you have copied the pb file to the data directory')
     traj_renderpath = trajectories.trajectories[trajectory].render_path
 

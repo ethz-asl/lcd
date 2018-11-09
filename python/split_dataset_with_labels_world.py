@@ -21,8 +21,8 @@ def split_dataset():
         with open(protobuf_path, 'rb') as f:
             trajectories.ParseFromString(f.read())
     except IOError:
-        print('Scenenet protobuf data not found at location:{0}'.format(
-            protobuf_path))
+        print('split_dataset_with_labels_world.py: Scenenet protobuf data not '
+              'found at location:{0}'.format(protobuf_path))
         print('Please ensure you have copied the pb file to the datadirectory')
 
     frames_total = 300

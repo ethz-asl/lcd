@@ -272,8 +272,8 @@ def convert_camera_coordinates_to_world(coor_camera, dataset_name, trajectory,
         with open(protobuf_path, 'rb') as f:
             trajectories.ParseFromString(f.read())
     except IOError:
-        print('Scenenet protobuf data not found at location:{0}'.format(
-            data_root_path))
+        print('scenenet_utils.py: Scenenet protobuf data not found at location:'
+              '{0}'.format(data_root_path))
         print('Please ensure you have copied the pb file to the data directory')
 
     view = trajectories.trajectories[trajectory].views[frame]

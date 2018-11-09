@@ -10,20 +10,6 @@ if [ -z $DATASET_NAME ]
 then
     echo "Please provide the name of dataset to use. Possible options are 'train' and 'val'. Exiting."
     exit 1
-else
-    # Check that name is valid
-    case "$DATASET_NAME" in
-        train)
-            echo "Using training set from pySceneNetRGBD."
-            ;;
-        val)
-            echo "Using validation set from pySceneNetRGBD."
-            ;;
-        *)
-            echo "Invalid argument $DATASET_NAME. Valid options are 'train' and 'val'. Exiting."
-            exit 1
-            ;;
-    esac
 fi
 
 # Retrieve correct protobuf path from dictionary
@@ -33,7 +19,14 @@ then
   echo "No entry for $DATASET_NAME was found in the protobuf dictionary (python/config_protobuf_paths). Exiting."
   exit 1
 else
-  echo "PROTOBUF_PATH is '$PROTOBUF_PATH"
+  case "$DATASET_NAME" in
+      train)
+          echo "Using training set from pySceneNetRGBD."
+          ;;
+      val)
+          echo "Using validation set from pySceneNetRGBD."
+          ;;
+  esac
 fi
 
 # Check protobuf path
@@ -54,11 +47,11 @@ trap "exit" INT
 
 # Generate bag
 echo -e "\n****  Generating bag for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
+echo "PLEASE NOTE! If an error occurs during the formation of the bag (e.g."
+echo "early termination by interrupt) the script will not check if the bag is"
+echo "valid. Therefore invalid bags should be manually removed.\n"
 if [ -e "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenet_traj_${TRAJ_NUM}.bag ]
 then
-    # PLEASE NOTE! If an error occurs during the formation of the bag (e.g.
-    # early termination by interrupt) the script will not check if the bag is
-    # valid. Therefore invalid bags should be manually removed.
     echo 'Bag file already existent. Using bag found.';
 else
     rosrun scenenet_ros_tools scenenet_to_rosbag.py -scenenet_path "$SCENENET_DATASET_PATH" -trajectory $TRAJ_NUM -output_bag "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenet_traj_${TRAJ_NUM}.bag -protobuf_path "$PROTOBUF_PATH" -dataset_type ${DATASET_NAME};

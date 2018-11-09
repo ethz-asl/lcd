@@ -24,6 +24,8 @@ def get_protobuf_path(dataset_name):
                     name = line_split[0]
                     # Remove leading whitespaces in path if any
                     path = line_split[1].lstrip()
+                    # Remove terminating new line characters if any
+                    path = path.rstrip("\n\r")
                     if dataset_name == name:
                         return path
         return None
