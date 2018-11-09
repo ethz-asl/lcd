@@ -1,0 +1,4 @@
+# Please enter dataset names followed by a colon, (a whitespace) and the path
+# of the protobuf file corresponding to the dataset name.
+train: /media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/data/train_protobufs/scenenet_rgbd_train_0.pb
+val: /media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/data/scenenet_rgbd_val.pb

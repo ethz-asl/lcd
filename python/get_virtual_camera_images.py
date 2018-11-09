@@ -10,6 +10,7 @@ import argparse
 
 from tools import scenenet_utils
 from tools import pathconfig
+from tools import get_protobuf_path
 
 
 def get_virtual_camera_images():
@@ -92,7 +93,6 @@ if __name__ == '__main__':
         help="Path to folder containing the scripts from pySceneNetRGBD, in "
         "particular scenenet_pb2.py (e.g. scenenetscripts_path="
         "'pySceneNetRGBD/').")
-    parser.add_argument("-protobuf_path", help="Path to the protobuf file.")
     parser.add_argument(
         "-dataset_path",
         help="Path to folder containing the different image files from the "
@@ -100,44 +100,53 @@ if __name__ == '__main__':
         "to it gives a folder with folders 'depth', 'instances' and 'photo' "
         "inside (e.g. dataset_path='pySceneNetRGBD/data/train/').")
     parser.add_argument(
-        "-linesfiles_path",
-        help="Path to folder containing text lines files (e.g. "
-        "'data/train_lines').")
+        "-dataset_name",
+        help="Either train or val, indicating whether "
+        "the data being pickled comes from the train or val dataset of "
+        "pySceneNetRGBD.")
+    parser.add_argument(
+        "-linesandimagesfolder_path",
+        help="Path to folder (e.g. 'data') containing text lines files (e.g. "
+        "under 'data/train_lines') and that should store the output virtual "
+        "camera images (e.g. under 'data/train_lines').")
     parser.add_argument(
         "-output_path",
         help="Data folder where to store the virtual camera images (e.g. "
         "'data/train').")
 
     args = parser.parse_args()
-    if (args.trajectory and args.scenenetscripts_path and args.protobuf_path and
-            args.dataset_path and args.linesfiles_path and
-            args.output_path):  # All arguments passed
+    if (args.trajectory and args.scenenetscripts_path and args.dataset_name and
+            args.dataset_path and args.linesandimagesfolder_path):  # All arguments passed
         trajectory = int(args.trajectory)
         scenenetscripts_path = args.scenenetscripts_path
-        protobuf_path = args.protobuf_path
+        dataset_name = args.dataset_name
         dataset_path = args.dataset_path
-        linesfiles_path = args.linesfiles_path
-        output_path = args.output_path
+        linesandimagesfolder_path = args.linesandimagesfolder_path
     else:
-        print("Some arguments are missing. Using default ones in "
-              "config_paths_and_variables.sh.")
+        print("get_virtual_camera_images.py: Some arguments are missing. Using "
+              "default ones in config_paths_and_variables.sh. In particular, "
+              "please note that I am using dataset pySceneNetRGBD.")
         # Obtain paths and variables
         scenenet_dataset_path = pathconfig.obtain_paths_and_variables(
             "SCENENET_DATASET_PATH")
         scenenetscripts_path = pathconfig.obtain_paths_and_variables(
             "SCENENET_SCRIPTS_PATH")
-        protobuf_path = pathconfig.obtain_paths_and_variables("PROTOBUF_PATH")
-        outputdata_path = pathconfig.obtain_paths_and_variables(
-            "OUTPUTDATA_PATH")
+        linesandimagesfolder_path = pathconfig.obtain_paths_and_variables(
+            "LINESANDIMAGESFOLDER_PATH")
         trajectory = pathconfig.obtain_paths_and_variables("TRAJ_NUM")
         dataset_name = pathconfig.obtain_paths_and_variables("DATASET_NAME")
         # Compose script arguments if necessary
         dataset_path = os.path.join(scenenet_dataset_path, 'data/',
                                     dataset_name)
-        linesfiles_path = os.path.join(outputdata_path,
-                                       '{}_lines'.format(dataset_name))
-        output_path = os.path.join(outputdata_path, dataset_name)
 
+    linesfiles_path = os.path.join(linesandimagesfolder_path,
+                                   '{}_lines'.format(dataset_name))
+    output_path = os.path.join(linesandimagesfolder_path, dataset_name)
+    # Find protobuf file associated to dataset_name
+    protobuf_path = get_protobuf_paths.get_protobuf_path(dataset_name)
+    if protobuf_path is None:
+        sys.exit('get_virtual_camera_images.py: Error in retrieving '
+                 'protobuf_path.')
     # Include the pySceneNetRGBD folder to the path and import its modules.
     sys.path.append(scenenetscripts_path)
     import scenenet_pb2 as sn

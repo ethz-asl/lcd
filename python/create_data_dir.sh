@@ -6,7 +6,7 @@ DATA_PATH=${2:-"../data"}
 DATASET_NAME=${3:-"train"}
 
 # Check that name of the dataset is valid
-# TODO Retrieve from the protobuf is the DATASET_NAME is valid
+# TODO Retrieve from the protobuf if the DATASET_NAME is valid
 
 case "$DATASET_NAME" in
     train)

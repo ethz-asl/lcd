@@ -1,13 +1,14 @@
 import numpy as np
 import sys
 
-# Retrieve scenenetscripts_path and protobuf path from config file.
-print('scenenet_utils.py: Using values in config_paths_and_variables.sh '
-      'for SCENENET_SCRIPTS_PATH and PROTOBUF_PATH.')
 import pathconfig
+from get_protobuf_paths import get_protobuf_path
+
+# Retrieve scenenetscripts_path from config file.
+print('scenenet_utils.py: Using value in config_paths_and_variables.sh '
+      'for SCENENET_SCRIPTS_PATH.')
 scenenetscripts_path = pathconfig.obtain_paths_and_variables(
     "SCENENET_SCRIPTS_PATH")
-protobuf_path = pathconfig.obtain_paths_and_variables("PROTOBUF_PATH")
 
 sys.path.append(scenenetscripts_path)
 import scenenet_pb2 as sn
@@ -248,10 +249,12 @@ def rgbd_to_pcl(rgb_image, depth_image, camera_model):
     return pointcloud
 
 
-def convert_camera_coordinates_to_world(coor_camera, trajectory, frame):
+def convert_camera_coordinates_to_world(coor_camera, dataset_name, trajectory,
+                                        frame):
     """Convert coordinates in camera frame to coordinates in world frame.
     Args:
         coor_camera: numpy array of shape (3, ). Coordinates in camera frame. [x, y, z].
+        dataset_name: string. Name associated to the dataset (cf. python/config_protobuf_paths)
         trajectory: int. A trajectory in SceneNetRGBD dataset.
         frame: int. A certain frame of in the trajectory.
 
@@ -260,6 +263,11 @@ def convert_camera_coordinates_to_world(coor_camera, trajectory, frame):
     """
 
     trajectories = sn.Trajectories()
+    # Find protobuf file associated to dataset_name
+    protobuf_path = get_protobuf_path(dataset_name)
+    if protobuf_path is None:
+        sys.exit('scenenet_utils.py/convert_camera_coordinates_to_world: Error '
+                 'in retrieving protobuf_path.')
     try:
         with open(protobuf_path, 'rb') as f:
             trajectories.ParseFromString(f.read())

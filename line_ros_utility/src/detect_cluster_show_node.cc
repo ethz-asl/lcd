@@ -23,16 +23,17 @@ int main(int argc, char** argv) {
   } else {
     ROS_INFO("Not enough arguments. Using default paths and variables in "
               "python/config_paths_and_variables.sh.");
-    std::string outputdata_path, dataset_name;
+    std::string linesandimagesfolder_path, dataset_name;
     if (!line_ros_utility::getDefaultPathsAndVariables("TRAJ_NUM", &traj_num)) {
       ROS_ERROR("Error in retrieving default argument TRAJ_NUM. Exiting."
                 "Got TRAJ_NUM=%d", traj_num);
       return -1;
     }
-    if (!line_ros_utility::getDefaultPathsAndVariables("OUTPUTDATA_PATH",
-                                                  &outputdata_path)) {
-      ROS_ERROR("Error in retrieving default argument OUTPUTDATA_PATH. "
-                "Exiting.");
+    if (!line_ros_utility::getDefaultPathsAndVariables(
+                                                  "LINESANDIMAGESFOLDER_PATH",
+                                                  &linesandimagesfolder_path)) {
+      ROS_ERROR("Error in retrieving default argument "
+                "LINESANDIMAGESFOLDER_PATH. Exiting.");
       return -1;
     }
     if (!line_ros_utility::getDefaultPathsAndVariables("DATASET_NAME",
@@ -40,7 +41,7 @@ int main(int argc, char** argv) {
       ROS_ERROR("Error in retrieving default argument DATASET_NAME. Exiting.");
       return -1;
     }
-    write_path = outputdata_path + "/" + dataset_name + "_lines/";
+    write_path = linesandimagesfolder_path + "/" + dataset_name + "_lines/";
     ROS_INFO("traj_num is %d, write_path is %s", traj_num, write_path.c_str());
   }
   line_ros_utility::ListenAndPublish ls(traj_num, write_path);

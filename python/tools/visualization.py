@@ -8,12 +8,10 @@ import matplotlib.pyplot as plt
 
 # Retrieve scenenetscripts_path and protobuf path from config file.
 print('visualization.py: Using values in config_paths_and_variables.sh '
-      'for SCENENET_SCRIPTS_PATH, PROTOBUF_PATH, OUTPUTDATA_PATH and DATASET_NAME.')
+      'for SCENENET_SCRIPTS_PATH, LINESANDIMAGESFOLDER_PATH.')
 scenenetscripts_path = pathconfig.obtain_paths_and_variables(
     "SCENENET_SCRIPTS_PATH")
-protobuf_path = pathconfig.obtain_paths_and_variables("PROTOBUF_PATH")
-outputdata_path = pathconfig.obtain_paths_and_variables("OUTPUTDATA_PATH")
-dataset_name = pathconfig.obtain_paths_and_variables("DATASET_NAME")
+linesandimagesfolder_path = pathconfig.obtain_paths_and_variables("LINESANDIMAGESFOLDER_PATH")
 
 sys.path.append(scenenetscripts_path)
 import scenenet_pb2 as sn
@@ -21,25 +19,31 @@ import scenenet_pb2 as sn
 from mpl_toolkits.mplot3d import Axes3D
 from camera_pose_and_intrinsics_example import camera_to_world_with_pose, interpolate_poses
 
-path_to_lines_root = os.path.join(outputdata_path,
-                                  '{}_lines/'.format(dataset_name))
-
-trajectories = sn.Trajectories()
-try:
-    with open(protobuf_path, 'rb') as f:
-        trajectories.ParseFromString(f.read())
-except IOError:
-    print('Scenenet protobuf data not found at location:{0}'.format(
-        protobuf_path))
-    print('Please ensure you have copied the pb file to the data directory')
 
 
-def get_lines_world_coordinates_with_instances(trajectory, frames):
+def get_lines_world_coordinates_with_instances(dataset_name, trajectory, frames):
     """For some frames in a trajectory, get lines start and end points world coordinates and the instance labels assigned to lines.
     """
     lines_world = {}
     frames_count = {}
     lines_total = 0
+
+    path_to_lines_root = os.path.join(linesandimagesfolder_path,
+                                    '{}_lines/'.format(dataset_name))
+    # Find protobuf file associated to dataset_name
+    protobuf_path = get_protobuf_paths.get_protobuf_path(dataset_name)
+    if protobuf_path is None:
+        sys.exit('visualization.py: Error in retrieving protobuf_path.')
+
+    trajectories = sn.Trajectories()
+    try:
+        with open(protobuf_path, 'rb') as f:
+            trajectories.ParseFromString(f.read())
+        except IOError:
+            print('Scenenet protobuf data not found at location:{0}'.format(
+                protobuf_path))
+            print('Please ensure you have copied the pb file to the data directory')
+
 
     frames_with_lines = []
 

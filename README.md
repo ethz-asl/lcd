@@ -23,16 +23,16 @@ $ catkin init
 
 `git clone` the following packages to your `src` directory in catkin workspace `catkin_ws`
 
-* catkin_simple
-* eigen_catkin
-* eigen_checks
-* gflags_catkin
-* glog_catkin
-* line_tools
-* opencv3_catkin
-* pcl_catkin
-* scenenet_ros_tools
-* vision_opencv
+* [catkin_simple](https://github.com/catkin/catkin_simple)
+* [eigen_catkin](https://github.com/ethz-asl/eigen_catkin)
+* [eigen_checks](https://github.com/ethz-asl/eigen_checks)
+* [gflags_catkin](https://github.com/ethz-asl/gflags_catkin)
+* [glog_catkin](https://github.com/ethz-asl/glog_catkin/)
+* [line_tools](https://github.com/ethz-asl/line_tools/)
+* [opencv3_catkin](https://github.com/ethz-asl/opencv3_catkin/)
+* [pcl_catkin](https://github.com/ethz-asl/pcl_catkin/)
+* [scenenet_ros_tools](https://github.com/ethz-asl/scenenet_ros_tools/)
+* [vision_opencv](https://github.com/ethz-asl/vision_opencv)
 
 You also need to edit the file `CMakeLists.txt` in the `opencv3_catkin` directory by:
 - modifying the following three lines:
@@ -53,7 +53,7 @@ opencv_line_descriptor
 opencv_ximgproc
 ```
 
-(For a safer operation, just make sure that opencv3_catkin points to commit c57f763 on branch line_tools).
+(For a safer operation, just make sure that opencv3_catkin points to commit [bd876bc](https://github.com/ethz-asl/opencv3_catkin/commit/bd876bcf5ad393190e6c771be3f19e9e0df6470d)).
 
 Build them (it could take 1 hour for the first time):
 ```

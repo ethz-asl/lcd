@@ -22,7 +22,7 @@ echo "SCENENET_DATASET_PATH $SCENENET_DATASET_PATH" >> paths_and_variables.txt
 echo "SCENENET_SCRIPTS_PATH $SCENENET_SCRIPTS_PATH" >> paths_and_variables.txt
 echo "PROTOBUF_PATH $PROTOBUF_PATH" >> paths_and_variables.txt
 echo "BAGFOLDER_PATH $BAGFOLDER_PATH" >> paths_and_variables.txt
-echo "OUTPUTDATA_PATH $OUTPUTDATA_PATH" >> paths_and_variables.txt
+echo "LINESANDIMAGESFOLDER_PATH $LINESANDIMAGESFOLDER_PATH" >> paths_and_variables.txt
 echo "PYTHONSCRIPTS_PATH $PYTHONSCRIPTS_PATH" >> paths_and_variables.txt
 echo "TARFILES_PATH $TARFILES_PATH" >> paths_and_variables.txt
 echo "PICKLEANDSPLIT_PATH $PICKLEANDSPLIT_PATH" >> paths_and_variables.txt

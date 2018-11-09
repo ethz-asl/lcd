@@ -16,10 +16,6 @@ def split_dataset():
     sys.path.append(scenenetscripts_path)
     import scenenet_pb2 as sn
 
-    #print('Path_to_linesfiles is {0}'.format(path_to_linesfiles))
-    #print('Path_to_virtualcameraimages is {0}'.format(
-    #    path_to_virtualcameraimages))
-
     trajectories = sn.Trajectories()
     try:
         with open(protobuf_path, 'rb') as f:
@@ -106,51 +102,50 @@ if __name__ == '__main__':
         help="Path to the scripts from pySceneNetRGBD (e.g. "
         "'../pySceneNetRGBD/').")
     parser.add_argument(
-        "-protobuf_path",
-        help="Path to protobuf file.")
+        "-dataset_name",
+        help="Either train or val, indicating whether "
+        "the data being pickled comes from the train or val dataset of "
+        "pySceneNetRGBD.")
     parser.add_argument(
-        "-path_to_linesfiles",
-        help="Path to the folder containing lines text files (e.g. "
-        "/data/train_lines/').")
-    parser.add_argument(
-        "-path_to_virtualcameraimages",
-        help="Path to the folder containing virtual camera images (e.g. "
-        "'data/train/').")
+        "-linesandimagesfolder_path",
+        help="Path to folder (e.g. 'data') containing text lines files (e.g. "
+        "under 'data/train_lines') as well as virtual camera images (e.g. "
+        "under 'data/train_lines').")
     parser.add_argument(
         "-output_path",
         help="Path where to write the txt files with the splitting.")
 
     args = parser.parse_args()
-    if (args.trajectory and args.scenenetscripts_path and args.protobuf_path and
-            args.path_to_linesfiles and args.path_to_virtualcameraimages and
-            args.output_path):  # All arguments passed
+    if (args.trajectory and args.scenenetscripts_path and args.dataset_name and
+            args.linesandimagesfolder_path and args.output_path):
+        # All arguments passed
         trajectory = int(args.trajectory)
         scenenetscripts_path = args.scenenetscripts_path
-        protobuf_path = args.protobuf_path
-        path_to_linesfiles = args.path_to_linesfiles
-        path_to_virtualcameraimages = args.path_to_virtualcameraimages
+        dataset_name = args.dataset_name
+        linesandimagesfolder_path = args.linesandimagesfolder_path
         output_path = args.output_path
     else:
-        print("Some arguments are missing. Using default ones in "
-              "config_paths_and_variables.sh.")
+        print("split_dataset_with_labels_world.py: Some arguments are missing. "
+              "Using default ones in config_paths_and_variables.sh.")
         # Obtain paths and variables
         scenenetscripts_path = pathconfig.obtain_paths_and_variables(
             "SCENENET_SCRIPTS_PATH")
-        protobuf_path = pathconfig.obtain_paths_and_variables("PROTOBUF_PATH")
-        outputdata_path = pathconfig.obtain_paths_and_variables(
-            "OUTPUTDATA_PATH")
+        linesandimagesfolder_path = pathconfig.obtain_paths_and_variables(
+            "LINESANDIMAGESFOLDER_PATH")
         trajectory = pathconfig.obtain_paths_and_variables("TRAJ_NUM")
         dataset_name = pathconfig.obtain_paths_and_variables("DATASET_NAME")
-        # Compose script arguments if necessary
-        path_to_linesfiles = os.path.join(outputdata_path,
-                                          '{}_lines'.format(dataset_name))
-        path_to_virtualcameraimages = os.path.join(outputdata_path,
-                                                   dataset_name)
-        output_path = os.path.join(outputdata_path)
-
-    path_to_linesfiles = os.path.join(path_to_linesfiles,
-                                      'traj_{0}/'.format(trajectory))
-    path_to_virtualcameraimages = os.path.join(path_to_virtualcameraimages,
-                                               'traj_{0}/'.format(trajectory))
+        output_path = os.path.join(linesandimagesfolder_path)
+    # Find protobuf file associated to dataset_name
+    protobuf_path = get_protobuf_paths.get_protobuf_path(dataset_name)
+    if protobuf_path is None:
+        sys.exit('split_dataset_with_labels_world.py: Error in retrieving '
+                 'protobuf_path.')
+    # Compose auxiliary paths
+    path_to_linesfiles = os.path.join(linesandimagesfolder_path,
+                                      '{0}_lines/traj_{1}/'.format(
+                                          dataset_name, trajectory))
+    path_to_virtualcameraimages = os.path.join(linesandimagesfolder_path,
+                                               '{0}/traj_{1}/'.format(
+                                                   dataset_name, trajectory))
 
     split_dataset()

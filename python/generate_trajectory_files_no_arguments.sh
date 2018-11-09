@@ -3,6 +3,7 @@
 # arguments - therefore letting them read the paths and variables values from
 # the config file - should produce the exact same result as when passing the
 # argument, e.g., when running the script generate_trajectory_files.sh
+echo "******* (DEPRECATED OR TO FIX) **********"
 source ~/catkin_ws/devel/setup.bash
 source ~/catkin_extended_ws/devel/setup.bash
 source ~/.virtualenvs/line_tools/bin/activate
@@ -39,7 +40,7 @@ fi
 
 # Create output trajectories (if nonexistent)
 mkdir -p "$BAGFOLDER_PATH"/${DATASET_NAME};
-mkdir -p "$OUTPUTDATA_PATH";
+mkdir -p "$LINESANDIMAGESFOLDER_PATH";
 mkdir -p "$TARFILES_PATH"/${DATASET_NAME};
 mkdir -p "$PICKLEANDSPLIT_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM}/;
 
@@ -60,29 +61,29 @@ fi
 
 # Create folders to store the data
 echo -e "\n**** Creating folders to store the data for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
-bash "$CURRENT_DIR"/create_data_dir.sh $TRAJ_NUM "$OUTPUTDATA_PATH" $DATASET_NAME;
+bash "$CURRENT_DIR"/create_data_dir.sh $TRAJ_NUM "$LINESANDIMAGESFOLDER_PATH" $DATASET_NAME;
 # Only create lines files if not there already (and valid)
-if [ -e "$OUTPUTDATA_PATH"/VALID_LINES_FILES_${TRAJ_NUM}_${DATASET_NAME} ]
+if [ -e "$LINESANDIMAGESFOLDER_PATH"/VALID_LINES_FILES_${TRAJ_NUM}_${DATASET_NAME} ]
 then
    echo 'Found valid lines files. Using them.'
 else
    # Delete any previous line textfile associated to that trajectory
-   rm "$OUTPUTDATA_PATH"/${DATASET_NAME}_lines/traj_${TRAJ_NUM}/*
+   rm "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/traj_${TRAJ_NUM}/*
    # Play bag and record data
 
    echo -e "\n**** Playing bag and recording data for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
-   roslaunch line_ros_utility detect_cluster_show.launch trajectory:=${TRAJ_NUM} write_path:="$OUTPUTDATA_PATH"/${DATASET_NAME}_lines/ &
+   roslaunch line_ros_utility detect_cluster_show.launch trajectory:=${TRAJ_NUM} write_path:="$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/ &
    LAUNCH_PID=$!;
    rosbag play -d 3.5 "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenet_traj_${TRAJ_NUM}.bag;
    sudo kill ${LAUNCH_PID};
 
    # Creates a file to say that lines files have been generated, to avoid
    # creating them again if reexecuting the script before moving files
-   touch "$OUTPUTDATA_PATH"/VALID_LINES_FILES_${TRAJ_NUM}_${DATASET_NAME};
+   touch "$LINESANDIMAGESFOLDER_PATH"/VALID_LINES_FILES_${TRAJ_NUM}_${DATASET_NAME};
 fi
 
 # Only generate virtual camera images files if not there already (and valid)
-if [ -e "$OUTPUTDATA_PATH"/VALID_VIRTUAL_CAMERA_IMAGES_${TRAJ_NUM}_${DATASET_NAME} ]
+if [ -e "$LINESANDIMAGESFOLDER_PATH"/VALID_VIRTUAL_CAMERA_IMAGES_${TRAJ_NUM}_${DATASET_NAME} ]
 then
    echo 'Found valid virtual camera images. Using them.'
 else
@@ -91,12 +92,12 @@ else
    python "$PYTHONSCRIPTS_PATH"/get_virtual_camera_images.py;
    # Creates a file to say that virtual camera images have been generated, to
    # avoid creating them again if reexecuting the script before moving files
-   touch "$OUTPUTDATA_PATH"/VALID_VIRTUAL_CAMERA_IMAGES_${TRAJ_NUM}_${DATASET_NAME};
+   touch "$LINESANDIMAGESFOLDER_PATH"/VALID_VIRTUAL_CAMERA_IMAGES_${TRAJ_NUM}_${DATASET_NAME};
 fi
 
 # Create archive
 echo -e "\n**** Zipping files for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
-cd "$OUTPUTDATA_PATH";
+cd "$LINESANDIMAGESFOLDER_PATH";
 tar -cf - ${DATASET_NAME}/traj_${TRAJ_NUM} ${DATASET_NAME}_lines/traj_${TRAJ_NUM} | gzip --no-name > "$TARFILES_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM}.tar.gz
 
 # Split dataset
@@ -110,13 +111,13 @@ for word in test train val all_lines; do
   # files were formed (i.e., how data was divided before pickling the data).
   # Further conversion is needed when using these files to train the NN, to
   # replace the absolute path.
-  mv "$OUTPUTDATA_PATH"/${word}.txt "$PICKLEANDSPLIT_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM}/;
+  mv "$LINESANDIMAGESFOLDER_PATH"/${word}.txt "$PICKLEANDSPLIT_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM}/;
 done
 
 # Delete lines files and virtual camera images
 echo -e "\n**** Delete lines files for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
-rm "$OUTPUTDATA_PATH"/VALID_LINES_FILES_${TRAJ_NUM}_${DATASET_NAME};
-rm -r "$OUTPUTDATA_PATH"/${DATASET_NAME}_lines/traj_${TRAJ_NUM};
+rm "$LINESANDIMAGESFOLDER_PATH"/VALID_LINES_FILES_${TRAJ_NUM}_${DATASET_NAME};
+rm -r "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/traj_${TRAJ_NUM};
 echo -e "\n**** Delete virtual camera images for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
-rm "$OUTPUTDATA_PATH"/VALID_VIRTUAL_CAMERA_IMAGES_${TRAJ_NUM}_${DATASET_NAME};
-rm -r "$OUTPUTDATA_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM};
+rm "$LINESANDIMAGESFOLDER_PATH"/VALID_VIRTUAL_CAMERA_IMAGES_${TRAJ_NUM}_${DATASET_NAME};
+rm -r "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM};

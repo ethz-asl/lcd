@@ -37,18 +37,18 @@ if __name__ == '__main__':
         output_path = args.output_path
         dataset_name = args.dataset_name
     else:
-        print("Some arguments are missing. Using default ones in "
-              "config_paths_and_variables.sh.")
+        print("pickle_files.py: ome arguments are missing. Using default ones "
+              "in config_paths_and_variables.sh.")
         # Obtain paths and variables
-        outputdata_path = pathconfig.obtain_paths_and_variables(
-            "OUTPUTDATA_PATH")
+        linesandimagesfolder_path = pathconfig.obtain_paths_and_variables(
+            "LINESANDIMAGESFOLDER_PATH")
         pickleandsplit_path = pathconfig.obtain_paths_and_variables(
             "PICKLEANDSPLIT_PATH")
         trajectory = pathconfig.obtain_paths_and_variables("TRAJ_NUM")
         dataset_name = pathconfig.obtain_paths_and_variables(
             "DATASET_NAME")
         # Compose script arguments if necessary
-        splittingfiles_path = outputdata_path
+        splittingfiles_path = linesandimagesfolder_path
         output_path = os.path.join(pickleandsplit_path, dataset_name,
                                    'traj_{}'.format(trajectory))
 
