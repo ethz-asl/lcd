@@ -108,7 +108,7 @@ tar -cf - ${DATASET_NAME}/traj_${TRAJ_NUM} ${DATASET_NAME}_lines/traj_${TRAJ_NUM
 
 # Split dataset
 echo -e "\n**** Splitting dataset for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
-python "$PYTHONSCRIPTS_PATH"/split_dataset_with_labels_world.py -trajectory ${TRAJ_NUM} -protobuf_path "$PROTOBUF_PATH" -path_to_linesfiles "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/ -path_to_virtualcameraimages "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}/ -output_path "$LINESANDIMAGESFOLDER_PATH" -scenenetscripts_path "$SCENENET_SCRIPTS_PATH"
+python "$PYTHONSCRIPTS_PATH"/split_dataset_with_labels_world.py -trajectory ${TRAJ_NUM} -linesandimagesfolder_path "$LINESANDIMAGESFOLDER_PATH" -output_path "$LINESANDIMAGESFOLDER_PATH" -scenenetscripts_path "$SCENENET_SCRIPTS_PATH"
 echo -e "\n**** Pickling files for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
 python "$PYTHONSCRIPTS_PATH"/pickle_files.py -splittingfiles_path "$LINESANDIMAGESFOLDER_PATH" -output_path "$PICKLEANDSPLIT_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM}/ -dataset_name ${DATASET_NAME}
 for word in test train val all_lines; do
