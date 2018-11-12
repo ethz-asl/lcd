@@ -9,7 +9,8 @@ from tools import pathconfig
 def pickle_images():
     for word in ['train', 'test', 'val']:
         pickle_dataset.pickle_images(
-            os.path.join(splittingfiles_path, '{}.txt'.format(word)),
+            os.path.join(splittingfiles_path,
+                         '{}_with_line_endpoints.txt'.format(word)),
             os.path.join(output_path, 'pickled_{}.pkl'.format(word)),
             dataset_name)
         print('Pickled {}'.format(word))
@@ -31,8 +32,7 @@ if __name__ == '__main__':
         "pySceneNetRGBD.")
 
     args = parser.parse_args()
-    if (args.splittingfiles_path and args.output_path and
-            args.dataset_name):
+    if (args.splittingfiles_path and args.output_path and args.dataset_name):
         splittingfiles_path = args.splittingfiles_path
         output_path = args.output_path
         dataset_name = args.dataset_name
@@ -45,8 +45,7 @@ if __name__ == '__main__':
         pickleandsplit_path = pathconfig.obtain_paths_and_variables(
             "PICKLEANDSPLIT_PATH")
         trajectory = pathconfig.obtain_paths_and_variables("TRAJ_NUM")
-        dataset_name = pathconfig.obtain_paths_and_variables(
-            "DATASET_NAME")
+        dataset_name = pathconfig.obtain_paths_and_variables("DATASET_NAME")
         # Compose script arguments if necessary
         splittingfiles_path = linesandimagesfolder_path
         output_path = os.path.join(pickleandsplit_path, dataset_name,

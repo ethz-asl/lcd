@@ -203,7 +203,10 @@ class ImageDataGenerator:
 
         # To numpy array
         labels = np.array(labels, dtype=np.float32)
-        assert labels.shape == (batch_size, 4)
+        if self.read_as_pickle:
+          assert labels.shape == (batch_size, 7)
+        else:
+          assert labels.shape == (batch_size, 4)
 
         # return array of images and labels
         return images, labels

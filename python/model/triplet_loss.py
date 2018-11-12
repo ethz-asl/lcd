@@ -143,6 +143,11 @@ def batch_hardest_triplet_loss(labels, embeddings, margin, squared=False):
     Returns:
         triplet_loss: scalar tensor containing the triplet loss
     """
+    # the label for each line must be of shape 4: 3 values for the center of the
+    # line and one for the instance
+    assert labels.shape[1] == 4, "{}".format(
+        labels.shape)
+
     # Get the pairwise distance matrix
     pairwise_dist = _pairwise_distances(embeddings, squared=squared)
 
@@ -199,6 +204,11 @@ def batch_all_triplet_loss(labels, embeddings, margin, squared=False):
     Returns:
         triplet_loss: scalar tensor containing the triplet loss
     """
+    # the label for each line must be of shape 4: 3 values for the center of the
+    # line and one for the instance
+    assert labels.shape[1] == 4, "{}".format(
+        labels.shape)
+
     # Get the pairwise distance matrix
     pairwise_dist = _pairwise_distances(embeddings, squared=squared)
 

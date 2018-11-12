@@ -8,6 +8,7 @@ from model.datagenerator import ImageDataGenerator
 from model.alexnet import AlexNet
 from model.triplet_loss import batch_all_triplet_loss, batch_hardest_triplet_loss
 from tools.train_set_mean import get_train_set_mean
+from tools.get_line_center import get_line_center
 from tools import pathconfig
 
 # Set a seed for numpy
@@ -22,10 +23,10 @@ pickleandsplit_path = pathconfig.obtain_paths_and_variables(
 
 # Configuration settings
 # Path to the textfiles for the trainings and validation set
-train_files = os.path.join(pickleandsplit_path,
-                           'train/traj_1/pickled_train.pkl')
-test_files = os.path.join(pickleandsplit_path, 'train/traj_1/pickled_test.pkl')
-val_files = os.path.join(pickleandsplit_path, 'train/traj_1/pickled_val.pkl')
+train_files = [os.path.join(pickleandsplit_path,
+                           'train/traj_2/pickled_train.pkl')]
+test_files = [os.path.join(pickleandsplit_path, 'train/traj_2/pickled_test.pkl')]
+val_files = [os.path.join(pickleandsplit_path, 'train/traj_2/pickled_val.pkl')]
 
 image_type = 'bgr-d'
 #train_set_mean = np.array([22.4536157, 20.11461999, 5.61416132, 605.87199598])
@@ -182,6 +183,11 @@ with tf.Session() as sess:
             batch_x_train, batch_labels_train = train_generator.next_batch(
                 batch_size)
 
+            # Pickled files have labels in the endpoints format -> convert them
+            # to center format
+            if read_as_pickle:
+                batch_labels_train = get_line_center(batch_labels_train)
+
             # And run the training op
             sess.run(
                 train_op,
@@ -209,11 +215,17 @@ with tf.Session() as sess:
         loss_val = 0.
         test_count = 0
         for _ in range(val_batches_per_epoch):
-            batch_tx, batch_ty = val_generator.next_batch(batch_size)
+            batch_x_val, batch_labels_val = val_generator.next_batch(batch_size)
+
+            # Pickled files have labels in the endpoints format -> convert them
+            # to center format
+            if read_as_pickle:
+                batch_labels_val = get_line_center(batch_labels_val)
+
             loss_current = sess.run(
                 loss, feed_dict={
-                    x: batch_tx,
-                    labels: batch_ty,
+                    x: batch_x_val,
+                    labels: batch_labels_val,
                     keep_prob: 1.
                 })
             loss_val += loss_current

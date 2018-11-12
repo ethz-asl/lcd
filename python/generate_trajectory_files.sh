@@ -111,6 +111,7 @@ for word in test train val all_lines; do
   # Further conversion is needed when using these files to train the NN, to
   # replace the absolute path.
   mv "$LINESANDIMAGESFOLDER_PATH"/${word}.txt "$PICKLEANDSPLIT_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM}/;
+  mv "$LINESANDIMAGESFOLDER_PATH"/${word}_with_line_endpoints.txt "$PICKLEANDSPLIT_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM}/;
 done
 
 # Delete lines files and virtual camera images

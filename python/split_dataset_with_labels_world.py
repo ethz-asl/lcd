@@ -9,6 +9,7 @@ import argparse
 
 from tools import pathconfig
 from tools import scenenet_utils
+from tools import get_protobuf_paths
 from camera_pose_and_intrinsics_example import camera_to_world_with_pose, interpolate_poses
 
 
@@ -90,6 +91,19 @@ def split_dataset():
                         os.path.abspath(path_to_write) + ' ' +
                         str(center_of_line[0]) + ' ' + str(center_of_line[1]) +
                         ' ' + str(center_of_line[2]) + ' ' + str(label) + '\n')
+
+                with open(
+                        os.path.join(output_path,
+                                     key + '_with_line_endpoints.txt'),
+                        'a') as f:
+                    f.write(
+                        os.path.abspath(path_to_write) + ' ' +
+                        str(line_start_point_world[0]) + ' ' +
+                        str(line_start_point_world[1]) + ' ' + str(
+                            line_start_point_world[2]) + ' ' + str(
+                                line_end_point_world[0]) + ' ' +
+                        str(line_end_point_world[1]) + ' ' + str(
+                            line_end_point_world[2]) + ' ' + str(label) + '\n')
 
 
 if __name__ == '__main__':
