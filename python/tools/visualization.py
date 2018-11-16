@@ -35,6 +35,9 @@ def get_lines_world_coordinates_with_instances(dataset_name, trajectory,
                                       '{}_lines/'.format(dataset_name))
     # Find protobuf file associated to dataset_name
     protobuf_path = get_protobuf_path(dataset_name)
+    print(
+        "visualization.py/get_lines_world_coordinates_with_instances: using {} as protobuf_path".
+        format(protobuf_path))
     if protobuf_path is None:
         sys.exit('visualization.py: Error in retrieving protobuf_path.')
 
@@ -98,10 +101,6 @@ def get_lines_world_coordinates_with_instances(dataset_name, trajectory,
         frames_with_lines.append(frame_id)
 
     print('Length of lines_world is ' + str(len(lines_world)))
-    print('Range:')
-    print range(len(lines_world))
-    print('Lines world')
-    print lines_world
     data_lines_world = np.vstack([lines_world[k] for k in frames_with_lines])
     print('Total number of lines: {}'.format(data_lines_world.shape[0]))
 
@@ -168,6 +167,18 @@ def plot_lines_with_matplotlib(pcl_lines):
         z = pcl_lines[i]['points'][:, 2]
         ax.plot(x, y, z, color=pcl_lines[i]['color'])
     plt.show()
+
+
+def plot_lines_with_open3d(pcl_lines, window_name="Open3D"):
+    """ Plots a set of lines (in the format outputted by pcl_lines_for_plot) in
+        open3d
+    """
+    vis = open3d.Visualizer()
+    vis.create_window(window_name=window_name)
+    for line in pcl_lines:
+        vis.add_geometry(line)
+    vis.run()
+    vis.destroy_window()
 
 
 def vis_square(data):
