@@ -69,14 +69,14 @@ if os.path.isfile(embeddings_path):
     test_embeddings_all = np.load(embeddings_path)
 else:
     graph = tf.get_default_graph()
-    x = graph.get_tensor_by_name('Placeholder:0')  # input images
+    input_img = graph.get_tensor_by_name('input_img')  # input images
     labels = graph.get_tensor_by_name(
-        'Placeholder_1:0')  # labels of input images
+        'labels')  # labels of input images
     keep_prob = graph.get_tensor_by_name(
-        'Placeholder_2:0')  # dropout probability
+        'keep_prob')  # dropout probability
     embeddings = graph.get_tensor_by_name('l2_normalize:0')
 
-    batch_size = int(x.shape[0])
+    batch_size = int(input_img.shape[0])
     test_embeddings_all = np.empty(
         (0, int(embeddings.shape[1])), dtype=np.float32)
     test_generator.reset_pointer()
@@ -120,7 +120,7 @@ else:
     #test_count = 0
 
     for i in range(test_set_size / batch_size):
-        batch_x, batch_labels = test_generator.next_batch(batch_size)
+        batch_input_img, batch_labels = test_generator.next_batch(batch_size)
 
         # Pickled files have labels in the endpoints format -> convert them
         # to center format
@@ -130,13 +130,13 @@ else:
         output = sess.run(
             embeddings,
             feed_dict={
-                x: batch_x,
+                input_img: batch_input_img,
                 labels: batch_labels,
                 keep_prob: 1.
             })
         #current_test_loss = sess.run(
         #    triplet_loss, feed_dict={
-        #        x: batch_x,
+        #        input_img: batch_input_img,
         #        labels: batch_labels,
         #        keep_prob: 1.
         #    })

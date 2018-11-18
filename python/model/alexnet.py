@@ -70,6 +70,9 @@ class AlexNet(object):
         dicts (e.g. weights['conv1'] is a dict with keys 'weights' & 'biases') we
         need a special load function
         """
+        # NOTE(fmilano): setting trainable=False below has no effect, since
+        # variables were previously defined with trainable=True.
+        # cf https://stackoverflow.com/a/37327561
 
         # Load the weights into memory
         weights_dict = np.load(self.WEIGHTS_PATH, encoding='bytes').item()

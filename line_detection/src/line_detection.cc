@@ -693,7 +693,7 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     // line to the set of points that lies closer to the origin (and therefore
     // closer to the camera). This is in most cases a reasonable assumption,
     // since the line most of the time belongs to the object that obscures the
-    // background (which causes the discontinouty).
+    // background (which causes the discontinuity).
     // The fitting is done in 3 steps:
     //  1.  Project the line_guess onto the plane fitted to the point set.
     //  2.  Find the line parallel to the projected one that goes through the
@@ -776,7 +776,7 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
   // If the distance along the plane1/2's normal direction between the two
   // sets of points is small and the both support planes for line are found,
   // the line should be either intersection line or surface line, otherwise
-  // the line is discontinouty line.
+  // the line is discontinuity line.
   if (fabs((mean1 - mean2).dot(normal1)) < params_->max_dist_between_planes &&
       fabs((mean1 - mean2).dot(normal2)) < params_->max_dist_between_planes &&
       planes_found) {
@@ -844,7 +844,7 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     // line to the set of points that lies closer to the origin (and therefore
     // closer to the camera). This is in most cases a reasonable assumption,
     // since the line most of the time belongs to the object that obscures the
-    // background (which causes the discontinouty).
+    // background (which causes the discontinuity).
     // The fitting is done in 3 steps:
     //  1.  Project the line_guess onto the plane fitted to the point set.
     //  2.  Find the line parallel to the projected one that goes through the
@@ -1564,7 +1564,7 @@ bool LineDetector::checkIfValidLineDiscont(const cv::Mat& cloud,
   int patch_size = 1;
   // The patch is restricted to be within the rectangle that is spawned by
   // start and end. This has two positive effects: We never try to acces a
-  // pixel outside of the image and if a line starts at an discontinouty edge
+  // pixel outside of the image and if a line starts at an discontinuity edge
   // it prevents the algorithm from early stopping.
   int x_max, y_max, x_min, y_min, x_from, x_to, y_from, y_to;
   if (line[0] < line[2]) {

@@ -42,16 +42,7 @@ def train():
 
     image_type = 'bgr-d'
 
-    train_set_mean = get_train_set_mean(
-        train_files, image_type, read_as_pickle=read_as_pickle)
-
-    print("Mean of train set: {}".format(train_set_mean))
-
-    train_set_mean_tensor = tf.convert_to_tensor(
-        train_set_mean, dtype=np.float64)
-    # Variable is created to save train set mean in the checkpoints
-    train_set_mean_variable = tf.Variable(
-        train_set_mean_tensor, name="train_set_mean")
+    log_files_folder = "./logs/"
 
     # Learning params
     learning_rate = 0.01
@@ -69,37 +60,75 @@ def train():
     display_step = 1
 
     # Path for tf.summary.FileWriter and to store model checkpoints
-    filewriter_path = os.path.join("./logs/", job_name,
+    filewriter_path = os.path.join(log_files_folder, job_name,
                                    "triplet_loss_{}".format(triplet_strategy))
     checkpoint_path = os.path.join(
-        "./logs/", job_name, "triplet_loss_{}_ckpt".format(triplet_strategy))
+        log_files_folder, job_name,
+        "triplet_loss_{}_ckpt".format(triplet_strategy))
 
     # Create parent path if it doesn't exist
     if not os.path.isdir(checkpoint_path):
         os.makedirs(checkpoint_path)
 
-    # TF placeholder for graph input and output
-    if image_type == 'bgr':
-        x = tf.placeholder(tf.float32, [batch_size, 227, 227, 3])
-    elif image_type == 'bgr-d':
-        x = tf.placeholder(tf.float32, [batch_size, 227, 227, 4])
+    # Check if checkpoints already exist
+    latest_checkpoint = tf.train.latest_checkpoint(checkpoint_path)
 
-    labels = tf.placeholder(tf.float32, [batch_size, 4])
-    keep_prob = tf.placeholder(tf.float32)
+    # Create model
+    # Placeholder for graph input and output
+    if image_type == 'bgr':
+        input_img = tf.placeholder(
+            tf.float32, [batch_size, 227, 227, 3], name="input_img")
+    elif image_type == 'bgr-d':
+        input_img = tf.placeholder(
+            tf.float32, [batch_size, 227, 227, 4], name="input_img")
+
+    labels = tf.placeholder(tf.float32, [batch_size, 4], name="labels")
+    keep_prob = tf.placeholder(tf.float32, name="keep_prob")
 
     # Initialize model
     skip_layers = ['fc8']  # Don't use weights from AlexNet
-    model = AlexNet(x, keep_prob, skip_layers, image_type)
+    model = AlexNet(input_img, keep_prob, skip_layers, image_type)
 
     # Link variable to model output
     embeddings = tf.nn.l2_normalize(model.fc8, axis=1)
 
+    # Get train_set_mean
+    if latest_checkpoint is None:
+        train_set_mean = get_train_set_mean(
+            train_files, image_type, read_as_pickle=read_as_pickle)
+        train_set_mean_tensor = tf.convert_to_tensor(
+            train_set_mean, dtype=np.float64)
+        train_set_mean_variable = tf.Variable(
+            initial_value=train_set_mean_tensor,
+            trainable=False,
+            name="train_set_mean")
+    else:
+        if image_type == 'bgr':
+            train_set_mean_shape = (3,)
+        elif image_type == 'bgr-d':
+            train_set_mean_shape = (4,)
+        # The value will be restored from the checkpoint
+        train_set_mean_variable = tf.get_variable(
+            name="train_set_mean",
+            shape=train_set_mean_shape,
+            dtype=tf.float64,
+            trainable=False)
+
     # List of trainable variables of the layers we want to train
     var_list = [
         v for v in tf.trainable_variables()
-        if v.name.split('/')[0] not in no_train_layers and
-        v is not train_set_mean_variable
+        if v.name.split('/')[0] not in no_train_layers
     ]
+    total_parameters = 0
+    print("**** List of variables used for training ****")
+    for var in var_list:
+        shape = var.get_shape()
+        var_parameters = 1
+        for dim in shape:
+            var_parameters *= dim.value
+        print("{0} --- {1} parameters".format(var.name, var_parameters))
+        total_parameters += var_parameters
+    print("Total number of parameters is {}".format(total_parameters))
 
     with tf.name_scope("triplet_loss"):
         if triplet_strategy == "batch_all":
@@ -150,44 +179,75 @@ def train():
     # Initialize an saver for store model checkpoints
     saver = tf.train.Saver()
 
-    # Generator for image data
-    train_generator = ImageDataGenerator(
-        train_files,
-        horizontal_flip=False,
-        shuffle=True,
-        image_type=image_type,
-        mean=train_set_mean,
-        read_as_pickle=read_as_pickle)
-    val_generator = ImageDataGenerator(
-        val_files,
-        shuffle=True,
-        image_type=image_type,
-        mean=train_set_mean,
-        read_as_pickle=read_as_pickle)
-
-    # Get the number of training/validation steps per epoch
-    train_batches_per_epoch = np.floor(
-        train_generator.data_size / batch_size).astype(np.int16)
-    val_batches_per_epoch = np.floor(
-        val_generator.data_size / batch_size).astype(np.int16)
-
     with tf.Session() as sess:
-        # Initialize all variables
-        sess.run(tf.global_variables_initializer())
+        if latest_checkpoint is None:
+            # Initialize all variables
+            sess.run(tf.global_variables_initializer())
+            # Load the pretrained weights into the  layers which are not in
+            # skip_layers
+            model.load_initial_weights(sess)
+            # Set first epoch to use for training as 0
+            starting_epoch = 0
+        else:
+            print("Found checkpoint {}".format(latest_checkpoint))
+            # Load values of variables from checkpoint
+            saver.restore(sess, latest_checkpoint)
+            # Set first epoch to use for training as the number in the last
+            # checkpoint (note that the number saved in this filename
+            # corresponds to the number of the last epoch + 1, cf. lines where
+            # the checkpoints are saved)
+            start_char = latest_checkpoint.find("epoch")
+            if start_char == -1:
+                print(
+                    "File name of checkpoint is in unexpected format: did not "
+                    "find ''epoch''. Exiting.")
+                exit()
+            else:
+                start_char += 5  # Length of the string 'epoch'
+                end_char = latest_checkpoint.find(".ckpt", start_char)
+                if end_char == -1:
+                    print(
+                        "File name of checkpoint is in unexpected format: did "
+                        "not find ''.ckpt''. Exiting.")
+                    exit()
+                else:
+                    starting_epoch = int(latest_checkpoint[start_char:end_char])
+
+        train_set_mean = sess.run(train_set_mean_variable)
+        print("Mean of train set: {}".format(train_set_mean))
+
+        # Initialize generators for image data
+        train_generator = ImageDataGenerator(
+            train_files,
+            horizontal_flip=False,
+            shuffle=True,
+            image_type=image_type,
+            mean=train_set_mean,
+            read_as_pickle=read_as_pickle)
+        val_generator = ImageDataGenerator(
+            val_files,
+            shuffle=True,
+            image_type=image_type,
+            mean=train_set_mean,
+            read_as_pickle=read_as_pickle)
+
+        # Get the number of training/validation steps per epoch
+        train_batches_per_epoch = np.floor(
+            train_generator.data_size / batch_size).astype(np.int16)
+        val_batches_per_epoch = np.floor(
+            val_generator.data_size / batch_size).astype(np.int16)
 
         # Add the model graph to TensorBoard
         writer.add_graph(sess.graph)
-
-        # Load the pretrained weights into the  layers which are not in
-        # skip_layers
-        model.load_initial_weights(sess)
 
         print("{} Start training...".format(datetime.now()))
         print("{} Open Tensorboard at --logdir {}".format(
             datetime.now(), filewriter_path))
 
+        print("Starting epoch is {0}, num_epochs is {1}".format(
+            starting_epoch, num_epochs))
         # Loop over number of epochs
-        for epoch in range(num_epochs):
+        for epoch in range(starting_epoch, num_epochs):
 
             print("{} Epoch number: {}".format(datetime.now(), epoch + 1))
 
@@ -196,7 +256,7 @@ def train():
             while step < train_batches_per_epoch:
 
                 # Get a batch of images and labels
-                batch_x_train, batch_labels_train = train_generator.next_batch(
+                batch_input_img_train, batch_labels_train = train_generator.next_batch(
                     batch_size)
 
                 # Pickled files have labels in the endpoints format -> convert
@@ -208,7 +268,7 @@ def train():
                 sess.run(
                     train_op,
                     feed_dict={
-                        x: batch_x_train,
+                        input_img: batch_input_img_train,
                         labels: batch_labels_train,
                         keep_prob: dropout_rate
                     })
@@ -219,7 +279,7 @@ def train():
                     s = sess.run(
                         merged_summary,
                         feed_dict={
-                            x: batch_x_train,
+                            input_img: batch_input_img_train,
                             labels: batch_labels_train,
                             keep_prob: 1.
                         })
@@ -233,7 +293,7 @@ def train():
             loss_val = 0.
             val_count = 0
             for _ in range(val_batches_per_epoch):
-                batch_x_val, batch_labels_val = val_generator.next_batch(
+                batch_input_img_val, batch_labels_val = val_generator.next_batch(
                     batch_size)
 
                 # Pickled files have labels in the endpoints format -> convert
@@ -244,7 +304,7 @@ def train():
                 loss_current = sess.run(
                     loss,
                     feed_dict={
-                        x: batch_x_val,
+                        input_img: batch_input_img_val,
                         labels: batch_labels_val,
                         keep_prob: 1.
                     })
@@ -267,6 +327,12 @@ def train():
 
             print("{} Model checkpoint saved at {}".format(
                 datetime.now(), checkpoint_name))
+
+            # The following is useful if one has no access to standard output
+            with open(
+                    os.path.join(log_files_folder, job_name,
+                                 "epochs_completed"), "aw") as f:
+                f.write("Completed epoch {}\n".format(epoch + 1))
 
 
 if __name__ == '__main__':
