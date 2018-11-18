@@ -47,9 +47,9 @@ trap "exit" INT
 
 # Generate bag
 echo -e "\n****  Generating bag for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
-echo "PLEASE NOTE! If an error occurs during the formation of the bag (e.g."
-echo "early termination by interrupt) the script will not check if the bag is"
-echo "valid. Therefore invalid bags should be manually removed.\n"
+echo -e "PLEASE NOTE! If an error occurs during the formation of the bag (e.g."
+echo -e "early termination by interrupt) the script will not check if the bag "
+echo -e "is valid. Therefore invalid bags should be manually removed.\n"
 if [ -e "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenet_traj_${TRAJ_NUM}.bag ]
 then
     echo 'Bag file already existent. Using bag found.';

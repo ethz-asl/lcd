@@ -10,7 +10,7 @@ import argparse
 
 from tools import scenenet_utils
 from tools import pathconfig
-from tools import get_protobuf_path
+from tools import get_protobuf_paths
 
 
 def get_virtual_camera_images():
