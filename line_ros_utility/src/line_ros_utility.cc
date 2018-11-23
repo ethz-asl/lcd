@@ -21,8 +21,10 @@ std::vector<int> clusterLinesAfterClassification(
       label.push_back(0);
     } else if (lines[i].type == line_detection::LineType::PLANE) {
       label.push_back(1);
-    } else {
+    } else if (lines[i].type == line_detection::LineType::EDGE) {
       label.push_back(2);
+    } else {
+      label.push_back(3);
     }
   }
   return label;
