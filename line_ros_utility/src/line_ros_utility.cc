@@ -538,18 +538,18 @@ bool getDefaultPathsAndVariables(const std::string& path_or_variable_name,
 
 
 DisplayClusters::DisplayClusters() {
-  colors_.push_back({1, 0, 0});
-  colors_.push_back({0, 1, 0});
-  colors_.push_back({0, 0, 1});
-  colors_.push_back({1, 1, 0});
-  colors_.push_back({1, 0, 1});
-  colors_.push_back({0, 1, 1});
-  colors_.push_back({1, 0.5, 0});
-  colors_.push_back({1, 0, 0.5});
-  colors_.push_back({0.5, 1, 0});
-  colors_.push_back({0, 1, 0.5});
-  colors_.push_back({0.5, 0, 1});
-  colors_.push_back({0, 0.5, 1});
+  colors_.push_back({1, 0, 0});    // Red
+  colors_.push_back({0, 1, 0});    // Green
+  colors_.push_back({0, 0, 1});    // Blue
+  colors_.push_back({1, 1, 0});    // Yellow
+  colors_.push_back({1, 0, 1});    // Magenta
+  colors_.push_back({0, 1, 1});    // Cyan
+  colors_.push_back({1, 0.5, 0});  // Orange
+  colors_.push_back({1, 0, 0.5});  // Red/Fuchsia
+  colors_.push_back({0.5, 1, 0});  // Lemon green
+  colors_.push_back({0, 1, 0.5});  // Bright mint
+  colors_.push_back({0.5, 0, 1});  // Purple
+  colors_.push_back({0, 0.5, 1});  // Light blue
 
   frame_id_set_ = false;
   clusters_set_ = false;
@@ -573,7 +573,7 @@ void DisplayClusters::setClusters(
   for (size_t i = 0u; i < lines3D.size(); ++i) {
     // This if-clause sets the number of clusters. This works well as long the
     // clusters are indexed as an array (0,1,2,3). In any other case, it creates
-    // to many clusters (which is not that bad, because empty clusters do not
+    // too many clusters (which is not that bad, because empty clusters do not
     // need a lot of memory nor a lot of time to allocate), but if one label is
     // higher than the number of colors defined in the constructor (which
     // defines the number of labels that can be displayed), some clusters might
@@ -592,7 +592,7 @@ void DisplayClusters::setClusters(
     size_t n = i % colors_.size();
     storeLines3DinMarkerMsg(line_clusters_[i], &marker_lines_[i], colors_[n]);
     marker_lines_[i].header.frame_id = frame_id_;
-    marker_lines_[i].lifetime = ros::Duration(1.1);
+    marker_lines_[i].lifetime = ros::Duration(11);//ros::Duration(1.1);
   }
   clusters_set_ = true;
 }

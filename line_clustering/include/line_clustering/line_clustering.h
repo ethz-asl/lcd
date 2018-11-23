@@ -35,7 +35,7 @@ class KMeansCluster {
   // Performs the clustering on the means of lines.
   void runLineMeans();
   // This initializes clustering with the additional information of the planes
-  // adjecent to the lines.
+  // adjacent to the lines.
   void initClusteringWithHessians(double scale_hessians);
   void runOnLinesAndHessians();
   // Returns distance matrix.

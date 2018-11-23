@@ -69,11 +69,11 @@ if os.path.isfile(embeddings_path):
     test_embeddings_all = np.load(embeddings_path)
 else:
     graph = tf.get_default_graph()
-    input_img = graph.get_tensor_by_name('input_img')  # input images
+    input_img = graph.get_tensor_by_name('input_img:0')  # input images
     labels = graph.get_tensor_by_name(
-        'labels')  # labels of input images
+        'labels:0')  # labels of input images
     keep_prob = graph.get_tensor_by_name(
-        'keep_prob')  # dropout probability
+        'keep_prob:0')  # dropout probability
     embeddings = graph.get_tensor_by_name('l2_normalize:0')
 
     batch_size = int(input_img.shape[0])

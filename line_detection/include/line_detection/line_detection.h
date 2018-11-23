@@ -11,6 +11,7 @@
 #include <vector>
 
 #include <opencv2/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/line_descriptor/descriptor.hpp>
@@ -25,7 +26,39 @@ constexpr double kPi = 3.141592653589793;
 
 enum class Detector : unsigned int { LSD = 0, EDL = 1, FAST = 2, HOUGH = 3 };
 
-enum class LineType : unsigned int { DISCONT = 0, PLANE = 1, INTER = 2 };
+// Meaning of line types:
+// - DISCONT: discontinuity line. Line on a discontinuity edge of an object,
+//            i.e., for which the two planes fitted to the inliers around the
+//            line are distant in depth from each other. Example: edge of a
+//            chair placed in front of a wall -> One 'inlier plane' belongs to
+//            the wall and the other belongs to the chair.
+// - PLANE: planar (surface) line. Line on a plane, i.e., for which the two
+//          'inlier planes' are close in depth and (almost) parallel to each
+//          other. Example: line on a poster or on any planar object.
+// - EDGE: edge line. Line that separates two parts of a same object, i.e., for
+//         which the two 'inlier planes' are close in depth but not parallel.
+//         Example: line that separates the seating cushion of an armchair and
+//         the cushion against which the back leans.
+// - INTERSECT: intersection line. Line that separates two different objects
+//              where they are in contact with each other. Example: line between
+//              a box and the surface on which the box is placed. Note: 'inlier
+//              planes' have the same properties as the those for an edge line.
+//              However, while the inlier points on the two planes around an
+//              edge line all belong to the same object, for intersection lines
+//              the inlier points on one plane belong to an object (e.g. the
+//              box) and those on the other plane belong to another object (e.g.
+//              the surface on which the box lies). We later assign the line to
+//              belong to the object (between the two) which, if removed, would
+//              cause the line to disappear (e.g., removing the box causes the
+//              line to disappear, whereas if the surface on which the box lies
+//              is removed the line is still present).
+
+enum class LineType : unsigned int {
+  DISCONT = 0,
+  PLANE = 1,
+  EDGE = 2,
+  INTERSECT = 3
+};
 
 struct LineWithPlanes {
   cv::Vec6f line;
@@ -57,6 +90,10 @@ struct LineDetectionParams {
   unsigned int min_points_in_line = 10;
   // default = 0.01: LineDetector::checkIfValidLineWith2DInfo
   double min_length_line_3D = 0.01;
+  // default = 0.1: LineDetector::assignEdgeOrIntersectionLineType
+  double extension_length_for_edge_or_intersection = 0.1;
+  // default = 10: LineDetetor::checkEdgeOrIntersectionGivenProlongedLine
+  double max_points_for_empty_rectangle = 10;
   // default = 0.02: LineDetector::checkIfValidLineBruteForce
   double max_deviation_inlier_line_check = 0.02;
   // default = 1e6: LineDetector::find3DlinesRated
@@ -175,6 +212,15 @@ inline cv::Vec3f computeMean(const std::vector<cv::Vec3f>& points) {
     mean += (points[i] / float(num_points));
   }
   return mean;
+}
+
+// Makes an hessian normal vector point towards the origin.
+// Output: hessian: Hessian directed towards the origin.
+inline void directHessianTowardsOrigin(cv::Vec4f* hessian){
+  // ax + by + cz + d = 0
+  float d = (*hessian)[3];
+  if (d < 0)
+    *hessian = -(*hessian);
 }
 
 // Returns the projection of a point on the plane given defined by the hessian.
@@ -318,13 +364,64 @@ class LineDetector {
   //
   //         line_guess: Initial guess of the line.
   //
+  //         cloud:    Point cloud as CV_32FC3.
+  //
+  //         camera_P:  Camera projection matrix.
+  //
   //         planes_found: True if and only if both planes of the line are found
   //
   // Output:  line:  The 3D line found.
   bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                           const std::vector<cv::Vec3f>& points2,
-                          const cv::Vec6f& line_guess, const bool planes_found,
+                          const cv::Vec6f& line_guess, const cv::Mat& cloud,
+                          const cv::Mat& camera_P, const bool planes_found,
                           LineWithPlanes* line);
+
+  // Assign the type of line to be either edge or intersection.
+  // Input: cloud:    Point cloud as CV_32FC3.
+  //
+  //        camera_P:  Camera projection matrix.
+  //
+  //        mean_points_1/2: Mean point of the inlier points for each of the two
+  //                         planes associated to the line.
+  //
+  // Output: line: Input line with a type assigned to it.
+  //         return: True if line type assignment could be performed, False
+  //                 otherwise.
+
+  bool assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
+                                        const cv::Mat& camera_P,
+                                        const cv::Vec3f& mean_points_1,
+                                        const cv::Vec3f& mean_points_2,
+                                        LineWithPlanes* line);
+
+  // Given the two endpoints of a prolonged line segment (produced by
+  // assignEdgeOrIntersectionLineType) checks if the points around the prolonged
+  // line segments are such that the original line is an edge line or rather an
+  // intersection line.
+  // Input: cloud:    Point cloud as CV_32FC3.
+  //
+  //        camera_P:  Camera projection matrix.
+  //
+  //        start: Start endpoint of the prolonged line segment.
+  //
+  //        end: End endpoint of the prolonged line segment.
+  //
+  //        hessians: Vector containing the Hessian normal form of the two
+  //                  planes around the original line.
+  //
+  // Output: line_type: either EDGE or INTERSECT, type of line to be assigned to
+  //                    the original line according to what found around the
+  //                    prolonged line segments.
+  //         return: True if type of line can be succcessfully determined, False
+  //                 otherwise.
+  bool checkEdgeOrIntersectionGivenProlongedLine(const cv::Mat& cloud,
+                                                 const cv::Mat& camera_P,
+                                                 const cv::Vec3f& start,
+                                                 const cv::Vec3f& end,
+                                                 const std::vector<cv::Vec4f>&
+                                                   hessians,
+                                                 LineType* line_type);
 
   // Fits a plane to the points using RANSAC.
   bool planeRANSAC(const std::vector<cv::Vec3f>& points,
@@ -364,6 +461,7 @@ class LineDetector {
   //
   // Overload: Add output lines2D_out that correspond to lines3D
   void project2Dto3DwithPlanes(const cv::Mat& cloud, const cv::Mat& image,
+                               const cv::Mat& camera_P,
                                const std::vector<cv::Vec4f>& lines2D_in,
                                const bool set_colors,
                                std::vector<cv::Vec4f>* lines2D_out,
@@ -380,14 +478,14 @@ class LineDetector {
   //
   // Output: lines3D: A vector with the lines found in 3D.
   //
-  //         correspondencies: The i-th element of this vector is the index of
+  //         correspondences: The i-th element of this vector is the index of
   //                           the element in lines2D that corresponds to the
   //                           i-th element in lines3D.
   void find3DlinesByShortest(const cv::Mat& cloud,
                              const std::vector<cv::Vec4f>& lines2D,
                              std::vector<cv::Vec6f>* lines3D,
-                             std::vector<int>* correspondencies);
-  // Overload: without correspondencies
+                             std::vector<int>* correspondences);
+  // Overload: without correspondences
   void find3DlinesByShortest(const cv::Mat& cloud,
                              const std::vector<cv::Vec4f>& lines2D,
                              std::vector<cv::Vec6f>* lines3D);
@@ -429,6 +527,8 @@ class LineDetector {
   // 2D lines (using checkIfValidLineWith2DInfo function to check)
   // Input: cloud: Point cloud in the format CV_32FC3.
   //
+  //        camera_P:  Camera projection matrix
+  //
   //        lines2D_in: 2D lines corresponding to lines3D_in.
   //
   //        lines3D_in: 3D lines to be checked.
@@ -459,7 +559,7 @@ class LineDetector {
   //
   //        line_2D:  Line in 2D correcponded to 3D line
   //
-  // Ouput: return:   True if it is a valid line, false otherwise.
+  // Output: return:   True if it is a valid line, false otherwise.
   bool checkIfValidLineWith2DInfo(const cv::Mat& cloud, const cv::Mat& camera_P,
                                   cv::Vec4f& line_2D, cv::Vec6f* line);
 
@@ -470,7 +570,7 @@ class LineDetector {
   //
   //        line:     Line in 3D defined by (start, end).
   //
-  // Ouput: return:   True if it is a possible line, false otherwise.
+  // Output: return:   True if it is a possible line, false otherwise.
   bool checkIfValidLineBruteForce(const cv::Mat& cloud, cv::Vec6f* line);
 
   // Checks if a line is valid by looking for discontinouties. It computes the
@@ -480,7 +580,7 @@ class LineDetector {
   //
   //        line:     Line in 2D defined by (start, end).
   //
-  // Ouput: return:   True if it is a possible line, false otherwise.
+  // Output: return:   True if it is a possible line, false otherwise.
   bool checkIfValidLineDiscont(const cv::Mat& cloud, const cv::Vec4f& line);
 
   // This function does a search for a line with non NaN start and end points in
@@ -551,7 +651,7 @@ class LineDetector {
   //          end_out: End point of the line after adjusting.
   //
   //  Return: False if the number of inliers of the line is less than the
-  // threshold min_points_in_line.
+  //          threshold min_points_in_line.
   bool adjustLineUsingInliers(const std::vector<cv::Vec3f>& points,
                               const cv::Vec3f& start_in,
                               const cv::Vec3f& end_in, cv::Vec3f* start_out,
@@ -581,14 +681,14 @@ class LineDetector {
 
   // find3DLineStartAndEnd:
   // Input: point_cloud:    Mat of type CV_32FC3, that stores the 3D points. A
-  //                        point can be acessed by
+  //                        point can be accessed by
   //                        point_cloud.at<cv::Point3f>(j, i).x.
   //
   //        line2D:         The line that was extracted in 2D.
   //
   // Output: line3D:        If a 3D line is found it is push_backed to this
   //                        vector. It is stored: (x_s, y_s, z_s, x_e, y_e,
-  //                        z_e), wher _s/_e means start resp. end point.
+  //                        z_e), where _s/_e means resp. start and end point.
   //
   //         start:         2D start point that corresponds to start point of
   //                        the 3D line.
