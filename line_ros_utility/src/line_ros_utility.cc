@@ -77,8 +77,10 @@ bool printToFile(const std::vector<line_detection::LineWithPlanes>& lines3D,
         file << 0 << " ";
       } else if (lines3D[i].type == line_detection::LineType::PLANE) {
         file << 1 << " ";
-      } else {
+      } else if (lines3D[i].type == line_detection::LineType::EDGE) {
         file << 2 << " ";
+      } else {
+        file << 3 << " ";
       }
       file << labels[i] << std::endl;
     }
@@ -681,8 +683,10 @@ void TreeClassifier::getLineDecisionPath(
       service.request.lines.push_back(0.0);
     } else if (lines[i].type == line_detection::LineType::PLANE) {
       service.request.lines.push_back(1.0);
-    } else {
+    } else if (lines[i].type == line_detection::LineType::EDGE) {
       service.request.lines.push_back(2.0);
+    } else {
+      service.request.lines.push_back(3.0);
     }
   }
   // Call the service.
