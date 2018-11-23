@@ -197,8 +197,9 @@ void ListenAndPublish::detectLines() {
 void ListenAndPublish::projectTo3D() {
   lines3D_temp_wp_.clear();
   start_time_ = std::chrono::system_clock::now();
-  line_detector_.project2Dto3DwithPlanes(cv_cloud_, cv_image_, lines2D_, true,
-                                         &lines2D_kept_tmp_, &lines3D_temp_wp_);
+  line_detector_.project2Dto3DwithPlanes(cv_cloud_, cv_image_, camera_P_,
+                                         lines2D_, true, &lines2D_kept_tmp_,
+                                         &lines3D_temp_wp_);
   end_time_ = std::chrono::system_clock::now();
   elapsed_seconds_ = end_time_ - start_time_;
   ROS_INFO("Projecting to 3D: %f", elapsed_seconds_.count());
