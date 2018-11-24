@@ -7,6 +7,8 @@
 #include <ros/ros.h>
 
 #include <cv_bridge/cv_bridge.h>
+#include <image_geometry/pinhole_camera_model.h>
+#include <dynamic_reconfigure/server.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/sync_policies/exact_time.h>
 #include <message_filters/synchronizer.h>
@@ -19,15 +21,11 @@
 #include <tf/transform_broadcaster.h>
 #include <visualization_msgs/Marker.h>
 
-#include <image_geometry/pinhole_camera_model.h>
-
-#include <dynamic_reconfigure/server.h>
-#include <line_ros_utility/line_toolsConfig.h>
-
 #include <line_clustering/line_clustering.h>
 #include <line_detection/line_detection.h>
 #include <line_detection/line_detection_inl.h>
-
+#include <line_ros_utility/common.h>
+#include <line_ros_utility/line_toolsConfig.h>
 #include <line_ros_utility/RequestDecisionPath.h>
 #include <line_ros_utility/TreeRequest.h>
 

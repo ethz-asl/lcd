@@ -20,6 +20,8 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
+#include <boost/filesystem.hpp>
+
 namespace line_detection {
 
 constexpr double kPi = 3.141592653589793;
@@ -91,9 +93,9 @@ struct LineDetectionParams {
   // default = 0.01: LineDetector::checkIfValidLineWith2DInfo
   double min_length_line_3D = 0.01;
   // default = 0.1: LineDetector::assignEdgeOrIntersectionLineType
-  double extension_length_for_edge_or_intersection = 0.1;
+  double extension_length_for_edge_or_intersection = 0.05;
   // default = 10: LineDetetor::checkEdgeOrIntersectionGivenProlongedLine
-  double max_points_for_empty_rectangle = 10;
+  double max_points_for_empty_rectangle = 5;
   // default = 0.02: LineDetector::checkIfValidLineBruteForce
   double max_deviation_inlier_line_check = 0.02;
   // default = 1e6: LineDetector::find3DlinesRated
@@ -194,7 +196,7 @@ inline double errorPointToPlane(const cv::Vec4f& hessian_n_f,
 
 inline double distPointToLine(const cv::Vec3f& start, const cv::Vec3f& end,
                               const cv::Vec3f& point) {
-  return cv::norm((point - start).cross(start - end)) / cv::norm(start - end);
+  return cv::norm((point - start).cross(point - end)) / cv::norm(start - end);
 }
 
 // Assume normalized direction vector.
@@ -245,7 +247,7 @@ void findXCoordOfPixelsOnVector(const cv::Point2f& start,
 
 // Returns all pixels that are within or on the border of a rectangle.
 // Input: corners:  These corners define the rectangle. It must contain
-//                  only 4 points.The points must be the cornerpoints of a
+//                  only 4 points. The points must be the cornerpoints of a
 //                  parallelogram. If that is not given, the outcome of the
 //                  function depends on the ordering of the corner point and
 //                  might be wrong.
@@ -266,6 +268,27 @@ bool getPointOnPlaneIntersectionLine(const cv::Vec4f& hessian1,
                                      const cv::Vec4f& hessian2,
                                      const cv::Vec3f& direction,
                                      cv::Vec3f* x_0);
+
+// Displays (via the script python/display_line_with_points_and_planes.py) a
+// line together with its two planes and its two sets of inliers.
+// Input: start/end: Endpoints of the line.
+//
+//        start/end_guess: Endpoints of the guess line.
+//
+//        inliers1/2: Points inliers to the two planes around the line.
+//
+//        hessian1/2: Planes around the line.
+//
+// Output: none.
+void displayLineWithPointsAndPlanes(const cv::Vec3f& start,
+                                    const cv::Vec3f& end,
+                                    const cv::Vec3f& start_guess,
+                                    const cv::Vec3f& end_guess,
+                                    const std::vector<cv::Vec3f>& inliers1,
+                                    const std::vector<cv::Vec3f>& inliers2,
+                                    const cv::Vec4f& hessian1,
+                                    const cv::Vec4f& hessian2);
+
 
 class LineDetector {
  public:

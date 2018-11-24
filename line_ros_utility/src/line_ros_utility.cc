@@ -9,9 +9,6 @@ namespace line_ros_utility {
 const std::string frame_id = "line_tools_id";
 const bool write_labeled_lines = true;
 const bool clustering_with_random_forest = false;
-// The following path should point to the root folder of line_tools (e.g.
-// ~/catkin_extended_ws/src/line_tools/)
-const std::string kLineToolsRootPath = "/home/francesco/catkin_extended_ws/src/line_tools/";
 
 std::vector<int> clusterLinesAfterClassification(
     const std::vector<line_detection::LineWithPlanes>& lines) {
@@ -476,15 +473,16 @@ bool getDefaultPathsAndVariables(const std::string& path_or_variable_name,
     return false;
   }
   // Run script to generate the paths_and_variables file
-  std::string generating_script_path = kLineToolsRootPath +
+  std::string generating_script_path = line_tools_paths::kLineToolsRootPath +
       "/python/print_paths_and_variables_to_file.sh";
   system(generating_script_path.c_str());
   // Read paths_and_variables file
-  std::ifstream paths_and_variables_file(kLineToolsRootPath +
+  std::ifstream paths_and_variables_file(line_tools_paths::kLineToolsRootPath +
                                          "paths_and_variables.txt");
   if (!paths_and_variables_file) {
     // Error during file open
-    LOG(WARNING) << "Error in opening file " << kLineToolsRootPath
+    LOG(WARNING) << "Error in opening file "
+                 << line_tools_paths::kLineToolsRootPath
                  << "paths_and_variables.txt. Exiting.";
     return false;
   }
@@ -512,15 +510,16 @@ bool getDefaultPathsAndVariables(const std::string& path_or_variable_name,
     return false;
   }
   // Run script to generate the paths_and_variables file
-  std::string generating_script_path = kLineToolsRootPath +
+  std::string generating_script_path = line_tools_paths::kLineToolsRootPath +
       "/python/print_paths_and_variables_to_file.sh";
   system(generating_script_path.c_str());
   // Read paths_and_variables file
-  std::ifstream paths_and_variables_file(kLineToolsRootPath +
+  std::ifstream paths_and_variables_file(line_tools_paths::kLineToolsRootPath +
                                          "paths_and_variables.txt");
   if (!paths_and_variables_file) {
     // Error during file open
-    LOG(WARNING) << "Error in opening file " << kLineToolsRootPath
+    LOG(WARNING) << "Error in opening file "
+                 << line_tools_paths::kLineToolsRootPath
                  << "paths_and_variables.txt. Exiting. Error: "
                  << strerror(errno);
     return false;
@@ -597,7 +596,7 @@ void DisplayClusters::setClusters(
     size_t n = i % colors_.size();
     storeLines3DinMarkerMsg(line_clusters_[i], &marker_lines_[i], colors_[n]);
     marker_lines_[i].header.frame_id = frame_id_;
-    marker_lines_[i].lifetime = ros::Duration(11);//ros::Duration(1.1);
+    marker_lines_[i].lifetime = ros::Duration(21);//ros::Duration(1.1);
   }
   clusters_set_ = true;
 }
