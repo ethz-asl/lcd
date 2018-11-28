@@ -396,7 +396,8 @@ void ListenAndPublish::masterCallback(
   ++iteration_;
 }
 
-void ListenAndPublish::labelLinesWithInstances(
+// DEPRECATED
+void ListenAndPublish::labelLinesWithInstancesByMajorityVoting(
     const std::vector<line_detection::LineWithPlanes>& lines,
     const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info,
     std::vector<int>* labels) {
@@ -464,6 +465,186 @@ void ListenAndPublish::labelLinesWithInstances(
     labels->at(i) = known_colors_[best_guess];
   }
 }
+
+void ListenAndPublish::labelLinesWithInstances(
+    const std::vector<line_detection::LineWithPlanes>& lines,
+    const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info,
+    std::vector<int>* labels) {
+    CHECK_NOTNULL(labels);
+    CHECK_EQ(instances.type(), CV_16UC1);
+    labels->resize(lines.size());
+
+    // For intermediate storage.
+    cv::Point2f point2D;
+    unsigned short color;
+    // For intermediate storage:
+    // - Temporarily stores a planar line.
+    std::vector<line_detection::LineWithPlanes> planar_line;
+    // - Stores the instance label for planar line.
+    std::vector<int> planar_line_instance;
+    // - Stores the Hessian forms of the two inlier planes.
+    cv::Vec4f hessian[2];
+    // - Stores the distance from the origin to the plane considered.
+    double distance_plane_from_origin[2];
+    // - Stores the Hessian of the plane closer to the origin.
+    cv::Vec4f* plane_closer_to_origin;
+
+    cv::Vec3f start, end, line, point3D;
+
+    // Iterate over all lines.
+    for (size_t i = 0u; i < lines.size(); ++i) {
+      start = {lines[i].line[0], lines[i].line[1], lines[i].line[2]};
+      end = {lines[i].line[3], lines[i].line[4], lines[i].line[5]};
+      line = end - start;
+      switch (lines[i].type) {
+        case line_detection::LineType::DISCONT:
+          // In case of a discontinuity line, the line should be assigned to
+          // belong to the frontmost object, i.e., it should have the same
+          // instance label as its inliers furthest forward.
+          hessian[0] = lines[i].hessians[0];
+          hessian[1] = lines[i].hessians[1];
+          distance_plane_from_origin[0] =
+              line_detection::errorPointToPlane(hessian[0],
+                                                cv::Vec3f({0.,0.,0.}));
+          distance_plane_from_origin[1] =
+              line_detection::errorPointToPlane(hessian[1],
+                                                cv::Vec3f({0.,0.,0.}));
+          if (distance_plane_from_origin[0] < distance_plane_from_origin[1])
+            plane_closer_to_origin = &(hessian[0]);
+          else
+            plane_closer_to_origin = &(hessian[1]);
+          // Asigns label of the plane closer to the origin.
+          labelLineGivenInlierPlane(lines[i], *plane_closer_to_origin,
+                                    instances, camera_info, &(labels->at(i)));
+          break;
+        case line_detection::LineType::PLANE:
+          // In case of a planar line, all points on the line should belong to
+          // the same instance and majority voting of the instances of a set of
+          // points in the line can therefore be applied.
+          planar_line.clear();
+          planar_line.push_back(lines[i]);
+          labelLinesWithInstancesByMajorityVoting(planar_line, instances,
+                                                  camera_info,
+                                                  &planar_line_instance);
+          CHECK_EQ(planar_line_instance.size(), 1);
+          labels->at(i) = planar_line_instance[0];
+          break;
+        case line_detection::LineType::EDGE:
+          break;
+        case line_detection::LineType::INTERSECT:
+          break;
+      }
+
+
+
+    }
+}
+
+void ListenAndPublish::labelLineGivenInlierPlane(
+    const line_detection::LineWithPlanes& line, const cv::Vec4f& plane,
+    const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info,
+    int* label) {
+  CHECK(line.hessians[0] == plane || line.hessians[1] == plane);
+  CHECK_EQ(instances.type(), CV_16UC1);
+  CHECK(cv_cloud_.type() == CV_32FC3);
+
+  // Points that are inliers to the plane. Each point is a pair of a cv::Vec3f
+  // (coordinates) and of an unsigned short representing the instance label.
+  std::vector<std::pair<cv::Vec3f, unsigned short>>* inliers_to_plane;
+  // Camera model for reprojection.
+  image_geometry::PinholeCameraModel camera_model;
+  camera_model.fromCameraInfo(camera_info);
+
+  // Reproject line in 2D.
+  cv::Vec3f start = {line.line[0], line.line[1], line.line[2]};
+  cv::Vec3f end = {line.line[3], line.line[4], line.line[5]};
+  cv::Point2f start_2D = camera_model.project3dToPixel({start[0], start[1],
+                                                        start[2]});
+  cv::Point2f end_2D = camera_model.project3dToPixel({end[0], end[1], end[2]});
+  cv::Vec4f line_2D = {start_2D.x, start_2D.y, start_2D.x, start_2D.y};
+
+  // Take rectangles and find points within them.
+  std::vector<cv::Point2f> rect_left, rect_right;
+  std::vector<cv::Point2i> points_in_rect;
+  // Each point in the vectors is a pair of a cv::Vec3f (coordinates) and of an
+  // unsigned short representing the instance label.
+  std::vector<std::pair<cv::Vec3f, unsigned short>> points_left_plane,
+                                                    points_right_plane;
+  unsigned short instance_label;
+
+  line_detector_.getRectanglesFromLine(line_2D, &rect_left, &rect_right);
+  // (Left side)
+  line_detection::findPointsInRectangle(rect_left, &points_in_rect);
+  points_left_plane.clear();
+  for (size_t j = 0; j < points_in_rect.size(); ++j) {
+    if (points_in_rect[j].x < 0 || points_in_rect[j].x >= instances.cols ||
+        points_in_rect[j].y < 0 || points_in_rect[j].y >= instances.rows) {
+      continue;
+    }
+    if (std::isnan(cv_cloud_.at<cv::Vec3f>(points_in_rect[j])[0])) continue;
+    instance_label = instances.at<unsigned short>(points_in_rect[j]);
+    points_left_plane.push_back(
+      std::make_pair(instances.at<cv::Vec3f>(points_in_rect[j]), instance_label)
+    );
+  }
+  // (Right side)
+  line_detection::findPointsInRectangle(rect_right, &points_in_rect);
+  points_right_plane.clear();
+  for (size_t j = 0; j < points_in_rect.size(); ++j) {
+    if (points_in_rect[j].x < 0 || points_in_rect[j].x >= cv_cloud_.cols ||
+        points_in_rect[j].y < 0 || points_in_rect[j].y >= cv_cloud_.rows) {
+      continue;
+    }
+    if (std::isnan(cv_cloud_.at<cv::Vec3f>(points_in_rect[j])[0])) continue;
+    instance_label = instances.at<unsigned short>(points_in_rect[j]);
+    points_right_plane.push_back(
+      std::make_pair(instances.at<cv::Vec3f>(points_in_rect[j]), instance_label)
+    );
+  }
+
+  // Find which of the two sets of inliers belong to the plane, i.e., which
+  // fits better to the plane.
+  line_detection::LineDetectionParams params =
+      line_detector_.get_line_detection_params();
+  double max_deviation = params_.max_error_inlier_ransac;
+  int valid_points_left_plane = 0, valid_points_right_plane = 0;
+  std::vector<std::pair<cv::Vec3f, unsigned short>>::iterator it;
+
+  for (it = points_left_plane.begin(); it != points_left_plane.end(); ++it) {
+    if (line_detection::errorPointToPlane(plane, it->first) < max_deviation)
+      ++valid_points_left_plane;
+  }
+  for (it = points_right_plane.begin(); it != points_right_plane.end(); ++it) {
+    if (line_detection::errorPointToPlane(plane, it->first) < max_deviation)
+      ++valid_points_right_plane;
+  }
+  if (valid_points_left_plane > valid_points_right_plane)
+    inliers_to_plane = &points_left_plane;
+  else
+    inliers_to_plane = &points_right_plane;
+
+  // Take majority vote of the instances of the inliers.
+  std::map<unsigned short, size_t> labels_count;
+  for (it = inliers_to_plane->begin(); it != inliers_to_plane->end(); ++it) {
+    instance_label = it->second;
+    if (labels_count.count(instance_label) == 0)
+      labels_count[instance_label] = 1;
+    else
+      ++labels_count[instance_label];
+  }
+  std::map<unsigned short, size_t>::iterator it_labels = labels_count.begin();
+  unsigned short most_frequent_label = it_labels->first;
+  it_labels++;
+  for (it_labels; it_labels != labels_count.end(); ++it_labels) {
+    // Compare the frequency counts
+    if (it_labels->second > labels_count[most_frequent_label])
+      most_frequent_label = it_labels->first;
+  }
+
+  // Return most frequent label.
+  (*label) = most_frequent_label;
+}
+
 
 bool getDefaultPathsAndVariables(const std::string& path_or_variable_name,
                                  std::string* path_or_variable_value) {

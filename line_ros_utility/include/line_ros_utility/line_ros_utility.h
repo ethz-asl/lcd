@@ -197,6 +197,7 @@ class ListenAndPublish {
                       const sensor_msgs::CameraInfoConstPtr& camera_info,
                       const sensor_msgs::ImageConstPtr& rosmsg_cloud);
 
+  // (Deprecated). Old version of labelLinesWithInstances.
   // This function labels with an instances image.
   // Input: lines:    Vector with the lines in 3D.
   //
@@ -210,10 +211,51 @@ class ListenAndPublish {
   // Output: labels:     Labels all lines according to their backprojection onto
   //                     instances. The labeling starts at 0 and goes up for
   //                     every additional instance that was found.
+  void labelLinesWithInstancesByMajorityVoting(
+      const std::vector<line_detection::LineWithPlanes>& lines,
+      const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info,
+      std::vector<int>* labels);
+
+  // This function labels with an instances image. The labelling depends on the
+  // line type associated to each line.
+  // Input: lines:    Vector with the lines in 3D.
+  //
+  //        instances:  CV_8UC3 image that labels objects with a different color
+  //                    for every instance. This image must be registered with
+  //                    the depth image where the point cloud was extracted.
+  //
+  //        camera_info: This is used to reproject 3D points onto the
+  //                     instances image.
+  //
+  // Output: labels:     Labels all lines according to their reprojection onto
+  //                     instances. The labeling starts at 0 and goes up for
+  //                     every additional instance that was found.
   void labelLinesWithInstances(
       const std::vector<line_detection::LineWithPlanes>& lines,
       const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info,
       std::vector<int>* labels);
+
+  // Given a 3D line and one of its two inlier planes, computes the instance of
+  // the line by taking the majority vote of the instances of the its inlier
+  // points that lie on that plane.
+  // Input: line: 3D line, the instance of which should be computed.
+  //
+  //        plane: cv::Vec4f vector representing the inlier plane from which to
+  //               extract the instance label (in Hessian form).
+  //
+  //        instances:  CV_8UC3 image that labels objects with a different color
+  //                    for every instance. This image must be registered with
+  //                    the depth image where the point cloud was extracted.
+  //
+  //        camera_info: This is used to reproject 3D points onto the
+  //                     instances image.
+  //
+  // Output: label: Instance label to be associated to the line.
+  void labelLineGivenInlierPlane(const line_detection::LineWithPlanes& line,
+                                 const cv::Vec4f& plane,
+                                 const cv::Mat& instances,
+                                 sensor_msgs::CameraInfoConstPtr camera_info,
+                                 int* label);
 
   // Data storage.
   size_t iteration_;
@@ -230,7 +272,7 @@ class ListenAndPublish {
   pcl::PointCloud<pcl::PointXYZRGB> pcl_cloud_;
   // all 2D lines detected in the grayscale mage
   std::vector<cv::Vec4f> lines2D_;
-  // all 2D lines kept(bijection with lines3D_)
+  // all 2D lines kept (bijection with lines3D_)
   std::vector<cv::Vec4f> lines2D_kept_;
   // a temperary variable for storing kept 2D lines
   std::vector<cv::Vec4f> lines2D_kept_tmp_;

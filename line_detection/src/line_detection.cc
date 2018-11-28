@@ -1124,12 +1124,12 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
   if (line->hessians[0].dot(mean_hom) > 0 &&
       line->hessians[1].dot(mean_hom) > 0) {
       // Convex angle
-      line -> type = LineType::INTERSECT;
+      line->type = LineType::INTERSECT;
       return true;
   } else if (line->hessians[0].dot(mean_hom) < 0 &&
       line->hessians[1].dot(mean_hom) < 0) {
       // Concave angle
-      line -> type = LineType::EDGE;
+      line->type = LineType::EDGE;
       return true;
   } else {
     // This case should never be entered

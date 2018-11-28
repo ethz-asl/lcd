@@ -297,6 +297,12 @@ class LineDetector {
 
   ~LineDetector();
 
+  // Returns the parameter of the line detector.
+  // Return: parameters params of the line detector.
+  inline LineDetectionParams get_line_detection_params() {
+    return *params_;
+  }
+
   // detectLines:
   // Input: image:    The image on which the lines should be detected.
   //
