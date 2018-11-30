@@ -1204,9 +1204,8 @@ bool LineDetector::checkEdgeOrIntersectionGivenProlongedLine(
     const cv::Vec3f& end, const std::vector<cv::Vec4f>& hessians,
     LineType* line_type) {
     cv::Vec4f hessian_of_object_owning_line;
-     return checkEdgeOrIntersectionGivenProlongedLine(cloud, camera_P, start, end,
-                                                      hessians, line_type,
-                                                      &hessian_of_object_owning_line);
+  return checkEdgeOrIntersectionGivenProlongedLine(cloud, camera_P, start, end,
+             hessians, line_type, &hessian_of_object_owning_line);
 }
 
 bool LineDetector::checkEdgeOrIntersectionGivenProlongedLine(
@@ -1216,8 +1215,6 @@ bool LineDetector::checkEdgeOrIntersectionGivenProlongedLine(
   CHECK_NOTNULL(line_type);
   double max_deviation = params_->max_error_inlier_ransac;
   bool left_plane_enough_valid_points, right_plane_enough_valid_points;
-  // Set default return value for hessian_of_object_owning_line.
-  hessian_of_object_owning_line = nullptr;
   // Get 2D coordinates of the endpoints of the line segment.
   cv::Vec2f start_2D, end_2D;
   cv::Vec4f prolonged_line;
