@@ -227,7 +227,8 @@ inline void directHessianTowardsOrigin(cv::Vec4f* hessian) {
   if (d < 0)
     *hessian = -(*hessian);
 }
-inline void directHessianTowardsPoint(cv::Vec3f& point, cv::Vec4f* hessian) {
+inline void directHessianTowardsPoint(const cv::Vec3f& point,
+                                      cv::Vec4f* hessian) {
   // Let (x_, y_, z_) be a point in the half-space towards which the hessian
   // of the plane should point. Then, letting the equation of the plane be
   // a * x +  b * y + c * z + d = 0, with WLOG ||(a, b, c)||_2 = 1 (otherwise
@@ -476,9 +477,24 @@ class LineDetector {
                                         LineWithPlanes* line);
 
   // Determines whether the two inlier planes of a line form a convex or concave
+  // angle when seen from a given viewpoint.
+  // Input: line:                       Input line.
+  //
+  //        viewpoint:                  Point from which the line is observed.
+  //
+  // Output: convex_true_concave_false: True if the planes form a convex angle,
+  //                                    false if they form a concave angle.
+  //
+  //         return:                    True if no errors occurs, false
+  //                                    otherwise.
+  bool determineConvexityOfLineFromViewpoint(const LineWithPlanes& line,
+                                             const cv::Vec3f& viewpoint,
+                                             bool* convex_true_concave_false);
+
+  // Determines whether the two inlier planes of a line form a convex or concave
   // angle when seen from a given viewpoint. This is done by using the two mean
   // points of the points inlier to the line.
-  // Input: line: Input line.
+  // Input: line:                       Input line.
   //
   //        mean_point_1/2:             Mean points of the inlier points.
   //
@@ -487,7 +503,7 @@ class LineDetector {
   // Output: convex_true_concave_false: True if the planes form a convex angle,
   //                                    false if they form a concave angle.
   //
-  //         return:                    True if no errors occured, false
+  //         return:                    True if no errors occurs, false
   //                                    otherwise.
   bool determineConvexityFromViewpointGivenLineAndMeanPoints(
     const LineWithPlanes& line, const cv::Vec3f& mean_point_1,

@@ -1162,8 +1162,8 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
   // on the planes.
   bool convex_true_concave_false;
   cv::Vec3f origin({0.0f, 0.0f, 0.0f});
-  if (determineConvexityFromViewpointGivenLineAndMeanPoints(*line,
-        mean_points_1, mean_points_2, origin, &convex_true_concave_false)) {
+  if (determineConvexityOfLineFromViewpoint(*line, origin,
+    &convex_true_concave_false)) {
       if (convex_true_concave_false) {
         // Convex => Intersection
         line->type = LineType::INTERSECT;
@@ -1174,6 +1174,45 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
       return true;
   } else {
     // This case should never be entered
+    return false;
+  }
+}
+
+bool LineDetector::determineConvexityOfLineFromViewpoint(
+  const LineWithPlanes& line, const cv::Vec3f& viewpoint,
+  bool* convex_true_concave_false) {
+  // Orient normal vectors towards the viewpoint (if not done before).
+  cv::Vec4f hessians[2];
+  hessians[0] = line.hessians[0];
+  hessians[1] = line.hessians[1];
+  directHessianTowardsPoint(viewpoint, &hessians[0]);
+  directHessianTowardsPoint(viewpoint, &hessians[1]);
+  // Take a generic point P on the line (e.g., the start endpoint).
+  cv::Vec3f point_on_the_line({line.line[0], line.line[1], line.line[2]});
+  // Find a point Q that is on the ray through the viewpoint and the point P,
+  // but on the side opposite of the viewpoint w.r.t. point P, e.g., the
+  // viewpoint mirrored w.r.t. to P.
+  cv::Vec3f direction = point_on_the_line - viewpoint;
+  cv::Vec3f point_on_the_other_side = point_on_the_line + direction;
+  // Check if the normal vectors of the plane point towards the point Q
+  // (concavity) or not (convexity).
+  cv::Vec4f point_on_the_other_side_homo({point_on_the_other_side[0],
+                                          point_on_the_other_side[1],
+                                          point_on_the_other_side[2], 1.0});
+  bool plane_1_faces_point =
+      (line.hessians[0].dot(point_on_the_other_side_homo) > 0.0f);
+  bool plane_2_faces_point =
+      (line.hessians[1].dot(point_on_the_other_side_homo) > 0.0f);
+  if (plane_1_faces_point && plane_2_faces_point) {
+    // Concavity
+    *convex_true_concave_false = false;
+    return true;
+  } else if (!plane_1_faces_point && !plane_2_faces_point){
+    // Convexity
+    *convex_true_concave_false = true;
+    return true;
+  } else {
+    // This case should never be entered.
     return false;
   }
 }
