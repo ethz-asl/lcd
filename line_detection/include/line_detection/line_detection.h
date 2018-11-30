@@ -228,6 +228,34 @@ inline void directHessianTowardsOrigin(cv::Vec4f* hessian){
 // Returns the projection of a point on the plane given defined by the hessian.
 cv::Vec3f projectPointOnPlane(const cv::Vec4f& hessian, const cv::Vec3f& point);
 
+// Returns the intersection point between a plane and a line, if possible.
+// Input: plane:               Plane in hessian form.
+//
+//        line_direction:      Direction of the line.
+//
+// Output: intersection_point: Intersection point between line and plane.
+//
+//         return:             True if an intersection was found, i.e., if line
+//                             is not parallel to the plane, false otherwise.
+bool findIntersectionBetweenPlaneAndLine(const cv::Vec4f& plane,
+                                         const cv::Vec3f& line_direction,
+                                         cv::Vec3f* intersection_point);
+
+// Returns the hessian form of a plane that contains a given point and a given
+// line.
+// Input: point:                Point that belongs to the plane.
+//
+//        line_start/end_start: Endpoints of the line that belongs to the plane.
+//
+// Output: plane:               Plane that contains both the line and the point,
+//                              in Hessian form.
+//         return:              True if a plane exists (i.e., if the point does
+//                              not belong to the line), false otherwise.
+bool findPlaneThroughPointAndLine(const cv::Vec3f& point,
+                                  const cv::Vec3f& line_start,
+                                  const cv::Vec3f& line_end,
+                                  cv::Vec4f* plane);
+
 // Finds the x-coordinates of a line between two points.
 // Input: start:      Starting point of line.
 //        end:        End point of line. Note that start.y < end.y must
@@ -442,8 +470,15 @@ class LineDetector {
   // Output: line_type: either EDGE or INTERSECT, type of line to be assigned to
   //                    the original line according to what found around the
   //                    prolonged line segments.
+  //
+  //         hessian_of_object_owning_line: in case of intersection line, hessian that
+  //                                        describes the plane (of the two associated
+  //                                        to the line) that belongs to the object
+  //                                        'owning' the line.
+  //
   //         return: True if type of line can be succcessfully determined, False
   //                 otherwise.
+  // Overload.
   bool checkEdgeOrIntersectionGivenProlongedLine(const cv::Mat& cloud,
                                                  const cv::Mat& camera_P,
                                                  const cv::Vec3f& start,
@@ -451,6 +486,15 @@ class LineDetector {
                                                  const std::vector<cv::Vec4f>&
                                                    hessians,
                                                  LineType* line_type);
+  bool checkEdgeOrIntersectionGivenProlongedLine(const cv::Mat& cloud,
+                                                 const cv::Mat& camera_P,
+                                                 const cv::Vec3f& start,
+                                                 const cv::Vec3f& end,
+                                                 const std::vector<cv::Vec4f>&
+                                                   hessians,
+                                                 LineType* line_type,
+                                                 cv::Vec4f*
+                                                   hessian_of_object_owning_line);
 
   // Fits a plane to the points using RANSAC.
   bool planeRANSAC(const std::vector<cv::Vec3f>& points,

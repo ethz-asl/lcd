@@ -201,9 +201,9 @@ class ListenAndPublish {
   // This function labels with an instances image.
   // Input: lines:    Vector with the lines in 3D.
   //
-  //        instances:  CV_8UC3 image that labels objects with a different color
-  //                    for every instance. This image must be registered with
-  //                    the depth image where the point cloud was extracted.
+  //        instances:  Image that labels objects with a different value for
+  //                    each instance. This image must be registered with the
+  //                    depth image where the point cloud was extracted.
   //
   //        camera_info: This is used to backproject 3D points onto the
   //                     instances image.
@@ -220,9 +220,9 @@ class ListenAndPublish {
   // line type associated to each line.
   // Input: lines:    Vector with the lines in 3D.
   //
-  //        instances:  CV_8UC3 image that labels objects with a different color
-  //                    for every instance. This image must be registered with
-  //                    the depth image where the point cloud was extracted.
+  //        instances:  Image that labels objects with a different value for
+  //                    each instance. This image must be registered with the
+  //                    depth image where the point cloud was extracted.
   //
   //        camera_info: This is used to reproject 3D points onto the
   //                     instances image.
@@ -235,6 +235,88 @@ class ListenAndPublish {
       const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info,
       std::vector<int>* labels);
 
+
+  // Assign the instance labels of a line to be the most frequent instance label
+  // among the points of the inlier plane respectively closest or furthest to
+  // the origin. Overloads assignLabelOfInlierPlaneBasedOnDistance.
+  void assignLabelOfClosestInlierPlane(
+    const line_detection::LineWithPlanes& line, const cv::Mat& instances,
+    sensor_msgs::CameraInfoConstPtr camera_info, int* label);
+  void assignLabelOfFurthestInlierPlane(
+    const line_detection::LineWithPlanes& line, const cv::Mat& instances,
+    sensor_msgs::CameraInfoConstPtr camera_info, int* label);
+  // Assigns the instance labels of a line to be the most frequent instance
+  // label among the points of the inlier plane either closest or furthest to
+  // the origin, according to the value of furthest_plane. To only consider the
+  // part of the inlier planes that actually contain points the distance is
+  // computed not by taking the regular point-to-plane distance, but by
+  // computing the mean point of both sets of inlier points and taking the
+  // distance between each of these mean points and the origin.
+  // Input: line:           Input line.
+  //
+  //        instances:      Image that labels objects with a different value for
+  //                        each instance. This image must be registered with
+  //                        the depth image where the point cloud was extracted.
+  //
+  //        camera_info:    This is used to reproject 3D points onto the
+  //                        instances image.
+  //
+  //        furthest_plane: True if the plane from which to take the instance
+  //                        label should be the one furthest away from the
+  //                        origin, false otherwise.
+  //
+  // Output: label: Output instance label.
+  void assignLabelOfInlierPlaneBasedOnDistance(
+    const line_detection::LineWithPlanes& line, const cv::Mat& instances,
+    sensor_msgs::CameraInfoConstPtr camera_info, bool furthest_plane,
+    int* label);
+
+  // Given one or both the inlier planes of a line, returns the set of inlier
+  // points (with the instance of each inlier point) associated to the plane(s).
+  // Input: line:               Input line.
+  //
+  //        plane:              Plane(s) inlier to the input line.
+  //              or
+  //        plane_1/plane_2:
+  //
+  //        instances:          Image that labels objects with a different value
+  //                            for each instance. This image must be registered
+  //                            with the depth image where the point cloud was
+  //                            extracted.
+  //
+  //        camera_info:        This is used to reproject 3D points onto the
+  //                            instances image.
+  //
+  //        (first_plane_only): True if inliers should be obtained only for the
+  //                            first of the two planes. Used for overloading
+  //                            to have the single-plane version.
+  //
+  // Output: inliers:           Inlier points associated to the plane(s).
+  //                 or
+  //         inliers_1/2:
+  void findInliersWithLabelsGivenPlane(
+      const line_detection::LineWithPlanes& line, const cv::Vec4f& plane,
+      const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info,
+      std::vector<std::pair<cv::Vec3f, unsigned short>>* inliers);
+  void findInliersWithLabelsGivenPlanes(
+      const line_detection::LineWithPlanes& line, const cv::Vec4f& plane_1,
+      const cv::Vec4f& plane_2, const cv::Mat& instances,
+      sensor_msgs::CameraInfoConstPtr camera_info,
+      std::vector<std::pair<cv::Vec3f, unsigned short>>* inliers_1,
+      std::vector<std::pair<cv::Vec3f, unsigned short>>* inliers_2,
+      bool first_plane_only = false);
+
+  // Given a set of inliers to the line, returns the instance label
+  // corresponding to the majority vote of the instances of the inliers.
+  // Input: inliers: Vector of inlier points, each in the form of a pair
+  //                 (cv::Vec3f, unsigned short), where the first element of the
+  //                 pair is the 3D point and the second is the instance label.
+  //
+  // Output: label: Most frequent instance label among the inlier points.
+  void getLabelFromInliersByMajorityVote(
+      const std::vector<std::pair<cv::Vec3f, unsigned short>>& inliers,
+      int* label);
+
   // Given a 3D line and one of its two inlier planes, computes the instance of
   // the line by taking the majority vote of the instances of the its inlier
   // points that lie on that plane.
@@ -243,9 +325,9 @@ class ListenAndPublish {
   //        plane: cv::Vec4f vector representing the inlier plane from which to
   //               extract the instance label (in Hessian form).
   //
-  //        instances:  CV_8UC3 image that labels objects with a different color
-  //                    for every instance. This image must be registered with
-  //                    the depth image where the point cloud was extracted.
+  //        instances:  Image that labels objects with a different value for
+  //                    each instance. This image must be registered with the
+  //                    depth image where the point cloud was extracted.
   //
   //        camera_info: This is used to reproject 3D points onto the
   //                     instances image.
