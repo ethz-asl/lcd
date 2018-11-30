@@ -94,7 +94,7 @@ def project_pcl_to_image(pointcloud, camera_model):
     pcl_inside_view = pcl_inside_view[index_bool, :]
 
     # Considering occlusion, we need to be careful with the order of assignment
-    # descending order according to the z coordiate
+    # descending order according to the z coordinate
     index_sort = pcl_inside_view[:, 2].argsort()[::-1]
     pixel = pixel[:, index_sort]
     pcl_inside_view = pcl_inside_view[index_sort, :]
