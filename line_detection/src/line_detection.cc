@@ -888,12 +888,12 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
   normal1 = {line->hessians[0][0], line->hessians[0][1], line->hessians[0][2]};
   normal2 = {line->hessians[1][0], line->hessians[1][1], line->hessians[1][2]};
 
-  //  Cmpute mean points of the two sets.
+  // Compute mean points of the two sets.
   mean1 = computeMean(points1);
   mean2 = computeMean(points2);
 
-  //  To consider a line found as valid. It should have enough number of inliers
-  //  and enough inliers around line's center.
+  // To consider a line found as valid. It should have enough number of inliers
+  // and enough inliers around line's center.
   bool enough_num_inliers, enough_inliers_around_center;
 
   // If the distance along the plane1/2's normal direction between the two
@@ -999,9 +999,9 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
         //cv::waitKey();
         cv::Vec3f start_guess_init = {line_guess[0], line_guess[1], line_guess[2]};
         cv::Vec3f end_guess_init = {line_guess[3], line_guess[4], line_guess[5]};
-        //displayLineWithPointsAndPlanes(start, end, start_guess_init, end_guess_init,
-        //                               points1, points2, line->hessians[0],
-        //                               line->hessians[1]);
+        displayLineWithPointsAndPlanes(start, end, start_guess_init, end_guess_init,
+                                       points1, points2, line->hessians[0],
+                                       line->hessians[1]);
 
         return false;
       } else{
@@ -1151,48 +1151,71 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
   // EDGE.
   // Let us note that a plane admits two different orientations, i.e., given the
   // direction of its normal vector, the latter can point either "towards" the
-  // camera of in the opposite way.
+  // camera or in the opposite way.
   directHessianTowardsOrigin(&(line->hessians[0]));
   directHessianTowardsOrigin(&(line->hessians[1]));
   // Take any point on the line that connects a generic pair of points, each of
   // which belonging to one of the two planes. If this point is "in front of"
   // (i.e., in the orientation of the normal vector) the planes than we have a
   // convex angle, otherwise a concave angle.
-  // As points belonging to the planes, take the projections of the two mean
+  // As points belonging to the planes, take the projections of the two means
   // on the planes.
-  cv::Vec3f mean_points_1_proj =
-      projectPointOnPlane(line->hessians[0], mean_points_1);
-  cv::Vec3f mean_points_2_proj =
-      projectPointOnPlane(line->hessians[1], mean_points_2);
-  cv::Vec3f mean_of_mean_points = (mean_points_1_proj + mean_points_2_proj) / 2;
+  bool convex_true_concave_false;
+  cv::Vec3f origin({0.0f, 0.0f, 0.0f});
+  if (determineConvexityFromViewpointGivenLineAndMeanPoints(*line,
+        mean_points_1, mean_points_2, origin, &convex_true_concave_false)) {
+      if (convex_true_concave_false) {
+        // Convex => Intersection
+        line->type = LineType::INTERSECT;
+      } else {
+        // Concave => Edge
+        line->type = LineType::EDGE;
+      }
+      return true;
+  } else {
+    // This case should never be entered
+    return false;
+  }
+}
+
+bool LineDetector::determineConvexityFromViewpointGivenLineAndMeanPoints(
+  const LineWithPlanes& line, const cv::Vec3f& mean_point_1,
+  const cv::Vec3f& mean_point_2, const cv::Vec3f& viewpoint,
+  bool* convex_true_concave_false) {
+  // Compute projection of mean points on the planes.
+  cv::Vec3f mean_point_1_proj =
+      projectPointOnPlane(line.hessians[0], mean_point_1);
+  cv::Vec3f mean_point_2_proj =
+      projectPointOnPlane(line.hessians[1], mean_point_2);
+  cv::Vec3f mean_of_mean_points = (mean_point_1_proj + mean_point_2_proj) / 2;
   cv::Vec4f mean_hom = {mean_of_mean_points[0], mean_of_mean_points[1],
                         mean_of_mean_points[2], 1.0};
-  if (line->hessians[0].dot(mean_hom) > 0 &&
-      line->hessians[1].dot(mean_hom) > 0) {
+  if (line.hessians[0].dot(mean_hom) > 0 &&
+      line.hessians[1].dot(mean_hom) > 0) {
       // Convex angle
-      line->type = LineType::INTERSECT;
+      *convex_true_concave_false = true;
       return true;
-  } else if (line->hessians[0].dot(mean_hom) < 0 &&
-      line->hessians[1].dot(mean_hom) < 0) {
+  } else if (line.hessians[0].dot(mean_hom) < 0 &&
+      line.hessians[1].dot(mean_hom) < 0) {
       // Concave angle
-      line->type = LineType::EDGE;
+      *convex_true_concave_false = false;
       return true;
   } else {
     // This case should never be entered
     LOG(ERROR) << "Error in determining the concavity/convexity of the angle "
                << "between the two planes around the line with the following "
-               << "3D coordinates: (" << line->line[0] << ", " << line->line[1]
-               << ", " << line->line[2] << ") -- (" << line->line[3] << ", "
-               << line->line[4] << ", " << line->line[5] << "). Hessians are: ["
-               << line->hessians[0][0] << ", " << line->hessians[0][1] << ", "
-               << line->hessians[0][2] << ", " << line->hessians[0][3] << "] "
-               << "and [" << line->hessians[1][0] << ", "
-               << line->hessians[1][1] << ", " << line->hessians[1][2] << ", "
-               << line->hessians[1][3] << "]. Mean point 1 is ("
-               << mean_points_1_proj[0] << ", " << mean_points_1_proj[1]
-               << ", " << mean_points_1_proj[2] << "). Mean point 2 is ("
-               << mean_points_2_proj[0] << ", " << mean_points_2_proj[1]
-               << ", " << mean_points_2_proj[2] << "). Mean of mean points is ("
+               << "3D coordinates: (" << line.line[0] << ", " << line.line[1]
+               << ", " << line.line[2] << ") -- (" << line.line[3] << ", "
+               << line.line[4] << ", " << line.line[5] << "). Hessians are: ["
+               << line.hessians[0][0] << ", " << line.hessians[0][1] << ", "
+               << line.hessians[0][2] << ", " << line.hessians[0][3] << "] "
+               << "and [" << line.hessians[1][0] << ", "
+               << line.hessians[1][1] << ", " << line.hessians[1][2] << ", "
+               << line.hessians[1][3] << "]. Mean point 1 is ("
+               << mean_point_1_proj[0] << ", " << mean_point_1_proj[1]
+               << ", " << mean_point_1_proj[2] << "). Mean point 2 is ("
+               << mean_point_2_proj[0] << ", " << mean_point_2_proj[1]
+               << ", " << mean_point_2_proj[2] << "). Mean of mean points is ("
                << mean_of_mean_points[0] << ", " << mean_of_mean_points[1]
                << ", " << mean_of_mean_points[2] << ").";
     return false;

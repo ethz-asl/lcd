@@ -216,12 +216,35 @@ inline cv::Vec3f computeMean(const std::vector<cv::Vec3f>& points) {
   return mean;
 }
 
-// Makes an hessian normal vector point towards the origin.
-// Output: hessian: Hessian directed towards the origin.
-inline void directHessianTowardsOrigin(cv::Vec4f* hessian){
-  // ax + by + cz + d = 0
+// Makes an hessian normal vector point towards a point/the origin, so that the
+// point lies in the half-space towards which the normal vector points.
+// (Input: point: Point towards which the hessian vector should be pointed.)
+//
+//  Output: hessian: Hessian directed towards the point/origin.
+inline void directHessianTowardsOrigin(cv::Vec4f* hessian) {
+  cv::Vec3f origin{0.0f, 0.0f, 0.0f};
   float d = (*hessian)[3];
   if (d < 0)
+    *hessian = -(*hessian);
+}
+inline void directHessianTowardsPoint(cv::Vec3f& point, cv::Vec4f* hessian) {
+  // Let (x_, y_, z_) be a point in the half-space towards which the hessian
+  // of the plane should point. Then, letting the equation of the plane be
+  // a * x +  b * y + c * z + d = 0, with WLOG ||(a, b, c)||_2 = 1 (otherwise
+  // the equation can be rescaled accordingly) => a^2 + b^2 + c^2 = 1, and
+  // letting (x_p, y_p, z_p) be the projection of (x_, y_, z_) on the plane, one
+  // has that:
+  // - a * x_p +  b * y_p + c * z_p + d = 0 (since the projection belongs to the
+  //   plane by definition);
+  // - There exists t > 0 s.t. x_ = x_p + a * t, y_ = y_p + b * t,
+  //   z_ = z_p + c * t.
+  // Therefore a * x_ +  b * y_ + c * z_ + d = a * (x_p + a * t) +
+  //           b * (y_p + b * t) + c * (z_p + c * t) + d =
+  //         = (a * x_p +  b * y_p + c * z_p + d) + t * (a^2 + b^2 + c^2) =
+  //         = 0 + t * (a^2 + b^2 + c^2) > 0, since t > 0.
+  // If this is not verified, the orientation of the normal should be reverted.
+  cv::Vec4f point_homo({point[0], point[1], point[2], 1.0});
+  if (hessian->dot(point_homo) < 0)
     *hessian = -(*hessian);
 }
 
@@ -452,6 +475,25 @@ class LineDetector {
                                         const cv::Vec3f& mean_points_2,
                                         LineWithPlanes* line);
 
+  // Determines whether the two inlier planes of a line form a convex or concave
+  // angle when seen from a given viewpoint. This is done by using the two mean
+  // points of the points inlier to the line.
+  // Input: line: Input line.
+  //
+  //        mean_point_1/2:             Mean points of the inlier points.
+  //
+  //        viewpoint:                  Point from which the line is observed.
+  //
+  // Output: convex_true_concave_false: True if the planes form a convex angle,
+  //                                    false if they form a concave angle.
+  //
+  //         return:                    True if no errors occured, false
+  //                                    otherwise.
+  bool determineConvexityFromViewpointGivenLineAndMeanPoints(
+    const LineWithPlanes& line, const cv::Vec3f& mean_point_1,
+    const cv::Vec3f& mean_point_2, const cv::Vec3f& viewpoint,
+    bool* convex_true_concave_false);
+
   // Given the two endpoints of a prolonged line segment (produced by
   // assignEdgeOrIntersectionLineType) checks if the points around the prolonged
   // line segments are such that the original line is an edge line or rather an
@@ -471,10 +513,11 @@ class LineDetector {
   //                    the original line according to what found around the
   //                    prolonged line segments.
   //
-  //         hessian_of_object_owning_line: in case of intersection line, hessian that
-  //                                        describes the plane (of the two associated
-  //                                        to the line) that belongs to the object
-  //                                        'owning' the line.
+  //         hessian_of_object_owning_line: in case of intersection line,
+  //                                        hessian that describes the plane (of
+  //                                        the two associated to the line) that
+  //                                        belongs to the object 'owning' the
+  //                                        line.
   //
   //         return: True if type of line can be succcessfully determined, False
   //                 otherwise.
