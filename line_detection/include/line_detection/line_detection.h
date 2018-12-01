@@ -463,22 +463,24 @@ class LineDetector {
   //
   //        camera_P:  Camera projection matrix.
   //
-  //        mean_points_1/2: Mean point of the inlier points for each of the two
-  //                         planes associated to the line.
+  //        inliers_1/2: Inlier points for each of the two planes associated to
+  //                     the line.
   //
   // Output: line: Input line with a type assigned to it.
   //         return: True if line type assignment could be performed, False
   //                 otherwise.
-
   bool assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
                                         const cv::Mat& camera_P,
-                                        const cv::Vec3f& mean_points_1,
-                                        const cv::Vec3f& mean_points_2,
+                                        const std::vector<cv::Vec3f>& inliers_1,
+                                        const std::vector<cv::Vec3f>& inliers_2,
                                         LineWithPlanes* line);
 
   // Determines whether the two inlier planes of a line form a convex or concave
-  // angle when seen from a given viewpoint.
+  // angle when seen from a given viewpoint. This is done by using the two sets
+  // of points inlier to the line.
   // Input: line:                       Input line.
+  //
+  //        inliers_1/2:                Inlier points.
   //
   //        viewpoint:                  Point from which the line is observed.
   //
@@ -487,9 +489,10 @@ class LineDetector {
   //
   //         return:                    True if no errors occurs, false
   //                                    otherwise.
-  bool determineConvexityOfLineFromViewpoint(const LineWithPlanes& line,
-                                             const cv::Vec3f& viewpoint,
-                                             bool* convex_true_concave_false);
+  bool determineConvexityFromViewpointGivenLineAndInlierPoints(
+    const LineWithPlanes& line, const std::vector<cv::Vec3f>& inliers_1,
+    const std::vector<cv::Vec3f>& inliers_2, const cv::Vec3f& viewpoint,
+    bool* convex_true_concave_false);
 
   // Determines whether the two inlier planes of a line form a convex or concave
   // angle when seen from a given viewpoint. This is done by using the two mean

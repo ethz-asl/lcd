@@ -962,7 +962,7 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
 
       line->line = {start[0], start[1], start[2], end[0], end[1], end[2]};
       // Line can now be either an edge or on an intersection line.
-      if (!assignEdgeOrIntersectionLineType(cloud, camera_P, mean1, mean2,
+      if (!assignEdgeOrIntersectionLineType(cloud, camera_P, points1, points2,
                                             line)) {
         LOG(ERROR) << "Could not assign neither edge- nor intersection- line "
                    << "type to line (" << line->line[0] << ", " << line->line[1]
@@ -1071,12 +1071,8 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
 }
 
 bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
-                                                    const cv::Mat& camera_P,
-                                                    const cv::Vec3f&
-                                                      mean_points_1,
-                                                    const cv::Vec3f&
-                                                      mean_points_2,
-                                                    LineWithPlanes* line) {
+    const cv::Mat& camera_P, const std::vector<cv::Vec3f>& inliers_1,
+    const std::vector<cv::Vec3f>& inliers_2, LineWithPlanes* line) {
   CHECK_NOTNULL(line);
   // As a first step extend the 3D line from both endpoints and extract the two
   // extensions as line segments.
@@ -1154,6 +1150,10 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
   // camera or in the opposite way.
   directHessianTowardsOrigin(&(line->hessians[0]));
   directHessianTowardsOrigin(&(line->hessians[1]));
+  // Compute mean points (needed if using
+  // determineConvexityFromViewpointGivenLineAndMeanPoints).
+  cv::Vec3f mean_point_1 = computeMean(inliers_1);
+  cv::Vec3f mean_point_2 = computeMean(inliers_2);
   // Take any point on the line that connects a generic pair of points, each of
   // which belonging to one of the two planes. If this point is "in front of"
   // (i.e., in the orientation of the normal vector) the planes than we have a
@@ -1162,8 +1162,8 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
   // on the planes.
   bool convex_true_concave_false;
   cv::Vec3f origin({0.0f, 0.0f, 0.0f});
-  if (determineConvexityOfLineFromViewpoint(*line, origin,
-    &convex_true_concave_false)) {
+  if (determineConvexityFromViewpointGivenLineAndInlierPoints(*line, inliers_1,
+    inliers_2, origin, &convex_true_concave_false)) {
       if (convex_true_concave_false) {
         // Convex => Intersection
         line->type = LineType::INTERSECT;
@@ -1178,8 +1178,9 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
   }
 }
 
-bool LineDetector::determineConvexityOfLineFromViewpoint(
-  const LineWithPlanes& line, const cv::Vec3f& viewpoint,
+bool LineDetector::determineConvexityFromViewpointGivenLineAndInlierPoints(
+  const LineWithPlanes& line, const std::vector<cv::Vec3f>& inliers_1,
+  const std::vector<cv::Vec3f>& inliers_2, const cv::Vec3f& viewpoint,
   bool* convex_true_concave_false) {
   // Orient normal vectors towards the viewpoint (if not done before).
   cv::Vec4f hessians[2];
@@ -1187,32 +1188,64 @@ bool LineDetector::determineConvexityOfLineFromViewpoint(
   hessians[1] = line.hessians[1];
   directHessianTowardsPoint(viewpoint, &hessians[0]);
   directHessianTowardsPoint(viewpoint, &hessians[1]);
-  // Take a generic point P on the line (e.g., the start endpoint).
-  cv::Vec3f point_on_the_line({line.line[0], line.line[1], line.line[2]});
-  // Find a point Q that is on the ray through the viewpoint and the point P,
-  // but on the side opposite of the viewpoint w.r.t. point P, e.g., the
-  // viewpoint mirrored w.r.t. to P.
-  cv::Vec3f direction = point_on_the_line - viewpoint;
-  cv::Vec3f point_on_the_other_side = point_on_the_line + direction;
-  // Check if the normal vectors of the plane point towards the point Q
-  // (concavity) or not (convexity).
-  cv::Vec4f point_on_the_other_side_homo({point_on_the_other_side[0],
-                                          point_on_the_other_side[1],
-                                          point_on_the_other_side[2], 1.0});
-  bool plane_1_faces_point =
-      (line.hessians[0].dot(point_on_the_other_side_homo) > 0.0f);
-  bool plane_2_faces_point =
-      (line.hessians[1].dot(point_on_the_other_side_homo) > 0.0f);
-  if (plane_1_faces_point && plane_2_faces_point) {
-    // Concavity
-    *convex_true_concave_false = false;
-    return true;
-  } else if (!plane_1_faces_point && !plane_2_faces_point){
-    // Convexity
-    *convex_true_concave_false = true;
-    return true;
+  // Let us note that each plane is divided by the other inlier plane (with
+  // which it intersects in correspondence to the line) into two half-planes.
+  // Only one half-plane, however, will actually be visible from the viewpoint
+  // and will contain the points, whereas the other should - if the line and the
+  // planes are good fit to the data - ideally not contain any point.
+  // At first we find each of these half-planes.
+  bool halfplane_1_is_behind_plane_2, halfplane_2_is_behind_plane_1;
+  int num_inliers_1_behind_plane_2 = 0;
+  int num_inliers_1_ahead_of_plane_2 = 0;
+  int num_inliers_2_behind_plane_1 = 0;
+  int num_inliers_2_ahead_of_plane_1 = 0;
+  cv::Vec4f inlier_homo;
+  // For further considerations on why the dot product works for this task, see
+  // directHessianTowardsPoint.
+  for (size_t i = 0; i < inliers_1.size(); ++i) {
+    inlier_homo = cv::Vec4f({inliers_1[i][0], inliers_1[i][1], inliers_1[i][2],
+                            1.0f});
+    if (hessians[1].dot(inlier_homo) > 0)
+      ++num_inliers_1_ahead_of_plane_2;
+    else
+      ++num_inliers_1_behind_plane_2;
+  }
+  if (num_inliers_1_behind_plane_2 > num_inliers_1_ahead_of_plane_2)
+    halfplane_1_is_behind_plane_2 = true;
+  else
+    halfplane_1_is_behind_plane_2 = false;
+  for (size_t i = 0; i < inliers_2.size(); ++i) {
+    inlier_homo = cv::Vec4f({inliers_2[i][0], inliers_2[i][1], inliers_2[i][2],
+                            1.0f});
+    if (hessians[0].dot(inlier_homo) > 0)
+      ++num_inliers_2_ahead_of_plane_1;
+    else
+      ++num_inliers_2_behind_plane_1;
+  }
+  if (num_inliers_2_behind_plane_1 > num_inliers_2_ahead_of_plane_1)
+    halfplane_2_is_behind_plane_1 = true;
+  else
+    halfplane_2_is_behind_plane_1 = false;
+  // Infer convexity/concavity.
+  if (halfplane_1_is_behind_plane_2 && halfplane_2_is_behind_plane_1) {
+      // Concave angle
+      *convex_true_concave_false = false;
+      return true;
+  } else if (!halfplane_1_is_behind_plane_2 && !halfplane_2_is_behind_plane_1) {
+      // Convex angle
+      *convex_true_concave_false = true;
+      return true;
   } else {
-    // This case should never be entered.
+    // This case should never be entered
+    LOG(ERROR) << "Error in determining the concavity/convexity of the angle "
+               << "between the two planes around the line with the following "
+               << "3D coordinates: (" << line.line[0] << ", " << line.line[1]
+               << ", " << line.line[2] << ") -- (" << line.line[3] << ", "
+               << line.line[4] << ", " << line.line[5] << "). Hessians are: ["
+               << hessians[0][0] << ", " << hessians[0][1] << ", "
+               << hessians[0][2] << ", " << hessians[0][3] << "] and ["
+               << hessians[1][0] << ", " << hessians[1][1] << ", "
+               << hessians[1][2] << ", " << hessians[1][3] << "].";
     return false;
   }
 }
