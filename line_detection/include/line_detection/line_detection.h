@@ -25,6 +25,9 @@
 namespace line_detection {
 
 constexpr double kPi = 3.141592653589793;
+// Factor that defines by how many times the original image is enlarged when
+// used to visualize lines and rectangles around them.
+constexpr int scale_factor_for_visualization = 4;
 
 enum class Detector : unsigned int { LSD = 0, EDL = 1, FAST = 2, HOUGH = 3 };
 
@@ -321,6 +324,55 @@ bool getPointOnPlaneIntersectionLine(const cv::Vec4f& hessian1,
                                      const cv::Vec3f& direction,
                                      cv::Vec3f* x_0);
 
+
+// Returns the image of a line,
+// overlapped on an input background image.
+// Input: line:               Input line.
+//
+//        cols/rows:          Columns/rows in the background image.
+//
+//        (background_image): Image to be used as background. Useful for
+//                            for instance to show the lines on the
+//                            original image.
+//
+//        (scale_factor):     Scale factor of the output image w.r.t. the
+//                            input background image.
+//
+// Output: return:            Output image with line on the input
+//                            background image.
+cv::Mat getImageOfLine(const cv::Vec4f& line, int cols, int rows,
+                       const int scale_factor);
+cv::Mat getImageOfLine(const cv::Vec4f& line,
+                       const cv::Mat& background_image,
+                       const int scale_factor);
+
+// Returns the image of a line with the two rectangles around it,
+// overlapped on an input background image.
+// Input: line:               Input line.
+//
+//        rect_left/_right:   Rectangles around the line.
+//
+//        cols/rows:          Columns/rows in the background image.
+//
+//        (background_image): Image to be used as background. Useful for
+//                            for instance to show the lines on the
+//                            original image.
+//
+//        (scale_factor):     Scale factor of the output image w.r.t. the
+//                            input background image.
+//
+// Output: return:            Output image with line and rectangles on the
+//                            input background image.
+cv::Mat getImageOfLineWithRectangles(
+    const cv::Vec4f& line, const std::vector<cv::Point2f>& rect_left,
+    const std::vector<cv::Point2f>& rect_right, int cols, int rows,
+    const int scale_factor = scale_factor_for_visualization);
+cv::Mat getImageOfLineWithRectangles(
+    const cv::Vec4f& line, const std::vector<cv::Point2f>& rect_left,
+    const std::vector<cv::Point2f>& rect_right,
+    const cv::Mat& background_image,
+    const int scale_factor = scale_factor_for_visualization);
+
 // Displays (via the script python/display_line_with_points_and_planes.py) a
 // line together with its two planes and its two sets of inliers.
 // Input: start/end: Endpoints of the line.
@@ -438,54 +490,78 @@ class LineDetector {
                           const cv::Vec6f& line_guess, cv::Vec6f* line);
   bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                           const std::vector<cv::Vec3f>& points2,
-                          const cv::Vec6f& line_guess, LineWithPlanes* line);
-
-  // Find 3D line using the points on the planes found by planeRANSAC.
-  // Input:  points1/2: Two sets of points.
-  //
-  //         line_guess: Initial guess of the line.
-  //
-  //         cloud:    Point cloud as CV_32FC3.
-  //
-  //         camera_P:  Camera projection matrix.
-  //
-  //         planes_found: True if and only if both planes of the line are found
-  //
-  // Output:  line:  The 3D line found.
-  bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
-                          const std::vector<cv::Vec3f>& points2,
-                          const cv::Vec6f& line_guess, const cv::Mat& cloud,
-                          const cv::Mat& camera_P, const bool planes_found,
+                          const cv::Vec6f& line_guess,
                           LineWithPlanes* line);
 
-  // Assign the type of line to be either edge or intersection.
-  // Input: cloud:    Point cloud as CV_32FC3.
+  // Find 3D line using the points on the planes found by planeRANSAC.
+  // Input:  points1/2:          Two sets of points.
   //
-  //        camera_P:  Camera projection matrix.
+  //         line_guess:         Initial guess of the line.
   //
-  //        inliers_1/2: Inlier points for each of the two planes associated to
-  //                     the line.
+  //         cloud:              Point cloud as CV_32FC3.
   //
-  // Output: line: Input line with a type assigned to it.
-  //         return: True if line type assignment could be performed, False
-  //                 otherwise.
-  bool assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
-                                        const cv::Mat& camera_P,
-                                        const std::vector<cv::Vec3f>& inliers_1,
-                                        const std::vector<cv::Vec3f>& inliers_2,
-                                        LineWithPlanes* line);
+  //         camera_P:           Camera projection matrix.
+  //
+  //         (background_image): Only for visualization purposes, it is
+  //                             the image that, when needed, should be
+  //                             displayed as background of the line and
+  //                             rectangle around the line.
+  //
+  //         planes_found:       True if and only if both planes of the
+  //                             line are found.
+  //
+  // Output:  line:              The 3D line found.
+  bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
+                          const std::vector<cv::Vec3f>& points2,
+                          const cv::Vec6f& line_guess,
+                          const cv::Mat& cloud, const cv::Mat& camera_P,
+                          const bool planes_found, LineWithPlanes* line);
+  bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
+                          const std::vector<cv::Vec3f>& points2,
+                          const cv::Vec6f& line_guess,
+                          const cv::Mat& cloud, const cv::Mat& camera_P,
+                          const cv::Mat& background_image,
+                          const bool planes_found, LineWithPlanes* line);
 
-  // Determines whether the two inlier planes of a line form a convex or concave
-  // angle when seen from a given viewpoint. This is done by using the two sets
-  // of points inlier to the line.
+  // Assign the type of line to be either edge or intersection.
+  // Input: cloud:               Point cloud as CV_32FC3.
+  //
+  //        camera_P:            Camera projection matrix.
+  //
+  //        inliers_1/2:         Inlier points for each of the two planes
+  //                             associated to the line.
+  //
+  //         (background_image): Only for visualization purposes, it is
+  //                             the image that, when needed, should be
+  //                             displayed as background of the line and
+  //                             rectangle around the line.
+  //
+  // Output: line:               Input line with a type assigned to it.
+  //         return:             True if line type assignment could be
+  //                             performed, False otherwise.
+  bool assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
+      const cv::Mat& camera_P,
+      const std::vector<cv::Vec3f>& inliers_right,
+      const std::vector<cv::Vec3f>& inliers_left, LineWithPlanes* line);
+  bool assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
+      const cv::Mat& camera_P,
+      const std::vector<cv::Vec3f>& inliers_right,
+      const std::vector<cv::Vec3f>& inliers_left,
+      const cv::Mat& background_image, LineWithPlanes* line);
+
+  // Determines whether the two inlier planes of a line form a convex or
+  // concave angle when seen from a given viewpoint. This is done by using
+  // the two sets of points inlier to the line.
   // Input: line:                       Input line.
   //
   //        inliers_1/2:                Inlier points.
   //
-  //        viewpoint:                  Point from which the line is observed.
+  //        viewpoint:                  Point from which the line is
+  //                                    observed.
   //
-  // Output: convex_true_concave_false: True if the planes form a convex angle,
-  //                                    false if they form a concave angle.
+  // Output: convex_true_concave_false: True if the planes form a convex
+  //                                    angle, false if they form a
+  //                                    concave angle.
   //
   //         return:                    True if no errors occurs, false
   //                                    otherwise.
@@ -514,49 +590,64 @@ class LineDetector {
     bool* convex_true_concave_false);
 
   // Given the two endpoints of a prolonged line segment (produced by
-  // assignEdgeOrIntersectionLineType) checks if the points around the prolonged
-  // line segments are such that the original line is an edge line or rather an
-  // intersection line.
-  // Input: cloud:    Point cloud as CV_32FC3.
+  // assignEdgeOrIntersectionLineType) checks if the points around the
+  // prolonged line segments are such that the original line is an edge
+  // line or rather an intersection line.
+  // Input: cloud:              Point cloud as CV_32FC3.
   //
-  //        camera_P:  Camera projection matrix.
+  //        camera_P:           Camera projection matrix.
   //
-  //        start: Start endpoint of the prolonged line segment.
+  //        start:              Start endpoint of the prolonged line
+  //                            segment.
   //
-  //        end: End endpoint of the prolonged line segment.
+  //        end:                End endpoint of the prolonged line
+  //                            segment.
   //
-  //        hessians: Vector containing the Hessian normal form of the two
-  //                  planes around the original line.
+  //        hessians:           Vector containing the Hessian normal form
+  //                            of the two planes around the original
+  //                            line.
   //
-  // Output: line_type: either EDGE or INTERSECT, type of line to be assigned to
-  //                    the original line according to what found around the
-  //                    prolonged line segments.
+  //        (background_image): Only for visualization purposes, it is
+  //                            the image that, when needed, should be
+  //                            displayed as background of the line and
+  //                            rectangle around the line.
+  //
+  // Output: line_type:                     either EDGE or INTERSECT, type
+  //                                        of line to be assigned to the
+  //                                        original line according to
+  //                                        what found around the
+  //                                        prolonged line segments.
   //
   //         hessian_of_object_owning_line: in case of intersection line,
-  //                                        hessian that describes the plane (of
-  //                                        the two associated to the line) that
-  //                                        belongs to the object 'owning' the
-  //                                        line.
+  //                                        hessian that describes the
+  //                                        plane (of the two associated
+  //                                        to the line) that belongs to
+  //                                        the object 'owning' the line.
   //
-  //         return: True if type of line can be succcessfully determined, False
-  //                 otherwise.
+  //         return:                        True if type of line can be
+  //                                        successfully determined, False
+  //                                        otherwise.
   // Overload.
-  bool checkEdgeOrIntersectionGivenProlongedLine(const cv::Mat& cloud,
-                                                 const cv::Mat& camera_P,
-                                                 const cv::Vec3f& start,
-                                                 const cv::Vec3f& end,
-                                                 const std::vector<cv::Vec4f>&
-                                                   hessians,
-                                                 LineType* line_type);
-  bool checkEdgeOrIntersectionGivenProlongedLine(const cv::Mat& cloud,
-                                                 const cv::Mat& camera_P,
-                                                 const cv::Vec3f& start,
-                                                 const cv::Vec3f& end,
-                                                 const std::vector<cv::Vec4f>&
-                                                   hessians,
-                                                 LineType* line_type,
-                                                 cv::Vec4f*
-                                                   hessian_of_object_owning_line);
+  bool checkEdgeOrIntersectionGivenProlongedLine(
+      const cv::Mat& cloud, const cv::Mat& camera_P,
+      const cv::Vec3f& start, const cv::Vec3f& end,
+      const std::vector<cv::Vec4f>& hessians, LineType* line_type);
+  bool checkEdgeOrIntersectionGivenProlongedLine(
+      const cv::Mat& cloud, const cv::Mat& camera_P,
+      const cv::Vec3f& start, const cv::Vec3f& end,
+      const std::vector<cv::Vec4f>& hessians,
+      const cv::Mat& background_image, LineType* line_type);
+  bool checkEdgeOrIntersectionGivenProlongedLine(
+      const cv::Mat& cloud, const cv::Mat& camera_P,
+      const cv::Vec3f& start, const cv::Vec3f& end,
+      const std::vector<cv::Vec4f>& hessians, LineType* line_type,
+      cv::Vec4f* hessian_of_object_owning_line);
+  bool checkEdgeOrIntersectionGivenProlongedLine(
+      const cv::Mat& cloud, const cv::Mat& camera_P,
+      const cv::Vec3f& start, const cv::Vec3f& end,
+      const std::vector<cv::Vec4f>& hessians,
+      const cv::Mat& background_image, LineType* line_type,
+      cv::Vec4f* hessian_of_object_owning_line);
 
   // Fits a plane to the points using RANSAC.
   bool planeRANSAC(const std::vector<cv::Vec3f>& points,

@@ -264,6 +264,87 @@ bool getPointOnPlaneIntersectionLine(const cv::Vec4f& hessian1,
   return success;
 }
 
+cv::Mat getImageOfLine(const cv::Vec4f& line, int cols, int rows,
+                       const int scale_factor) {
+  cv::Mat background_image(rows*scale_factor, cols*scale_factor, CV_8UC3);
+  background_image = cv::Scalar(255,255,255);  // White
+
+  return getImageOfLine(line, background_image, scale_factor);
+}
+
+cv::Mat getImageOfLine(const cv::Vec4f& line, const cv::Mat& background_image,
+                       const int scale_factor) {
+   // Display line with rectangles in the image
+   int cols = background_image.cols;
+   int rows = background_image.rows;
+
+   cv::Mat img_for_display(rows, cols, CV_8UC3);
+   cv::resize(background_image, img_for_display, img_for_display.size());
+
+   cv::Vec2f start({line[0], line[1]});
+   cv::Vec2f end({line[2], line[3]});
+   // Line
+   cv::line(img_for_display, cv::Point(start[0], start[1]),
+            cv::Point(end[0], end[1]),
+            cv::Scalar(255, 0, 0));  // Red
+  // Resize image
+   cv::resize(img_for_display, img_for_display,
+     img_for_display.size()*scale_factor);
+   return img_for_display;
+}
+
+cv::Mat getImageOfLineWithRectangles(const cv::Vec4f& line,
+                                     const std::vector<cv::Point2f>& rect_left,
+                                     const std::vector<cv::Point2f>& rect_right,
+                                     int cols, int rows,
+                                     const int scale_factor) {
+  cv::Mat background_image(rows*scale_factor, cols*scale_factor, CV_8UC3);
+  background_image = cv::Scalar(255,255,255);  // White
+
+
+  return getImageOfLineWithRectangles(line, rect_left, rect_right,
+                                      background_image, scale_factor);
+}
+
+cv::Mat getImageOfLineWithRectangles(const cv::Vec4f& line,
+                                     const std::vector<cv::Point2f>& rect_left,
+                                     const std::vector<cv::Point2f>& rect_right,
+                                     const cv::Mat& background_image,
+                                     const int scale_factor) {
+  // Display line with rectangles in the image
+  int cols = background_image.cols;
+  int rows = background_image.rows;
+
+  cv::Mat img_for_display(rows, cols, CV_8UC3);
+  cv::resize(background_image, img_for_display, img_for_display.size());
+
+  cv::Vec2f start({line[0], line[1]});
+  cv::Vec2f end({line[2], line[3]});
+  // Line
+  cv::line(img_for_display, cv::Point(start[0], start[1]),
+           cv::Point(end[0], end[1]),
+           cv::Scalar(0, 0, 0));  // Black
+  // Left rectangle
+  cv::line(img_for_display, rect_left[0], rect_left[1],
+           cv::Scalar(255, 0, 255)); // Purple
+  cv::line(img_for_display, rect_left[2], rect_left[3],
+           cv::Scalar(255, 0, 255)); // Purple
+  cv::line(img_for_display, rect_left[1], rect_left[3],
+           cv::Scalar(255, 0, 255)); // Purple
+  // Left rectangle
+  cv::line(img_for_display, rect_right[0], rect_right[1],
+           cv::Scalar(255, 255, 0)); // Cyan
+  cv::line(img_for_display, rect_right[2], rect_right[3],
+           cv::Scalar(255, 255, 0)); // Cyan
+  cv::line(img_for_display, rect_right[1], rect_right[3],
+           cv::Scalar(255, 255, 0)); // Cyan
+  cv::resize(img_for_display, img_for_display,
+    img_for_display.size()*scale_factor);
+  return img_for_display;
+}
+
+
+
 void displayLineWithPointsAndPlanes(const cv::Vec3f& start,
                                     const cv::Vec3f& end,
                                     const cv::Vec3f& start_guess,
@@ -872,6 +953,27 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                                       const cv::Mat& camera_P,
                                       const bool planes_found,
                                       LineWithPlanes* line) {
+  int cols = cloud.cols;
+  int rows = cloud.rows;
+
+  cv::Mat background_image(rows*scale_factor_for_visualization,
+                           cols*scale_factor_for_visualization, CV_8UC3);
+  background_image = cv::Scalar(255,255,255);  // White
+
+  return find3DlineOnPlanes(points1, points2, line_guess, cloud, camera_P,
+                            background_image, planes_found, line);
+}
+
+
+
+bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
+                                      const std::vector<cv::Vec3f>& points2,
+                                      const cv::Vec6f& line_guess,
+                                      const cv::Mat& cloud,
+                                      const cv::Mat& camera_P,
+                                      const cv::Mat& background_image,
+                                      const bool planes_found,
+                                      LineWithPlanes* line) {
   CHECK_NOTNULL(line);
   size_t N1 = points1.size();
   size_t N2 = points2.size();
@@ -966,51 +1068,43 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
         return false;
 
       line->line = {start[0], start[1], start[2], end[0], end[1], end[2]};
+
+      cv::Vec3f start_guess_init = {line_guess[0], line_guess[1], line_guess[2]};
+      cv::Vec3f end_guess_init = {line_guess[3], line_guess[4], line_guess[5]};
+      displayLineWithPointsAndPlanes(start, end, start_guess_init, end_guess_init,
+                                     points1, points2, line->hessians[0],
+                                     line->hessians[1]);
+       // Project line re-adjusted through inliers in 2D and add it to the
+       // background image.
+       cv::Vec2f start_2D, end_2D;
+       cv::Vec4f start_3D_homo = {line->line[0], line->line[1], line->line[2],
+                                  1.0};
+       cv::Vec4f end_3D_homo = {line->line[3], line->line[4], line->line[5],
+                                1.0};
+       cv::Mat start_2D_homo = camera_P * cv::Mat(start_3D_homo);
+       cv::Mat end_2D_homo = camera_P * cv::Mat(end_3D_homo);
+       start_2D = {start_2D_homo.at<float>(0, 0) /
+                   start_2D_homo.at<float>(2, 0),
+                   start_2D_homo.at<float>(1, 0) /
+                   start_2D_homo.at<float>(2, 0)};
+       end_2D = {end_2D_homo.at<float>(0, 0) / end_2D_homo.at<float>(2, 0),
+                 end_2D_homo.at<float>(1, 0) / end_2D_homo.at<float>(2, 0)};
+       cv::Vec4f line_2D({start_2D[0], start_2D[1], end_2D[0], end_2D[1]});
+       cv::Mat new_background_image;
+       new_background_image = getImageOfLine(line_2D, background_image, 1);
+
       // Line can now be either an edge or on an intersection line.
       if (!assignEdgeOrIntersectionLineType(cloud, camera_P, points1, points2,
-                                            line)) {
+                                            new_background_image, line)) {
         LOG(ERROR) << "Could not assign neither edge- nor intersection- line "
                    << "type to line (" << line->line[0] << ", " << line->line[1]
                    << ", " << line->line[2] << ") -- (" << line->line[3] << ", "
                    << line->line[4] << ", " << line->line[5] << ")";
-        // Display projected line
-        int cols = cloud.cols;
-        int rows = cloud.rows;
-        cv::Vec2f start_2D, end_2D;
-        cv::Vec4f start_3D_homo = {line->line[0], line->line[1], line->line[2],
-                                   1.0};
-        cv::Vec4f end_3D_homo = {line->line[3], line->line[4], line->line[5],
-                                 1.0};
-        cv::Mat start_2D_homo = camera_P * cv::Mat(start_3D_homo);
-        cv::Mat end_2D_homo = camera_P * cv::Mat(end_3D_homo);
-        start_2D = {start_2D_homo.at<float>(0, 0) / start_2D_homo.at<float>(2, 0),
-                    start_2D_homo.at<float>(1, 0) / start_2D_homo.at<float>(2, 0)};
-        end_2D = {end_2D_homo.at<float>(0, 0) / end_2D_homo.at<float>(2, 0),
-                  end_2D_homo.at<float>(1, 0) / end_2D_homo.at<float>(2, 0)};
 
-        cv::Mat img_for_display(rows*4,cols*4, CV_8UC3);
-        //img_for_display = cv::Scalar(255,255,255);  // White
-        cv::resize(cloud,img_for_display, img_for_display.size());
-
-        //LOG(ERROR) << "Faulty line looks as follows in 2D: (" << start_2D[0]
-        //           << ", " << start_2D[1] << ") -- (" << end_2D[0] << ", "
-        //           << end_2D[1] << ").";
-        // Faulty line to be displayed
-        cv::line(img_for_display, cv::Point(start_2D[0]*4, start_2D[1]*4),
-                 cv::Point(end_2D[0]*4, end_2D[1]*4),
-               cv::Scalar(255, 0, 0));
-
-        //cv::imshow("Faulty line", img_for_display);
-        //cv::waitKey();
-        cv::Vec3f start_guess_init = {line_guess[0], line_guess[1], line_guess[2]};
-        cv::Vec3f end_guess_init = {line_guess[3], line_guess[4], line_guess[5]};
-        displayLineWithPointsAndPlanes(start, end, start_guess_init, end_guess_init,
-                                       points1, points2, line->hessians[0],
-                                       line->hessians[1]);
 
         return false;
       } else{
-        LOG(INFO) << "Succcessfully determined type "
+        LOG(INFO) << "Successfully determined type "
                   << (line->type==LineType::EDGE ? "EDGE " : "INTERSECT ")
                   << "for line (" << line->line[0] << ", " << line->line[1]
                   << ", " << line->line[2] << ") -- (" << line->line[3] << ", "
@@ -1079,8 +1173,24 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
 }
 
 bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
-    const cv::Mat& camera_P, const std::vector<cv::Vec3f>& inliers_1,
-    const std::vector<cv::Vec3f>& inliers_2, LineWithPlanes* line) {
+    const cv::Mat& camera_P, const std::vector<cv::Vec3f>& inliers_right,
+    const std::vector<cv::Vec3f>& inliers_left, LineWithPlanes* line) {
+    int cols = cloud.cols;
+    int rows = cloud.rows;
+
+    cv::Mat background_image(rows*scale_factor_for_visualization,
+                             cols*scale_factor_for_visualization, CV_8UC3);
+    background_image = cv::Scalar(255,255,255);  // White
+
+    return assignEdgeOrIntersectionLineType(cloud, camera_P, inliers_right,
+                                            inliers_left, background_image,
+                                            line);
+}
+
+bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
+    const cv::Mat& camera_P, const std::vector<cv::Vec3f>& inliers_right,
+    const std::vector<cv::Vec3f>& inliers_left, const cv::Mat& background_image,
+    LineWithPlanes* line) {
   CHECK_NOTNULL(line);
   // As a first step extend the 3D line from both endpoints and extract the two
   // extensions as line segments.
@@ -1088,29 +1198,14 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
   cv::Vec3f end(line->line[3], line->line[4], line->line[5]);
   cv::Vec3f direction = end - start;
   normalizeVector3D(&direction);
-  //LOG(INFO) << "Direction of line (" << start[0] << ", " << start[1] << ", "
-  //          << start[2] << ") -- (" << end[0] << ", " << end[1] << ", "
-  //          << end[2] << ").";
   // Line prolonged before start
   cv::Vec3f start_line_before_start =
       start - params_->extension_length_for_edge_or_intersection * direction;
   cv::Vec3f end_line_before_start = start;
-  //LOG(INFO) << "Line prolonged before start (" << start_line_before_start[0]
-  //          << ", " << start_line_before_start[1] << ", "
-  //          << start_line_before_start[2] << ") -- ("
-  //          << end_line_before_start[0] << ", " << end_line_before_start[1]
-  //          << ", " << end_line_before_start[2] << ") has length "
-  //          << cv::norm(end_line_before_start -start_line_before_start);
   // Line prolonged after end
   cv::Vec3f start_line_after_end = end;
   cv::Vec3f end_line_after_end =
       end + params_->extension_length_for_edge_or_intersection * direction;
-  //LOG(INFO) << "Line prolonged after end (" << start_line_after_end[0]
-  //          << ", " << start_line_after_end[1] << ", "
-  //          << start_line_after_end[2] << ") -- ("
-  //          << end_line_after_end[0] << ", " << end_line_after_end[1]
-  //          << ", " << end_line_after_end[2] << ") has length "
-  //          << cv::norm(end_line_after_end - start_line_after_end);
   // Check if the line type can be determined by looking at the prolonged lines.
   LineType line_type_before_start, line_type_after_end;
   bool line_type_determinable_before_start, line_type_determinable_after_end;
@@ -1119,12 +1214,14 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
                                                 start_line_before_start,
                                                 end_line_before_start,
                                                 line->hessians,
+                                                background_image,
                                                 &line_type_before_start);
   line_type_determinable_after_end =
       checkEdgeOrIntersectionGivenProlongedLine(cloud, camera_P,
                                                 start_line_after_end,
                                                 end_line_after_end,
                                                 line->hessians,
+                                                background_image,
                                                 &line_type_after_end);
   // Possible cases:
   // - Line type can be determined from only one of the two prolonged lines ->
@@ -1306,16 +1403,53 @@ bool LineDetector::checkEdgeOrIntersectionGivenProlongedLine(
     const cv::Mat& cloud, const cv::Mat& camera_P, const cv::Vec3f& start,
     const cv::Vec3f& end, const std::vector<cv::Vec4f>& hessians,
     LineType* line_type) {
-    cv::Vec4f hessian_of_object_owning_line;
+    int cols = cloud.cols;
+    int rows = cloud.rows;
+
+    cv::Mat background_image(rows*scale_factor_for_visualization,
+                             cols*scale_factor_for_visualization, CV_8UC3);
+    background_image = cv::Scalar(255,255,255);  // White
+
+    return checkEdgeOrIntersectionGivenProlongedLine(cloud, camera_P, start,
+                                                     end, hessians,
+                                                     background_image,
+                                                     line_type);
+}
+
+
+bool LineDetector::checkEdgeOrIntersectionGivenProlongedLine(
+    const cv::Mat& cloud, const cv::Mat& camera_P, const cv::Vec3f& start,
+    const cv::Vec3f& end, const std::vector<cv::Vec4f>& hessians,
+    const cv::Mat& background_image, LineType* line_type) {
+  cv::Vec4f hessian_of_object_owning_line;
   return checkEdgeOrIntersectionGivenProlongedLine(cloud, camera_P, start, end,
-             hessians, line_type, &hessian_of_object_owning_line);
+             hessians, background_image, line_type,
+             &hessian_of_object_owning_line);
 }
 
 bool LineDetector::checkEdgeOrIntersectionGivenProlongedLine(
     const cv::Mat& cloud, const cv::Mat& camera_P, const cv::Vec3f& start,
     const cv::Vec3f& end, const std::vector<cv::Vec4f>& hessians,
     LineType* line_type, cv::Vec4f* hessian_of_object_owning_line) {
+    int cols = cloud.cols;
+    int rows = cloud.rows;
+
+    cv::Mat background_image(rows*scale_factor_for_visualization,
+                             cols*scale_factor_for_visualization, CV_8UC3);
+    background_image = cv::Scalar(255,255,255);  // White
+
+    return checkEdgeOrIntersectionGivenProlongedLine(cloud, camera_P, start,
+               end, hessians, background_image, line_type,
+               hessian_of_object_owning_line);
+}
+
+bool LineDetector::checkEdgeOrIntersectionGivenProlongedLine(
+    const cv::Mat& cloud, const cv::Mat& camera_P, const cv::Vec3f& start,
+    const cv::Vec3f& end, const std::vector<cv::Vec4f>& hessians,
+    const cv::Mat& background_image, LineType* line_type,
+    cv::Vec4f* hessian_of_object_owning_line) {
   CHECK_NOTNULL(line_type);
+  CHECK_NOTNULL(hessian_of_object_owning_line);
   double max_deviation = params_->max_error_inlier_ransac;
   bool left_plane_enough_valid_points, right_plane_enough_valid_points;
   // Get 2D coordinates of the endpoints of the line segment.
@@ -1339,6 +1473,18 @@ bool LineDetector::checkEdgeOrIntersectionGivenProlongedLine(
   std::vector<cv::Point2i> points_in_rect;
   std::vector<cv::Vec3f> points_left_plane, points_right_plane;
   getRectanglesFromLine(prolonged_line, &rect_left, &rect_right);
+
+
+  cv::Vec4f line({start_2D[0], start_2D[1], end_2D[0], end_2D[1]});
+
+  // Display image of prolonged line.
+  cv::Mat image_of_line_with_rectangles = getImageOfLineWithRectangles(
+                                              line, rect_left, rect_right,
+                                              background_image);
+  cv::imshow("Line with rectangles and prolonged line/planes",
+             image_of_line_with_rectangles);
+  cv::waitKey();
+
   // Find points for the left side.
   //LOG(INFO) << "Find points in left rectangle for prolonged line (" << start[0]
   //          << ", " << start[1] << ", " << start[2] << ") -- (" << end[0]
@@ -1667,6 +1813,7 @@ void LineDetector::project2Dto3DwithPlanes(
   std::vector<double> rating;
   cv::Point2i start, end;
   LineWithPlanes line3D_true;
+  cv::Mat image_of_line_with_rectangles;
   // Parameter: Fraction of inlier that must be found for the plane model to
   // be valid.
   double min_inliers = params_->min_inlier_ransac;
@@ -1780,12 +1927,22 @@ void LineDetector::project2Dto3DwithPlanes(
       planes_found = true;
     }
 
+    //image_of_line_with_rectangles = getImageOfLineWithRectangles(lines2D[i],
+    //                                    rect_left, rect_right, image, 1);
+    image_of_line_with_rectangles = image;
+
     // Find 3D line on planes.
     if (find3DlineOnPlanes(inliers_right, inliers_left, lines3D_cand[i], cloud,
-                           camera_P, planes_found, &line3D_true)) {
+                           camera_P, image_of_line_with_rectangles,
+                           planes_found, &line3D_true)) {
       // Only push back the reliably found lines.
       lines3D->push_back(line3D_true);
       lines2D_out->push_back(lines2D[i]);
+      // Display 2D image with rectangles
+      image_of_line_with_rectangles = getImageOfLineWithRectangles(lines2D[i],
+                                          rect_left, rect_right, image);
+      cv::imshow("Line with rectangles", image_of_line_with_rectangles);
+      cv::waitKey();
     }
   }
 }
