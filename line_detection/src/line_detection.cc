@@ -926,6 +926,8 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       cv::Vec3f start, end;
       enough_num_inliers =
           adjustLineUsingInliers(points, start_guess, end_guess, &start, &end);
+      // Fix orientation w.r.t. reference line if needed
+      adjustLineOrientationGivenReferenceLine(line_guess, &start, &end);
 
       line->line = {start[0], start[1], start[2], end[0], end[1], end[2]};
       line->type = LineType::PLANE;
@@ -953,6 +955,9 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       cv::Vec3f start, end;
       enough_num_inliers =
           adjustLineUsingInliers(points, start_guess, end_guess, &start, &end);
+      // Fix orientation w.r.t. reference line if needed
+      adjustLineOrientationGivenReferenceLine(line_guess, &start, &end);
+
       if (!enough_num_inliers)
         return false;
       enough_inliers_around_center =
@@ -1056,6 +1061,9 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     cv::Vec3f start, end;
     enough_num_inliers =
         adjustLineUsingInliers(*points, start_guess, end_guess, &start, &end);
+    // Fix orientation w.r.t. reference line if needed
+    adjustLineOrientationGivenReferenceLine(line_guess, &start, &end);
+
 
     line->line = {start[0], start[1], start[2], end[0], end[1], end[2]};
     line->type = LineType::DISCONT;
@@ -2325,6 +2333,22 @@ bool LineDetector::adjustLineUsingInliers(const std::vector<cv::Vec3f>& points,
     return false;
   } else {
     return true;
+  }
+}
+
+void LineDetector::adjustLineOrientationGivenReferenceLine(
+    const cv::Vec6f& reference_line, cv::Vec3f* start, cv::Vec3f* end) {
+  cv::Vec3f temp_endpoint;
+  cv::Vec3f ref_start({reference_line[0], reference_line[1],
+                      reference_line[2]});
+  cv::Vec3f ref_end({reference_line[3], reference_line[4], reference_line[5]});
+
+  if (cv::norm(*start - ref_end) < cv::norm(*start - ref_start) &&
+      cv::norm(*end - ref_start) < cv::norm(*end - ref_end)) {
+    LOG(INFO) << "Switching endpoints.";
+    temp_endpoint = *start;
+    *start = *end;
+    *end = temp_endpoint;
   }
 }
 

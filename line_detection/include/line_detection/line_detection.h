@@ -792,6 +792,21 @@ class LineDetector {
                               const cv::Vec3f& end_in, cv::Vec3f* start_out,
                               cv::Vec3f* end_out);
 
+  // It might happen that when adjusting line using inliers the orientation of
+  // the resulting line changes w.r.t. to the original lines. It might, i.e.,
+  // happen that what was defined to be the start in the original line is closer
+  // to the end of the adjusted line and what was defined to be the end in the
+  // original line is closer to the start of the adjusted line. If this is the
+  // case, this function switches start and end.
+  //
+  // Input: reference_line: Original reference line.
+  //
+  // Output: start,end:     Endpoints of the input line, switched if needed to
+  //                        match the orientation of the reference line.
+  void adjustLineOrientationGivenReferenceLine(const cv::Vec6f& reference_line,
+                                               cv::Vec3f* start,
+                                               cv::Vec3f* end);
+
   // Checks if a line is valid using the inliers of the line. If the ratio of
   // the inliers that lie around the center of the line is smaller than the
   // threshold kRatioThreshold, the line is not valid.
