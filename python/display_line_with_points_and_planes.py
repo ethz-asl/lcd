@@ -1,11 +1,28 @@
-import numpy as np
+from matplotlib.patches import FancyArrowPatch
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d import proj3d
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
+import numpy as np
 import yaml
 import os
 
 file_dir = os.path.dirname(os.path.abspath(__file__))
+
+
+class Arrow3D(FancyArrowPatch):
+    """ Class definition and subsequent instantiation taken from
+        https://stackoverflow.com/a/29188796 """
+
+    def __init__(self, xs, ys, zs, *args, **kwargs):
+        FancyArrowPatch.__init__(self, (0, 0), (0, 0), *args, **kwargs)
+        self._verts3d = xs, ys, zs
+
+    def draw(self, renderer):
+        xs3d, ys3d, zs3d = self._verts3d
+        xs, ys, zs = proj3d.proj_transform(xs3d, ys3d, zs3d, renderer.M)
+        self.set_positions((xs[0], ys[0]), (xs[1], ys[1]))
+        FancyArrowPatch.draw(self, renderer)
 
 
 def get_plane(hessian, x, y):
@@ -81,20 +98,34 @@ def plot():
     #max_x = max(0, max_x)
     max_y = int(np.ceil(max(max(inliers_1[:, 1]), max(inliers_2[:, 1]))))
     #max_y = max(0, max_y)
-    x, y = np.meshgrid(np.linspace(min_x, max_x, 100), np.linspace(min_y, max_y, 100))
+    x, y = np.meshgrid(
+        np.linspace(min_x, max_x, 100), np.linspace(min_y, max_y, 100))
 
     plot_ = plt.figure().gca(projection='3d')
 
     # Plot line
     start = np.array(data['start']) * scale_factor
     end = np.array(data['end']) * scale_factor
-    plot_.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], 'r',
-               label='Line after adjustment through inliers.')
+    args_adjusted_line = dict(
+        mutation_scale=20, arrowstyle='-|>', color='r', shrinkA=0, shrinkB=0)
+    arrow_adjusted_line = Arrow3D([start[0], end[0]], [start[1], end[1]],
+                                  [start[2], end[2]], **args_adjusted_line)
+    plot_.add_artist(arrow_adjusted_line)
+
     start_guess = np.array(data['start_guess']) * scale_factor
     end_guess = np.array(data['end_guess']) * scale_factor
-    plot_.plot([start_guess[0], end_guess[0]], [start_guess[1], end_guess[1]],
-               [start_guess[2], end_guess[2]], 'b',
-               label='Guess before adjustment through inliers.')
+    args_guess_line = dict(
+        mutation_scale=20, arrowstyle='-|>', color='b', shrinkA=0, shrinkB=0)
+    arrow_guess_line = Arrow3D(
+        [start_guess[0], end_guess[0]], [start_guess[1], end_guess[1]],
+        [start_guess[2], end_guess[2]], **args_guess_line)
+    plot_.add_artist(arrow_guess_line)
+
+    legend_ = plt.legend([arrow_adjusted_line, arrow_guess_line], [
+        'Line after adjustment through inliers.',
+        'Guess before adjustment through inliers.'
+    ])
+    plot_.add_artist(legend_)
 
     # Plot first plane
     #plot_.plot_surface(
