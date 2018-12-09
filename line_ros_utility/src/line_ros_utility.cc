@@ -200,6 +200,7 @@ void ListenAndPublish::projectTo3D() {
   end_time_ = std::chrono::system_clock::now();
   elapsed_seconds_ = end_time_ - start_time_;
   ROS_INFO("Projecting to 3D: %f", elapsed_seconds_.count());
+  line_detector_.displayStatistics();
 }
 
 void ListenAndPublish::checkLines() {
@@ -491,19 +492,18 @@ void ListenAndPublish::labelLinesWithInstances(
     cv::Vec4f hessian[2];
     // - Stores the distance from the origin to the plane considered.
     double distance_plane_from_origin[2];
-    // - Stores the Hessian of the plane that belongs to the object that owns
-    //   the line.
-    cv::Vec4f plane_in_object_owning_line;
     // - For sanity-check purposes only. Line type obtained when calling
-    //   checkEdgeOrIntersectionGivenProlongedLine.
+    //   checkIfValidPointsOnPlanesGivenProlongedLine.
     line_detection::LineType line_type_for_check;
     // - For intersection lines.
     cv::Vec3f start_line_before_start, end_line_before_start,
       start_line_after_end, end_line_after_end;
-    line_detection::LineType line_type_before_start, line_type_after_end;
-    bool line_type_determinable_before_start, line_type_determinable_after_end;
-    cv::Vec4f plane_in_object_owning_line_before_start,
-        plane_in_object_owning_line_after_end;
+    // Check which of the prolonged planes contain (enough) points that are valid
+    // fit to them.
+    bool right_plane_enough_valid_points_before_start;
+    bool left_plane_enough_valid_points_before_start;
+    bool right_plane_enough_valid_points_after_end;
+    bool left_plane_enough_valid_points_after_end;
 
     cv::Vec3f start, end, direction, point3D;
 
@@ -571,19 +571,19 @@ void ListenAndPublish::labelLinesWithInstances(
           end_line_after_end = end +
               extension_length_for_intersection * direction;
 
-          line_type_determinable_before_start =
-              line_detector_.checkEdgeOrIntersectionGivenProlongedLine(
-                  cv_cloud_, camera_P_, start_line_before_start,
-                  end_line_before_start, lines[i].hessians,
-                  &line_type_before_start,
-                  &plane_in_object_owning_line_before_start);
-          line_type_determinable_after_end =
-              line_detector_.checkEdgeOrIntersectionGivenProlongedLine(
-                  cv_cloud_, camera_P_, start_line_after_end,
-                  end_line_after_end, lines[i].hessians, &line_type_after_end,
-                  &plane_in_object_owning_line_after_end);
+          line_detector_.setVisualizationMode(false);
+          line_detector_.checkIfValidPointsOnPlanesGivenProlongedLine(
+              cv_cloud_, camera_P_, start_line_before_start,
+              end_line_before_start, lines[i].hessians,
+              &right_plane_enough_valid_points_before_start,
+              &left_plane_enough_valid_points_before_start);
+          line_detector_.checkIfValidPointsOnPlanesGivenProlongedLine(
+              cv_cloud_, camera_P_, start_line_after_end,
+              end_line_after_end, lines[i].hessians,
+              &right_plane_enough_valid_points_after_end,
+              &left_plane_enough_valid_points_after_end);
 
-          if (line_type_determinable_before_start &&
+          /*if (line_type_determinable_before_start &&
               !line_type_determinable_after_end) {
             CHECK(lines[i].type == line_type_before_start);
             plane_in_object_owning_line =
@@ -605,7 +605,7 @@ void ListenAndPublish::labelLinesWithInstances(
                       << "furthest away.";
             assignLabelOfFurthestInlierPlane(lines[i], instances, camera_info,
                                              &(labels->at(i)));
-          }
+          }*/
           break;
       }
     }

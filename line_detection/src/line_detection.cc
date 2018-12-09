@@ -264,15 +264,7 @@ bool getPointOnPlaneIntersectionLine(const cv::Vec4f& hessian1,
   return success;
 }
 
-cv::Mat getImageOfLine(const cv::Vec4f& line, int cols, int rows,
-                       const int scale_factor) {
-  cv::Mat background_image(rows*scale_factor, cols*scale_factor, CV_8UC3);
-  background_image = cv::Scalar(255,255,255);  // White
-
-  return getImageOfLine(line, background_image, scale_factor);
-}
-
-cv::Mat getImageOfLine(const cv::Vec4f& line, const cv::Mat& background_image,
+cv::Mat getImageOfLine(const cv::Vec4f& line, const cv::Mat background_image,
                        const int scale_factor) {
    // Display line with rectangles in the image
    int cols = background_image.cols;
@@ -296,20 +288,7 @@ cv::Mat getImageOfLine(const cv::Vec4f& line, const cv::Mat& background_image,
 cv::Mat getImageOfLineWithRectangles(const cv::Vec4f& line,
                                      const std::vector<cv::Point2f>& rect_left,
                                      const std::vector<cv::Point2f>& rect_right,
-                                     int cols, int rows,
-                                     const int scale_factor) {
-  cv::Mat background_image(rows*scale_factor, cols*scale_factor, CV_8UC3);
-  background_image = cv::Scalar(255,255,255);  // White
-
-
-  return getImageOfLineWithRectangles(line, rect_left, rect_right,
-                                      background_image, scale_factor);
-}
-
-cv::Mat getImageOfLineWithRectangles(const cv::Vec4f& line,
-                                     const std::vector<cv::Point2f>& rect_left,
-                                     const std::vector<cv::Point2f>& rect_right,
-                                     const cv::Mat& background_image,
+                                     const cv::Mat background_image,
                                      const int scale_factor) {
   // Display line with rectangles in the image
   int cols = background_image.cols;
@@ -431,7 +410,7 @@ void LineDetector::detectLines(const cv::Mat& image, int detector,
     detectLines(image, Detector::HOUGH, lines);
   else {
     LOG(WARNING)
-        << "LineDetetor::detectLines: Detector choice not valid, LSD was "
+        << "LineDetector::detectLines: Detector choice not valid, LSD was "
            "chosen as default.";
     detectLines(image, Detector::LSD, lines);
   }
@@ -953,27 +932,6 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                                       const cv::Mat& camera_P,
                                       const bool planes_found,
                                       LineWithPlanes* line) {
-  int cols = cloud.cols;
-  int rows = cloud.rows;
-
-  cv::Mat background_image(rows*scale_factor_for_visualization,
-                           cols*scale_factor_for_visualization, CV_8UC3);
-  background_image = cv::Scalar(255,255,255);  // White
-
-  return find3DlineOnPlanes(points1, points2, line_guess, cloud, camera_P,
-                            background_image, planes_found, line);
-}
-
-
-
-bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
-                                      const std::vector<cv::Vec3f>& points2,
-                                      const cv::Vec6f& line_guess,
-                                      const cv::Mat& cloud,
-                                      const cv::Mat& camera_P,
-                                      const cv::Mat& background_image,
-                                      const bool planes_found,
-                                      LineWithPlanes* line) {
   CHECK_NOTNULL(line);
   size_t N1 = points1.size();
   size_t N2 = points2.size();
@@ -1033,6 +991,7 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
 
       line->line = {start[0], start[1], start[2], end[0], end[1], end[2]};
       line->type = LineType::PLANE;
+      num_planar_lines++;
 
       enough_inliers_around_center =
           checkIfValidLineUsingInliers(points, start, end);
@@ -1069,33 +1028,39 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
 
       line->line = {start[0], start[1], start[2], end[0], end[1], end[2]};
 
-      cv::Vec3f start_guess_init = {line_guess[0], line_guess[1], line_guess[2]};
+      cv::Vec3f start_guess_init = {line_guess[0], line_guess[1],
+                                    line_guess[2]};
       cv::Vec3f end_guess_init = {line_guess[3], line_guess[4], line_guess[5]};
-      displayLineWithPointsAndPlanes(start, end, start_guess_init, end_guess_init,
-                                     points1, points2, line->hessians[0],
-                                     line->hessians[1]);
-       // Project line re-adjusted through inliers in 2D and add it to the
-       // background image.
-       cv::Vec2f start_2D, end_2D;
-       cv::Vec4f start_3D_homo = {line->line[0], line->line[1], line->line[2],
-                                  1.0};
-       cv::Vec4f end_3D_homo = {line->line[3], line->line[4], line->line[5],
+      if (visualization_mode_on_) {
+        displayLineWithPointsAndPlanes(start, end, start_guess_init,
+                                       end_guess_init, points1, points2,
+                                       line->hessians[0], line->hessians[1]);
+      }
+      // Project line re-adjusted through inliers in 2D and add it to the
+      // background image.
+      cv::Vec2f start_2D, end_2D;
+      cv::Vec4f start_3D_homo = {line->line[0], line->line[1], line->line[2],
                                 1.0};
-       cv::Mat start_2D_homo = camera_P * cv::Mat(start_3D_homo);
-       cv::Mat end_2D_homo = camera_P * cv::Mat(end_3D_homo);
-       start_2D = {start_2D_homo.at<float>(0, 0) /
-                   start_2D_homo.at<float>(2, 0),
-                   start_2D_homo.at<float>(1, 0) /
-                   start_2D_homo.at<float>(2, 0)};
-       end_2D = {end_2D_homo.at<float>(0, 0) / end_2D_homo.at<float>(2, 0),
-                 end_2D_homo.at<float>(1, 0) / end_2D_homo.at<float>(2, 0)};
-       cv::Vec4f line_2D({start_2D[0], start_2D[1], end_2D[0], end_2D[1]});
-       cv::Mat new_background_image;
-       new_background_image = getImageOfLine(line_2D, background_image, 1);
+      cv::Vec4f end_3D_homo = {line->line[3], line->line[4], line->line[5],
+                              1.0};
+      cv::Mat start_2D_homo = camera_P * cv::Mat(start_3D_homo);
+      cv::Mat end_2D_homo = camera_P * cv::Mat(end_3D_homo);
+      start_2D = {start_2D_homo.at<float>(0, 0) /
+                 start_2D_homo.at<float>(2, 0),
+                 start_2D_homo.at<float>(1, 0) /
+                 start_2D_homo.at<float>(2, 0)};
+      end_2D = {end_2D_homo.at<float>(0, 0) / end_2D_homo.at<float>(2, 0),
+               end_2D_homo.at<float>(1, 0) / end_2D_homo.at<float>(2, 0)};
+      cv::Vec4f line_2D({start_2D[0], start_2D[1], end_2D[0], end_2D[1]});
+
+      if (visualization_mode_on_) {
+       // Update background image
+        background_image_ = getImageOfLine(line_2D, background_image_, 1);
+      }
 
       // Line can now be either an edge or on an intersection line.
       if (!assignEdgeOrIntersectionLineType(cloud, camera_P, points1, points2,
-                                            new_background_image, line)) {
+                                            line)) {
         LOG(ERROR) << "Could not assign neither edge- nor intersection- line "
                    << "type to line (" << line->line[0] << ", " << line->line[1]
                    << ", " << line->line[2] << ") -- (" << line->line[3] << ", "
@@ -1103,7 +1068,7 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
 
 
         return false;
-      } else{
+      } else {
         LOG(INFO) << "Successfully determined type "
                   << (line->type==LineType::EDGE ? "EDGE " : "INTERSECT ")
                   << "for line (" << line->line[0] << ", " << line->line[1]
@@ -1161,6 +1126,7 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
 
     line->line = {start[0], start[1], start[2], end[0], end[1], end[2]};
     line->type = LineType::DISCONT;
+    num_discontinuity_lines++;
 
     enough_inliers_around_center =
         checkIfValidLineUsingInliers(*points, start, end);
@@ -1175,22 +1141,6 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
 bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
     const cv::Mat& camera_P, const std::vector<cv::Vec3f>& inliers_right,
     const std::vector<cv::Vec3f>& inliers_left, LineWithPlanes* line) {
-    int cols = cloud.cols;
-    int rows = cloud.rows;
-
-    cv::Mat background_image(rows*scale_factor_for_visualization,
-                             cols*scale_factor_for_visualization, CV_8UC3);
-    background_image = cv::Scalar(255,255,255);  // White
-
-    return assignEdgeOrIntersectionLineType(cloud, camera_P, inliers_right,
-                                            inliers_left, background_image,
-                                            line);
-}
-
-bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
-    const cv::Mat& camera_P, const std::vector<cv::Vec3f>& inliers_right,
-    const std::vector<cv::Vec3f>& inliers_left, const cv::Mat& background_image,
-    LineWithPlanes* line) {
   CHECK_NOTNULL(line);
   // As a first step extend the 3D line from both endpoints and extract the two
   // extensions as line segments.
@@ -1206,81 +1156,60 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
   cv::Vec3f start_line_after_end = end;
   cv::Vec3f end_line_after_end =
       end + params_->extension_length_for_edge_or_intersection * direction;
-  // Check if the line type can be determined by looking at the prolonged lines.
-  LineType line_type_before_start, line_type_after_end;
-  bool line_type_determinable_before_start, line_type_determinable_after_end;
-  line_type_determinable_before_start =
-      checkEdgeOrIntersectionGivenProlongedLine(cloud, camera_P,
-                                                start_line_before_start,
-                                                end_line_before_start,
-                                                line->hessians,
-                                                background_image,
-                                                &line_type_before_start);
-  line_type_determinable_after_end =
-      checkEdgeOrIntersectionGivenProlongedLine(cloud, camera_P,
-                                                start_line_after_end,
-                                                end_line_after_end,
-                                                line->hessians,
-                                                background_image,
-                                                &line_type_after_end);
+
+  // Check which of the prolonged planes contain (enough) points that are valid
+  // fit to them.
+  bool right_plane_enough_valid_points_before_start;
+  bool left_plane_enough_valid_points_before_start;
+  bool right_plane_enough_valid_points_after_end;
+  bool left_plane_enough_valid_points_after_end;
+  checkIfValidPointsOnPlanesGivenProlongedLine(
+      cloud, camera_P, start_line_before_start, end_line_before_start,
+      line->hessians, &right_plane_enough_valid_points_before_start,
+      &left_plane_enough_valid_points_before_start);
+  checkIfValidPointsOnPlanesGivenProlongedLine(
+      cloud, camera_P, start_line_after_end, end_line_after_end, line->hessians,
+      &right_plane_enough_valid_points_after_end,
+      &left_plane_enough_valid_points_after_end);
+  // Convert booleans to string.
+  std::string point_planes_config;
+  point_planes_config.push_back(
+      int(left_plane_enough_valid_points_before_start) + '0');
+  point_planes_config.push_back(
+      int(right_plane_enough_valid_points_before_start) + '0');
+  point_planes_config.push_back(
+      int(left_plane_enough_valid_points_after_end) + '0');
+  point_planes_config.push_back(
+      int(right_plane_enough_valid_points_after_end) + '0');
   // Possible cases:
-  // - Line type can be determined from only one of the two prolonged lines ->
-  //   use the determined line type;
-  // - Line type can be determined from both prolonged lines and coincides ->
-  //   use the determined line type;
-  // - Line type can be determined from both prolonged lines but does not
-  //   coincide -> see alternative method below;
-  // - Line type cannot be determined from either of the two prolonged lines ->
-  //   see alternative method below.
-  if (line_type_determinable_before_start &&
-      !line_type_determinable_after_end) {
-    line->type = line_type_before_start;
-    return true;
-  } else if (!line_type_determinable_before_start &&
-             line_type_determinable_after_end) {
-    line->type = line_type_after_end;
-    return true;
-  } else if (line_type_determinable_before_start &&
-             line_type_determinable_after_end) {
-    if (line_type_before_start == line_type_after_end) {
-        line->type = line_type_before_start;
-      return true;
-    }
-  }
-  // Alternative method: if the two planes around the original line form a
-  // convex angle, set the line type to be INTERSECT, otherwise set it to be
-  // EDGE.
-  // Let us note that a plane admits two different orientations, i.e., given the
-  // direction of its normal vector, the latter can point either "towards" the
-  // camera or in the opposite way.
-  directHessianTowardsOrigin(&(line->hessians[0]));
-  directHessianTowardsOrigin(&(line->hessians[1]));
-  // Compute mean points (needed if using
-  // determineConvexityFromViewpointGivenLineAndMeanPoints).
-  cv::Vec3f mean_point_1 = computeMean(inliers_1);
-  cv::Vec3f mean_point_2 = computeMean(inliers_2);
-  // Take any point on the line that connects a generic pair of points, each of
-  // which belonging to one of the two planes. If this point is "in front of"
-  // (i.e., in the orientation of the normal vector) the planes than we have a
-  // convex angle, otherwise a concave angle.
-  // As points belonging to the planes, take the projections of the two means
-  // on the planes.
-  bool convex_true_concave_false;
-  cv::Vec3f origin({0.0f, 0.0f, 0.0f});
-  if (determineConvexityFromViewpointGivenLineAndInlierPoints(*line, inliers_1,
-    inliers_2, origin, &convex_true_concave_false)) {
-      if (convex_true_concave_false) {
-        // Convex => Intersection
-        line->type = LineType::INTERSECT;
-      } else {
-        // Concave => Edge
-        line->type = LineType::EDGE;
-      }
-      return true;
+  // - [0][0]/[0][0] -> Edge line.
+  // - All other cases -> Intersection line.
+  if (point_planes_config == "0000") {
+    line->type = LineType::EDGE;
+    occurrences_config_prolonged_plane[0][0][0][0]++;
   } else {
-    // This case should never be entered
-    return false;
+    if (point_planes_config == "0001" || point_planes_config == "0010" ||
+        point_planes_config == "0100" || point_planes_config == "1000") {
+      occurrences_config_prolonged_plane[1][0][0][0]++;
+    } else if (point_planes_config == "1100" || point_planes_config == "0011") {
+      occurrences_config_prolonged_plane[1][1][0][0]++;
+    } else if (point_planes_config == "1010" || point_planes_config == "0101") {
+      occurrences_config_prolonged_plane[1][0][1][0]++;
+    } else if (point_planes_config == "1001" || point_planes_config == "0110") {
+      occurrences_config_prolonged_plane[1][0][0][1]++;
+    } else if (point_planes_config == "1110" || point_planes_config == "1101" ||
+               point_planes_config == "1011" || point_planes_config == "0111") {
+      occurrences_config_prolonged_plane[1][1][1][0]++;
+    } else if (point_planes_config == "1111") {
+      occurrences_config_prolonged_plane[1][1][1][1]++;
+    } else {
+      LOG(ERROR) << "Found a case for the configuration valid points/prolonged "
+                 << "planes that should be impossible.";
+      return false;
+    }
+    line->type = LineType::INTERSECT;
   }
+  return true;
 }
 
 bool LineDetector::determineConvexityFromViewpointGivenLineAndInlierPoints(
@@ -1399,59 +1328,14 @@ bool LineDetector::determineConvexityFromViewpointGivenLineAndMeanPoints(
   }
 }
 
-bool LineDetector::checkEdgeOrIntersectionGivenProlongedLine(
+void LineDetector::checkIfValidPointsOnPlanesGivenProlongedLine(
     const cv::Mat& cloud, const cv::Mat& camera_P, const cv::Vec3f& start,
     const cv::Vec3f& end, const std::vector<cv::Vec4f>& hessians,
-    LineType* line_type) {
-    int cols = cloud.cols;
-    int rows = cloud.rows;
-
-    cv::Mat background_image(rows*scale_factor_for_visualization,
-                             cols*scale_factor_for_visualization, CV_8UC3);
-    background_image = cv::Scalar(255,255,255);  // White
-
-    return checkEdgeOrIntersectionGivenProlongedLine(cloud, camera_P, start,
-                                                     end, hessians,
-                                                     background_image,
-                                                     line_type);
-}
-
-
-bool LineDetector::checkEdgeOrIntersectionGivenProlongedLine(
-    const cv::Mat& cloud, const cv::Mat& camera_P, const cv::Vec3f& start,
-    const cv::Vec3f& end, const std::vector<cv::Vec4f>& hessians,
-    const cv::Mat& background_image, LineType* line_type) {
-  cv::Vec4f hessian_of_object_owning_line;
-  return checkEdgeOrIntersectionGivenProlongedLine(cloud, camera_P, start, end,
-             hessians, background_image, line_type,
-             &hessian_of_object_owning_line);
-}
-
-bool LineDetector::checkEdgeOrIntersectionGivenProlongedLine(
-    const cv::Mat& cloud, const cv::Mat& camera_P, const cv::Vec3f& start,
-    const cv::Vec3f& end, const std::vector<cv::Vec4f>& hessians,
-    LineType* line_type, cv::Vec4f* hessian_of_object_owning_line) {
-    int cols = cloud.cols;
-    int rows = cloud.rows;
-
-    cv::Mat background_image(rows*scale_factor_for_visualization,
-                             cols*scale_factor_for_visualization, CV_8UC3);
-    background_image = cv::Scalar(255,255,255);  // White
-
-    return checkEdgeOrIntersectionGivenProlongedLine(cloud, camera_P, start,
-               end, hessians, background_image, line_type,
-               hessian_of_object_owning_line);
-}
-
-bool LineDetector::checkEdgeOrIntersectionGivenProlongedLine(
-    const cv::Mat& cloud, const cv::Mat& camera_P, const cv::Vec3f& start,
-    const cv::Vec3f& end, const std::vector<cv::Vec4f>& hessians,
-    const cv::Mat& background_image, LineType* line_type,
-    cv::Vec4f* hessian_of_object_owning_line) {
-  CHECK_NOTNULL(line_type);
-  CHECK_NOTNULL(hessian_of_object_owning_line);
+    bool* right_plane_enough_valid_points,
+    bool* left_plane_enough_valid_points) {
+  CHECK_NOTNULL(left_plane_enough_valid_points);
+  CHECK_NOTNULL(right_plane_enough_valid_points);
   double max_deviation = params_->max_error_inlier_ransac;
-  bool left_plane_enough_valid_points, right_plane_enough_valid_points;
   // Get 2D coordinates of the endpoints of the line segment.
   cv::Vec2f start_2D, end_2D;
   cv::Vec4f prolonged_line;
@@ -1477,13 +1361,16 @@ bool LineDetector::checkEdgeOrIntersectionGivenProlongedLine(
 
   cv::Vec4f line({start_2D[0], start_2D[1], end_2D[0], end_2D[1]});
 
-  // Display image of prolonged line.
-  cv::Mat image_of_line_with_rectangles = getImageOfLineWithRectangles(
-                                              line, rect_left, rect_right,
-                                              background_image);
-  cv::imshow("Line with rectangles and prolonged line/planes",
-             image_of_line_with_rectangles);
-  cv::waitKey();
+  cv::Mat image_of_line_with_rectangles;
+  if (visualization_mode_on_) {
+    // Display image of prolonged line.
+    image_of_line_with_rectangles = getImageOfLineWithRectangles(
+                                        line, rect_left, rect_right,
+                                        background_image_);
+    cv::imshow("Line with rectangles and prolonged line/planes",
+               image_of_line_with_rectangles);
+    cv::waitKey();
+  }
 
   // Find points for the left side.
   //LOG(INFO) << "Find points in left rectangle for prolonged line (" << start[0]
@@ -1499,14 +1386,9 @@ bool LineDetector::checkEdgeOrIntersectionGivenProlongedLine(
     if (std::isnan(cloud.at<cv::Vec3f>(points_in_rect[j])[0])) continue;
     points_left_plane.push_back(cloud.at<cv::Vec3f>(points_in_rect[j]));
   }
-  // If the number of points around the plane is too small, either the line
-  // segment is too short (but this should not be the case if
-  // extension_length_for_edge_or_intersection is properly set) or the line
-  // segment is near the edge of the image. Therefore, not enough information
-  // is available to determine the type of the original line.
-  if (points_left_plane.size() < params_->min_points_in_rect) {
-    return false;
-  }
+  LOG(INFO) << "Left rectangle contains " << points_left_plane.size()
+            << " points.";
+
   // Find points for the right side.
   //LOG(INFO) << "Find points in right rectangle for prolonged line (" << start[0]
   //          << ", " << start[1] << ", " << start[2] << ") -- (" << end[0]
@@ -1521,88 +1403,69 @@ bool LineDetector::checkEdgeOrIntersectionGivenProlongedLine(
     if (std::isnan(cloud.at<cv::Vec3f>(points_in_rect[j])[0])) continue;
     points_right_plane.push_back(cloud.at<cv::Vec3f>(points_in_rect[j]));
   }
+  LOG(INFO) << "Right rectangle contains " << points_right_plane.size()
+            << " points.";
+
   // If the number of points around the plane is too small, either the line
   // segment is too short (but this should not be the case if
   // extension_length_for_edge_or_intersection is properly set) or the line
-  // segment is near the edge of the image. Therefore, not enough information
-  // is available to determine the type of the original line.
-  if (points_right_plane.size() < params_->min_points_in_rect) {
-    return false;
+  // segment is near the edge of the image. Therefore, not enough points can be
+  // counted to determine whether there are enough valid points on the two
+  // sides.
+  bool enough_left_points_to_count = true;
+  bool enough_right_points_to_count = true;
+  if (points_left_plane.size() < params_->min_points_in_prolonged_rect) {
+    *left_plane_enough_valid_points = false;
+    enough_left_points_to_count = false;
   }
+
+  if (points_right_plane.size() < params_->min_points_in_prolonged_rect) {
+    *right_plane_enough_valid_points = false;
+    enough_right_points_to_count = false;
+  }
+
   // Now check if the points around the two planes could be part of the two
   // planes around the original line, i.e., if they could belong to the same
   // object as the points on the corresponding plane around the original line.
   // To do so, count how many points in the two planes around the prolonged line
-  // are consistent with the hessians of the original line. Since the order of
-  // the hessians around the original line might not match the left and right
-  // planes just detected around the prolonged line, both combinations are tried
-  // and the one that achieves more positive correspondences is kept.
+  // are consistent with the hessians of the original line.
   int valid_points_left_plane = 0, valid_points_right_plane = 0;
-  int prev_valid_points_left_plane, prev_valid_points_right_plane;
   cv::Vec4f hessian_left_plane, hessian_right_plane;
   std::vector<cv::Vec3f>::iterator it;
-  // First combination: hessian[0] -> left, hessian[1] -> right
-  for (it = points_left_plane.begin(); it != points_left_plane.end(); ++it) {
-    if (errorPointToPlane(hessians[0], *it) < max_deviation)
-      ++valid_points_left_plane;
-  }
-  prev_valid_points_left_plane = valid_points_left_plane;
-  for (it = points_right_plane.begin(); it != points_right_plane.end(); ++it) {
-    if (errorPointToPlane(hessians[1], *it) < max_deviation)
-      ++valid_points_right_plane;
-  }
-  prev_valid_points_right_plane = valid_points_right_plane;
-  // Second combination: hessian[1] -> left, hessian[0] -> right
+  // According to the way hessians were assigned to the lines in
+  // project2Dto3DwithPlanes, the map between hessians and side is
+  // hessians[0] -> right, hessians[1] -> left.
   valid_points_left_plane = 0;
   valid_points_right_plane = 0;
-  for (it = points_left_plane.begin(); it != points_left_plane.end(); ++it) {
-    if (errorPointToPlane(hessians[1], *it) < max_deviation)
-      ++valid_points_left_plane;
-  }
-  for (it = points_right_plane.begin(); it != points_right_plane.end(); ++it) {
-    if (errorPointToPlane(hessians[0], *it) < max_deviation)
-      ++valid_points_right_plane;
-  }
   hessian_left_plane = hessians[1];
   hessian_right_plane = hessians[0];
-  if (valid_points_left_plane + valid_points_right_plane <
-      prev_valid_points_left_plane + prev_valid_points_right_plane) {
-      // Use the first combination
-      valid_points_left_plane = prev_valid_points_left_plane;
-      valid_points_right_plane = prev_valid_points_right_plane;
-      hessian_left_plane = hessians[0];
-      hessian_right_plane = hessians[1];
+
+  if (enough_left_points_to_count) {
+    for (it = points_left_plane.begin(); it != points_left_plane.end(); ++it) {
+      if (errorPointToPlane(hessian_left_plane, *it) < max_deviation)
+        ++valid_points_left_plane;
+    }
+    // Determine if enough valid points are found for the left plane.
+    if (valid_points_left_plane < params_-> max_points_for_empty_rectangle)
+      *left_plane_enough_valid_points = false;
+    else
+      *left_plane_enough_valid_points = true;
   }
-  // Determine if enough valid points are found for the two planes.
-  if (valid_points_left_plane < params_-> max_points_for_empty_rectangle)
-    left_plane_enough_valid_points = false;
-  else
-    left_plane_enough_valid_points = true;
-  if (valid_points_right_plane < params_-> max_points_for_empty_rectangle)
-    right_plane_enough_valid_points = false;
-  else
-    right_plane_enough_valid_points = true;
-  // Finally assign the line type as follows:
-  // - If one plane has enough valid points, while the other does not, set the
-  //   line to be INTERSECTION;
-  // - If both planes have enough valid points, set the line to be EDGE;
-  // - If none of the two planes has enough valid points, there is not enough
-  //   information to determine the type of the original line.
-  if (left_plane_enough_valid_points && !right_plane_enough_valid_points) {
-    *line_type = LineType::INTERSECT;
-    *hessian_of_object_owning_line = hessian_left_plane;
-    return true;
-  } else if (!left_plane_enough_valid_points && right_plane_enough_valid_points) {
-    *line_type = LineType::INTERSECT;
-    *hessian_of_object_owning_line = hessian_right_plane;
-    return true;
-  } else if (left_plane_enough_valid_points &&
-    right_plane_enough_valid_points) {
-      *line_type = LineType::EDGE;
-      return true;
-  } else {
-    return false;
+  if (enough_right_points_to_count) {
+    for (it = points_right_plane.begin(); it != points_right_plane.end();
+         ++it) {
+      if (errorPointToPlane(hessian_right_plane, *it) < max_deviation)
+        ++valid_points_right_plane;
+    }
+    // Determine if enough valid points are found for the right plane.
+    if (valid_points_right_plane < params_-> max_points_for_empty_rectangle)
+      *right_plane_enough_valid_points = false;
+    else
+      *right_plane_enough_valid_points = true;
   }
+  LOG(INFO) << "Found " << valid_points_left_plane << " valid points on the "
+            << "left plane and " << valid_points_right_plane << " valid points "
+            << "on the right plane.";
 }
 
 bool LineDetector::planeRANSAC(const std::vector<cv::Vec3f>& points,
@@ -1805,6 +1668,7 @@ void LineDetector::project2Dto3DwithPlanes(
   CHECK_EQ(cloud.type(), CV_32FC3);
   lines3D->clear();
   lines2D_out->clear();
+  resetStatistics();
   // Declare all variables before the main loop.
   std::vector<cv::Point2f> rect_left, rect_right;
   std::vector<cv::Point2i> points_in_rect;
@@ -1813,7 +1677,6 @@ void LineDetector::project2Dto3DwithPlanes(
   std::vector<double> rating;
   cv::Point2i start, end;
   LineWithPlanes line3D_true;
-  cv::Mat image_of_line_with_rectangles;
   // Parameter: Fraction of inlier that must be found for the plane model to
   // be valid.
   double min_inliers = params_->min_inlier_ransac;
@@ -1927,22 +1790,28 @@ void LineDetector::project2Dto3DwithPlanes(
       planes_found = true;
     }
 
-    //image_of_line_with_rectangles = getImageOfLineWithRectangles(lines2D[i],
-    //                                    rect_left, rect_right, image, 1);
-    image_of_line_with_rectangles = image;
+    cv::Mat image_of_line_with_rectangles;
+
+    if (visualization_mode_on_) {
+      //background_image_ = getImageOfLineWithRectangles(lines2D[i],
+      //                                    rect_left, rect_right, 1);
+      background_image_ = image;
+    }
 
     // Find 3D line on planes.
     if (find3DlineOnPlanes(inliers_right, inliers_left, lines3D_cand[i], cloud,
-                           camera_P, image_of_line_with_rectangles,
-                           planes_found, &line3D_true)) {
+                           camera_P, planes_found, &line3D_true)) {
       // Only push back the reliably found lines.
       lines3D->push_back(line3D_true);
       lines2D_out->push_back(lines2D[i]);
-      // Display 2D image with rectangles
-      image_of_line_with_rectangles = getImageOfLineWithRectangles(lines2D[i],
-                                          rect_left, rect_right, image);
-      cv::imshow("Line with rectangles", image_of_line_with_rectangles);
-      cv::waitKey();
+      if (visualization_mode_on_) {
+        // Display 2D image with rectangles
+        image_of_line_with_rectangles = getImageOfLineWithRectangles(lines2D[i],
+                                            rect_left, rect_right,
+                                            background_image_);
+        cv::imshow("Line with rectangles", image_of_line_with_rectangles);
+        cv::waitKey();
+      }
     }
   }
 }
@@ -2075,39 +1944,12 @@ void LineDetector::find3DlinesRated(const cv::Mat& cloud,
     lower_line2D[3] = checkInBoundary(
         floor(lines2D[i][3]) + floor(line.x / line_normalizer + 0.5), 0.0,
         rows - 1);
-    cv::Mat img_for_display(rows*4,cols*4, CV_8UC3);
-    img_for_display = cv::Scalar(255,255,255);  // White
-    // Upper line
-    cv::line(img_for_display, cv::Point(upper_line2D[0]*4, upper_line2D[1]*4),
-             cv::Point(upper_line2D[2]*4, upper_line2D[3]*4),
-             cv::Scalar(255, 255, 0));  // Cyan
-    // Inital (mid) line
-    cv::line(img_for_display, cv::Point(lines2D[i][0]*4, lines2D[i][1]*4),
-             cv::Point(lines2D[i][2]*4, lines2D[i][3]*4),
-             cv::Scalar(255, 0, 255)); // Purple
-    // Lower line
-    cv::line(img_for_display, cv::Point(lower_line2D[0]*4, lower_line2D[1]*4),
-             cv::Point(lower_line2D[2]*4, lower_line2D[3]*4),
-             cv::Scalar(0, 0, 0)); // Black
-    //LOG(INFO) << "Coordinates of lines are\nUp: (" << upper_line2D[0] << ", "
-    //          << upper_line2D[1] << ") - (" << upper_line2D[2] << ", "
-    //          << upper_line2D[3] << ")\nMid: (" << lines2D[i][0] << ", "
-    //          << lines2D[i][1] << ") - (" << lines2D[i][2] << ", "
-    //          << lines2D[i][3] << ")\nLow: (" << lower_line2D[0] << ", "
-    //          << lower_line2D[1] << ") - (" << lower_line2D[2] << ", "
-    //          << lower_line2D[3] << ").";
-
-    //LOG(INFO) << "Rate low:";
     rate_low = findAndRate3DLine(cloud, lower_line2D, &lower_line3D);
-    //LOG(INFO) << "Rate mid:";
     rate_mid = findAndRate3DLine(cloud, lines2D[i], &line3D);
-    //LOG(INFO) << "Rate up:";
     rate_up = findAndRate3DLine(cloud, upper_line2D, &upper_line3D);
 
     //LOG(INFO) << "Ratings of lines are:\nUp = " << rate_up << "\nMid = "
     //          << rate_mid << "\nLow = " << rate_low << "\n";
-    //cv::imshow("Detected line with upper and lower line", img_for_display);
-    //cv::waitKey();
 
     if (rate_up < rate_mid && rate_up < rate_low) {
       lines3D->push_back(upper_line3D);
@@ -2532,6 +2374,50 @@ bool LineDetector::checkIfValidLineUsingInliers(
   } else {
     return true;
   }
+}
+
+void LineDetector::displayStatistics() {
+  int total_num_lines = num_discontinuity_lines + num_planar_lines +
+                        num_intersection_lines + num_edge_lines;
+  LOG(INFO) << "Found " << total_num_lines << " total lines, of which:\n* "
+            << num_discontinuity_lines << " discontinuity lines\n* "
+            << num_planar_lines << " planar lines\n* "
+            << num_edge_lines << " edge lines\n* "
+            << num_intersection_lines << " intersection lines.";
+  LOG(INFO) << "Among the edge/intersection lines that were assigned to their "
+            << "type by looking at the prolonged lines/planes the following "
+            << "occurrences for each configuration were found (format: "
+            << "before_start [L][R]/[L][R] after end):"
+            << "\n* [0][0]/[0][0]: "
+            << occurrences_config_prolonged_plane[0][0][0][0]
+            << "\n* [0][0]/[0][1], [0][0]/[1][0], [0][1]/[0][0], "
+            << "[1][0]/[0][0]: "
+            << occurrences_config_prolonged_plane[1][0][0][0]
+            << "\n* [1][1]/[0][0], [0][0]/[1][1]: "
+            << occurrences_config_prolonged_plane[1][1][0][0]
+            << "\n* [1][0]/[1][1], [0][1]/[0][1]: "
+            << occurrences_config_prolonged_plane[1][0][1][0]
+            << "\n* [1][0]/[0][1], [0][1]/[1][0]: "
+            << occurrences_config_prolonged_plane[1][0][0][1]
+            << "\n* [1][1]/[1][0], [1][1]/[0][1], [1][0]/[1][1], "
+            << "[0][1]/[1][1]: "
+            << occurrences_config_prolonged_plane[1][1][1][0]
+            << "\n* [1][1]/[1][1]: "
+            << occurrences_config_prolonged_plane[1][1][1][1];
+}
+
+void LineDetector::resetStatistics() {
+  num_discontinuity_lines = 0;
+  num_planar_lines = 0;
+  num_intersection_lines = 0;
+  num_edge_lines = 0;
+  occurrences_config_prolonged_plane[0][0][0][0] = 0;
+  occurrences_config_prolonged_plane[1][0][0][0] = 0;
+  occurrences_config_prolonged_plane[1][1][0][0] = 0;
+  occurrences_config_prolonged_plane[1][0][1][0] = 0;
+  occurrences_config_prolonged_plane[1][0][0][1] = 0;
+  occurrences_config_prolonged_plane[1][1][1][0] = 0;
+  occurrences_config_prolonged_plane[1][1][1][1] = 0;
 }
 
 }  // namespace line_detection
