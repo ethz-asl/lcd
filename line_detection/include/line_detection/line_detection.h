@@ -884,6 +884,8 @@ private:
   int num_discontinuity_lines, num_planar_lines, num_intersection_lines,
       num_edge_lines;
 
+  int num_lines_discarded_for_convexity_concavity;
+
   // The following matrix stores the number of occurrences for each
   // configuration of points in the 'prolonged planes', i.e., the planes around
   // the prolonged lines.

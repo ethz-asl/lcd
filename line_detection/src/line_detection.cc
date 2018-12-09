@@ -991,12 +991,12 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
 
       line->line = {start[0], start[1], start[2], end[0], end[1], end[2]};
       line->type = LineType::PLANE;
-      num_planar_lines++;
 
       enough_inliers_around_center =
           checkIfValidLineUsingInliers(points, start, end);
 
       if (enough_num_inliers && enough_inliers_around_center) {
+        num_planar_lines++;
         return true;
       } else {
         return false;
@@ -1066,7 +1066,6 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                    << ", " << line->line[2] << ") -- (" << line->line[3] << ", "
                    << line->line[4] << ", " << line->line[5] << ")";
 
-
         return false;
       } else {
         LOG(INFO) << "Successfully determined type "
@@ -1126,11 +1125,11 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
 
     line->line = {start[0], start[1], start[2], end[0], end[1], end[2]};
     line->type = LineType::DISCONT;
-    num_discontinuity_lines++;
 
     enough_inliers_around_center =
         checkIfValidLineUsingInliers(*points, start, end);
     if (enough_num_inliers && enough_inliers_around_center) {
+      num_discontinuity_lines++;
       return true;
     } else {
       return false;
@@ -1196,6 +1195,7 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
   // - All other cases -> Intersection line.
   if (point_planes_config == "0000") {
     line->type = LineType::EDGE;
+    num_edge_lines++;
     occurrences_config_prolonged_plane[0][0][0][0]++;
   } else {
     if (point_planes_config == "0001" || point_planes_config == "0010" ||
@@ -1218,6 +1218,7 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
       return false;
     }
     line->type = LineType::INTERSECT;
+    num_intersection_lines++;
   }
   return true;
 }
@@ -1290,6 +1291,7 @@ bool LineDetector::determineConvexityFromViewpointGivenLineAndInlierPoints(
                << hessians[0][2] << ", " << hessians[0][3] << "] and ["
                << hessians[1][0] << ", " << hessians[1][1] << ", "
                << hessians[1][2] << ", " << hessians[1][3] << "].";
+    num_lines_discarded_for_convexity_concavity++;
     return false;
   }
 }
@@ -2390,6 +2392,9 @@ void LineDetector::displayStatistics() {
             << num_planar_lines << " planar lines\n* "
             << num_edge_lines << " edge lines\n* "
             << num_intersection_lines << " intersection lines.";
+  LOG(INFO) << num_lines_discarded_for_convexity_concavity << " lines were "
+            << "discarded because it was not possible to determine convexity/"
+            << "concavity";
   LOG(INFO) << "Among the edge/intersection lines that were assigned to their "
             << "type by looking at the prolonged lines/planes the following "
             << "occurrences for each configuration were found (format: "
@@ -2401,7 +2406,7 @@ void LineDetector::displayStatistics() {
             << occurrences_config_prolonged_plane[1][0][0][0]
             << "\n* [1][1]/[0][0], [0][0]/[1][1]: "
             << occurrences_config_prolonged_plane[1][1][0][0]
-            << "\n* [1][0]/[1][1], [0][1]/[0][1]: "
+            << "\n* [1][0]/[1][0], [0][1]/[0][1]: "
             << occurrences_config_prolonged_plane[1][0][1][0]
             << "\n* [1][0]/[0][1], [0][1]/[1][0]: "
             << occurrences_config_prolonged_plane[1][0][0][1]
@@ -2417,6 +2422,7 @@ void LineDetector::resetStatistics() {
   num_planar_lines = 0;
   num_intersection_lines = 0;
   num_edge_lines = 0;
+  num_lines_discarded_for_convexity_concavity = 0;
   occurrences_config_prolonged_plane[0][0][0][0] = 0;
   occurrences_config_prolonged_plane[1][0][0][0] = 0;
   occurrences_config_prolonged_plane[1][1][0][0] = 0;
