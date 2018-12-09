@@ -1171,6 +1171,16 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
       cloud, camera_P, start_line_after_end, end_line_after_end, line->hessians,
       &right_plane_enough_valid_points_after_end,
       &left_plane_enough_valid_points_after_end);
+  // Show image with two prolonged lines.
+  cv::Mat img_for_display = background_image_;
+  if (visualization_mode_on_) {
+    cv::resize(background_image_, img_for_display,
+               img_for_display.size() * scale_factor_for_visualization);
+    cv::imshow("Line with rectangles and prolonged line/planes",
+                img_for_display);
+    cv::waitKey();
+  }
+
   // Convert booleans to string.
   std::string point_planes_config;
   point_planes_config.push_back(
@@ -1361,15 +1371,11 @@ void LineDetector::checkIfValidPointsOnPlanesGivenProlongedLine(
 
   cv::Vec4f line({start_2D[0], start_2D[1], end_2D[0], end_2D[1]});
 
-  cv::Mat image_of_line_with_rectangles;
   if (visualization_mode_on_) {
     // Display image of prolonged line.
-    image_of_line_with_rectangles = getImageOfLineWithRectangles(
-                                        line, rect_left, rect_right,
-                                        background_image_);
-    cv::imshow("Line with rectangles and prolonged line/planes",
-               image_of_line_with_rectangles);
-    cv::waitKey();
+    background_image_ = getImageOfLineWithRectangles(line, rect_left,
+                                                    rect_right,
+                                                    background_image_, 1);
   }
 
   // Find points for the left side.
