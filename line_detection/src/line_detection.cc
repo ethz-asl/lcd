@@ -1141,6 +1141,43 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
     const cv::Mat& camera_P, const std::vector<cv::Vec3f>& inliers_right,
     const std::vector<cv::Vec3f>& inliers_left, LineWithPlanes* line) {
   CHECK_NOTNULL(line);
+  // First step: if the two planes around the original line form a
+  // convex angle, set the line type to be EDGE, otherwise both EDGE and
+  // INTERSECTION line type are possible and a further test is required.
+  // Let us note that a plane admits two different orientations, i.e., given the
+  // direction of its normal vector, the latteassignEdger can point either "towards" the
+  // camera or in the opposite way.
+  directHessianTowardsOrigin(&(line->hessians[0]));
+  directHessianTowardsOrigin(&(line->hessians[1]));
+  // Compute mean points (needed if using
+  // determineConvexityFromViewpointGivenLineAndMeanPoints).
+  cv::Vec3f mean_point_right = computeMean(inliers_right);
+  cv::Vec3f mean_point_left = computeMean(inliers_left);
+  bool convex_true_concave_false;
+  cv::Vec3f origin({0.0f, 0.0f, 0.0f});
+  if (determineConvexityFromViewpointGivenLineAndInlierPoints(*line,
+    inliers_right, inliers_left, origin, &convex_true_concave_false)) {
+      if (convex_true_concave_false) {
+        // Convex => Edge
+        line->type = LineType::EDGE;
+        num_edge_lines++;
+        return true;
+      }
+  } else {
+    // This case should never be entered
+    return false;
+  }
+  // Concave => Use the following method: prolonge the line from its endpoints,
+  // and prolonge the inlier planes as well. If on any on the two sides one of
+  // the two prolonged inlier planes contains points while the other is empty,
+  // then the line is an intersection line (one of the two objects in contact
+  // with each other reaches its boundary). If none of the two sides is of this
+  // type, but for at least one side both the prolonged inlier planes contain
+  // points, than the line is of type edge. If this is not the case either,
+  // there is not enough information to determine the type of the line.
+  LOG(INFO) << "Line with concave planes. Using method of prolonged lines to "
+            << "determine edge/intersection line type.";
+
   // As a first step extend the 3D line from both endpoints and extract the two
   // extensions as line segments.
   cv::Vec3f start(line->line[0], line->line[1], line->line[2]);
@@ -1227,6 +1264,7 @@ bool LineDetector::determineConvexityFromViewpointGivenLineAndInlierPoints(
   const LineWithPlanes& line, const std::vector<cv::Vec3f>& inliers_1,
   const std::vector<cv::Vec3f>& inliers_2, const cv::Vec3f& viewpoint,
   bool* convex_true_concave_false) {
+  CHECK_NOTNULL(convex_true_concave_false);
   // Orient normal vectors towards the viewpoint (if not done before).
   cv::Vec4f hessians[2];
   hessians[0] = line.hessians[0];
@@ -1273,12 +1311,12 @@ bool LineDetector::determineConvexityFromViewpointGivenLineAndInlierPoints(
     halfplane_2_is_behind_plane_1 = false;
   // Infer convexity/concavity.
   if (halfplane_1_is_behind_plane_2 && halfplane_2_is_behind_plane_1) {
-      // Concave angle
-      *convex_true_concave_false = false;
-      return true;
-  } else if (!halfplane_1_is_behind_plane_2 && !halfplane_2_is_behind_plane_1) {
       // Convex angle
       *convex_true_concave_false = true;
+      return true;
+  } else if (!halfplane_1_is_behind_plane_2 && !halfplane_2_is_behind_plane_1) {
+      // Concave angle
+      *convex_true_concave_false = false;
       return true;
   } else {
     // This case should never be entered
@@ -1300,6 +1338,14 @@ bool LineDetector::determineConvexityFromViewpointGivenLineAndMeanPoints(
   const LineWithPlanes& line, const cv::Vec3f& mean_point_1,
   const cv::Vec3f& mean_point_2, const cv::Vec3f& viewpoint,
   bool* convex_true_concave_false) {
+  CHECK_NOTNULL(convex_true_concave_false);
+  // Take any point on the line that connects a generic pair of points, each of
+  // which belonging to one of the two planes. If this point is "in front of"
+  // (i.e., in the orientation of the normal vector) the planes than we have a
+  // convex angle, otherwise a concave angle.
+  // As points belonging to the planes, take the projections of the two means
+  // on the planes.
+
   // Compute projection of mean points on the planes.
   cv::Vec3f mean_point_1_proj =
       projectPointOnPlane(line.hessians[0], mean_point_1);
@@ -1310,13 +1356,13 @@ bool LineDetector::determineConvexityFromViewpointGivenLineAndMeanPoints(
                         mean_of_mean_points[2], 1.0};
   if (line.hessians[0].dot(mean_hom) > 0 &&
       line.hessians[1].dot(mean_hom) > 0) {
-      // Convex angle
-      *convex_true_concave_false = true;
+      // Concave angle
+      *convex_true_concave_false = false;
       return true;
   } else if (line.hessians[0].dot(mean_hom) < 0 &&
       line.hessians[1].dot(mean_hom) < 0) {
-      // Concave angle
-      *convex_true_concave_false = false;
+      // Convex angle
+      *convex_true_concave_false = true;
       return true;
   } else {
     // This case should never be entered
