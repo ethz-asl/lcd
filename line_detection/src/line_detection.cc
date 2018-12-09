@@ -1038,20 +1038,9 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       }
       // Project line re-adjusted through inliers in 2D and add it to the
       // background image.
-      cv::Vec2f start_2D, end_2D;
-      cv::Vec4f start_3D_homo = {line->line[0], line->line[1], line->line[2],
-                                1.0};
-      cv::Vec4f end_3D_homo = {line->line[3], line->line[4], line->line[5],
-                              1.0};
-      cv::Mat start_2D_homo = camera_P * cv::Mat(start_3D_homo);
-      cv::Mat end_2D_homo = camera_P * cv::Mat(end_3D_homo);
-      start_2D = {start_2D_homo.at<float>(0, 0) /
-                 start_2D_homo.at<float>(2, 0),
-                 start_2D_homo.at<float>(1, 0) /
-                 start_2D_homo.at<float>(2, 0)};
-      end_2D = {end_2D_homo.at<float>(0, 0) / end_2D_homo.at<float>(2, 0),
-               end_2D_homo.at<float>(1, 0) / end_2D_homo.at<float>(2, 0)};
-      cv::Vec4f line_2D({start_2D[0], start_2D[1], end_2D[0], end_2D[1]});
+      cv::Vec4f line_2D;
+      project3DLineTo2D(*line, camera_P, &line_2D);
+
 
       if (visualization_mode_on_) {
        // Update background image
@@ -1395,17 +1384,9 @@ void LineDetector::checkIfValidPointsOnPlanesGivenProlongedLine(
   CHECK_NOTNULL(right_plane_enough_valid_points);
   double max_deviation = params_->max_error_inlier_ransac;
   // Get 2D coordinates of the endpoints of the line segment.
-  cv::Vec2f start_2D, end_2D;
   cv::Vec4f prolonged_line;
-  cv::Vec4f start_3D_homo = {start[0], start[1], start[2], 1.0};
-  cv::Vec4f end_3D_homo = {end[0], end[1], end[2], 1.0};
-  cv::Mat start_2D_homo = camera_P * cv::Mat(start_3D_homo);
-  cv::Mat end_2D_homo = camera_P * cv::Mat(end_3D_homo);
-  start_2D = {start_2D_homo.at<float>(0, 0) / start_2D_homo.at<float>(2, 0),
-              start_2D_homo.at<float>(1, 0) / start_2D_homo.at<float>(2, 0)};
-  end_2D = {end_2D_homo.at<float>(0, 0) / end_2D_homo.at<float>(2, 0),
-            end_2D_homo.at<float>(1, 0) / end_2D_homo.at<float>(2, 0)};
-  prolonged_line = {start_2D[0], start_2D[1], end_2D[0], end_2D[1]};
+  project3DLineTo2D(start, end, camera_P, &prolonged_line);
+
   // For both the left and the right side of the line: Find a rectangle
   // defining a patch, find all points within the patch. We will later try to
   // fit a plane to these points, in such a way that the plane is parallel to
@@ -1417,19 +1398,14 @@ void LineDetector::checkIfValidPointsOnPlanesGivenProlongedLine(
   getRectanglesFromLine(prolonged_line, &rect_left, &rect_right);
 
 
-  cv::Vec4f line({start_2D[0], start_2D[1], end_2D[0], end_2D[1]});
-
   if (visualization_mode_on_) {
     // Display image of prolonged line.
-    background_image_ = getImageOfLineWithRectangles(line, rect_left,
-                                                    rect_right,
-                                                    background_image_, 1);
+    background_image_ = getImageOfLineWithRectangles(prolonged_line, rect_left,
+                                                     rect_right,
+                                                     background_image_, 1);
   }
 
   // Find points for the left side.
-  //LOG(INFO) << "Find points in left rectangle for prolonged line (" << start[0]
-  //          << ", " << start[1] << ", " << start[2] << ") -- (" << end[0]
-  //          << ", " << end[1] << ", " << end[2] << ").";
   findPointsInRectangle(rect_left, &points_in_rect);
   points_left_plane.clear();
   for (size_t j = 0; j < points_in_rect.size(); ++j) {
@@ -1444,9 +1420,6 @@ void LineDetector::checkIfValidPointsOnPlanesGivenProlongedLine(
             << " points.";
 
   // Find points for the right side.
-  //LOG(INFO) << "Find points in right rectangle for prolonged line (" << start[0]
-  //          << ", " << start[1] << ", " << start[2] << ") -- (" << end[0]
-  //          << ", " << end[1] << ", " << end[2] << ").";
   findPointsInRectangle(rect_right, &points_in_rect);
   points_right_plane.clear();
   for (size_t j = 0; j < points_in_rect.size(); ++j) {
@@ -1725,18 +1698,15 @@ void LineDetector::project2Dto3DwithPlanes(
   resetStatistics();
   // Declare all variables before the main loop.
   std::vector<cv::Point2f> rect_left, rect_right;
-  std::vector<cv::Point2i> points_in_rect;
-  std::vector<cv::Vec3f> plane_point_cand, inliers_left, inliers_right;
+  std::vector<cv::Vec3f> inliers_left, inliers_right;
   std::vector<cv::Vec6f> lines3D_cand;
   std::vector<double> rating;
   cv::Point2i start, end;
   LineWithPlanes line3D_true;
-  // Parameter: Fraction of inlier that must be found for the plane model to
-  // be valid.
-  double min_inliers = params_->min_inlier_ransac;
+
   double max_rating = params_->max_rating_valid_line;
   bool right_found, left_found;
-  constexpr size_t min_points_for_ransac = 3;
+
   // This is a first guess of the 3D lines. They are used in some cases, where
   // the lines cannot be found by intersecting planes.
   std::vector<cv::Vec4f> lines2D =
@@ -1766,71 +1736,10 @@ void LineDetector::project2Dto3DwithPlanes(
   for (size_t i = 0; i < lines2D.size(); ++i) {
     // If cannot find valid 3D start and end points for the 2D line.
     if (rating[i] > max_rating) continue;
-    // For both the left and the right side of the line: Find a rectangle
-    // defining a patch, find all points within the patch and try to fit a
-    // plane to these points.
-    getRectanglesFromLine(lines2D[i], &rect_left, &rect_right);
-    // Find lines for the left side.
-    //LOG(INFO) << "Find points in left rectangle for 3D line ("
-    //          << lines3D_cand[i][0] << ", " << lines3D_cand[i][1] << ", "
-    //          << lines3D_cand[i][2] << ") -- (" << lines3D_cand[i][3] << ", "
-    //          << lines3D_cand[i][4] << ", " << lines3D_cand[i][5] << ").";
-    findPointsInRectangle(rect_left, &points_in_rect);
-    if (set_colors) {
-      assignColorToLines(image, points_in_rect, &line3D_true);
-    }
-    plane_point_cand.clear();
-    for (size_t j = 0; j < points_in_rect.size(); ++j) {
-      if (points_in_rect[j].x < 0 || points_in_rect[j].x >= cloud.cols ||
-          points_in_rect[j].y < 0 || points_in_rect[j].y >= cloud.rows) {
-        continue;
-      }
-      if (std::isnan(cloud.at<cv::Vec3f>(points_in_rect[j])[0])) continue;
-      plane_point_cand.push_back(cloud.at<cv::Vec3f>(points_in_rect[j]));
-    }
-    // If the size of plane_point_cand is too small, either the line is too
-    // short or the line is near the edge of the image, reject it.
-    if (plane_point_cand.size() < params_->min_points_in_rect) {
-      continue;
-    }
-    // See if left plane is found by RANSAC.
-    left_found = false;
-    if (plane_point_cand.size() > min_points_for_ransac) {
-      planeRANSAC(plane_point_cand, &inliers_left);
-      if (inliers_left.size() >= min_inliers * plane_point_cand.size()) {
-        left_found = true;
-      }
-    }
-    // Find lines for the right side.
-    //LOG(INFO) << "Find points in right rectangle for 3D line ("
-    //          << lines3D_cand[i][0] << ", " << lines3D_cand[i][1] << ", "
-    //          << lines3D_cand[i][2] << ") -- (" << lines3D_cand[i][3] << ", "
-    //          << lines3D_cand[i][4] << ", " << lines3D_cand[i][5] << ").";
-    findPointsInRectangle(rect_right, &points_in_rect);
-    if (set_colors) {
-      assignColorToLines(image, points_in_rect, &line3D_true);
-    }
-    plane_point_cand.clear();
-    for (size_t j = 0; j < points_in_rect.size(); ++j) {
-      if (points_in_rect[j].x < 0 || points_in_rect[j].x >= cloud.cols ||
-          points_in_rect[j].y < 0 || points_in_rect[j].y >= cloud.rows) {
-        continue;
-      }
-      if (std::isnan(cloud.at<cv::Vec3f>(points_in_rect[j])[0])) continue;
-      plane_point_cand.push_back(cloud.at<cv::Vec3f>(points_in_rect[j]));
-    }
 
-    if (plane_point_cand.size() < params_->min_points_in_rect) {
-      continue;
-    }
-    // See if right plane is found by RANSAC.
-    right_found = false;
-    if (plane_point_cand.size() > min_points_for_ransac) {
-      planeRANSAC(plane_point_cand, &inliers_right);
-      if (inliers_right.size() >= min_inliers * plane_point_cand.size()) {
-        right_found = true;
-      }
-    }
+    findInliersGiven2DLine(lines2D[i], cloud, image, set_colors, &line3D_true,
+                          &inliers_right, &inliers_left, &rect_right,
+                          &rect_left, &right_found, &left_found);
 
     bool planes_found = false;
     if ((!right_found) && (!left_found)) {
@@ -1866,6 +1775,146 @@ void LineDetector::project2Dto3DwithPlanes(
         cv::imshow("Line with rectangles", image_of_line_with_rectangles);
         cv::waitKey();
       }
+    }
+  }
+}
+
+void LineDetector::project3DLineTo2D(const cv::Vec3f& start_3D,
+                                     const cv::Vec3f& end_3D,
+                                     const cv::Mat& camera_P,
+                                     cv::Vec4f* line_2D) {
+  CHECK_NOTNULL(line_2D);
+  cv::Vec2f start_2D, end_2D;
+  cv::Vec4f start_3D_homo = {start_3D[0], start_3D[1], start_3D[2], 1.0};
+  cv::Vec4f end_3D_homo = {end_3D[0], end_3D[1], end_3D[2], 1.0};
+
+  cv::Mat start_2D_homo = camera_P * cv::Mat(start_3D_homo);
+  cv::Mat end_2D_homo = camera_P * cv::Mat(end_3D_homo);
+  start_2D = {start_2D_homo.at<float>(0, 0) /
+              start_2D_homo.at<float>(2, 0),
+              start_2D_homo.at<float>(1, 0) /
+              start_2D_homo.at<float>(2, 0)};
+  end_2D = {end_2D_homo.at<float>(0, 0) / end_2D_homo.at<float>(2, 0),
+            end_2D_homo.at<float>(1, 0) / end_2D_homo.at<float>(2, 0)};
+  *line_2D = cv::Vec4f({start_2D[0], start_2D[1], end_2D[0], end_2D[1]});
+
+}
+
+void LineDetector::project3DLineTo2D(const LineWithPlanes& line_3D,
+                                     const cv::Mat& camera_P,
+                                     cv::Vec4f* line_2D) {
+  CHECK_NOTNULL(line_2D);
+  cv::Vec3f start_3D({line_3D.line[0], line_3D.line[1], line_3D.line[2]});
+  cv::Vec3f end_3D({line_3D.line[3], line_3D.line[4], line_3D.line[5]});
+
+  project3DLineTo2D(start_3D, end_3D, camera_P, line_2D);
+}
+
+
+
+void LineDetector::findInliersGiven2DLine(const cv::Vec4f& line_2D,
+                                          const cv::Mat& cloud,
+                                          std::vector<cv::Vec3f>* inliers_right,
+                                          std::vector<cv::Vec3f>* inliers_left)
+                                          {
+  const cv::Mat image;
+  LineWithPlanes line_3D;
+  std::vector<cv::Point2f> rect_right, rect_left;
+  bool right_found, left_found;
+
+  findInliersGiven2DLine(line_2D, cloud, image, false, &line_3D, inliers_right,
+                         inliers_left, &rect_right, &rect_left, &right_found,
+                         &left_found);
+}
+
+void LineDetector::findInliersGiven2DLine(const cv::Vec4f& line_2D,
+                                        const cv::Mat& cloud,
+                                        const cv::Mat& image,
+                                        bool set_colors,
+                                        LineWithPlanes* line_3D,
+                                        std::vector<cv::Vec3f>* inliers_right,
+                                        std::vector<cv::Vec3f>* inliers_left,
+                                        std::vector<cv::Point2f>* rect_right,
+                                        std::vector<cv::Point2f>* rect_left,
+                                        bool* right_found, bool* left_found) {
+  CHECK_NOTNULL(line_3D);
+  CHECK_NOTNULL(inliers_right);
+  CHECK_NOTNULL(inliers_left);
+  CHECK_NOTNULL(rect_right);
+  CHECK_NOTNULL(rect_left);
+  CHECK_NOTNULL(right_found);
+  CHECK_NOTNULL(left_found);
+
+  std::vector<cv::Point2i> points_in_rect;
+  std::vector<cv::Vec3f> plane_point_cand;
+  constexpr size_t min_points_for_ransac = 3;
+  // Parameter: Fraction of inlier that must be found for the plane model to
+  // be valid.
+  double min_inliers = params_->min_inlier_ransac;
+
+  // Clear inliers.
+  inliers_right->clear();
+  inliers_left->clear();
+
+  // For both the left and the right side of the line: Find a rectangle
+  // defining a patch, find all points within the patch and try to fit a plane
+  // to these points.
+  getRectanglesFromLine(line_2D, rect_left, rect_right);
+  // Find lines for the left side.
+  findPointsInRectangle(*rect_left, &points_in_rect);
+  if (set_colors) {
+    assignColorToLines(image, points_in_rect, line_3D);
+  }
+  plane_point_cand.clear();
+  for (size_t j = 0; j < points_in_rect.size(); ++j) {
+    if (points_in_rect[j].x < 0 || points_in_rect[j].x >= cloud.cols ||
+        points_in_rect[j].y < 0 || points_in_rect[j].y >= cloud.rows) {
+      continue;
+    }
+    if (std::isnan(cloud.at<cv::Vec3f>(points_in_rect[j])[0])) continue;
+    plane_point_cand.push_back(cloud.at<cv::Vec3f>(points_in_rect[j]));
+  }
+  // If the size of plane_point_cand is too small, either the line is too short
+  // or the line is near the edge of the image, reject it.
+  if (plane_point_cand.size() < params_->min_points_in_rect) {
+    *right_found = false;
+    *left_found = false;
+    return;
+  }
+  // See if left plane is found by RANSAC.
+  *left_found = false;
+  if (plane_point_cand.size() > min_points_for_ransac) {
+    planeRANSAC(plane_point_cand, inliers_left);
+    if (inliers_left->size() >= min_inliers * plane_point_cand.size()) {
+      *left_found = true;
+    }
+  }
+  // Find lines for the right side.
+  findPointsInRectangle(*rect_right, &points_in_rect);
+  if (set_colors) {
+    assignColorToLines(image, points_in_rect, line_3D);
+  }
+  plane_point_cand.clear();
+  for (size_t j = 0; j < points_in_rect.size(); ++j) {
+    if (points_in_rect[j].x < 0 || points_in_rect[j].x >= cloud.cols ||
+        points_in_rect[j].y < 0 || points_in_rect[j].y >= cloud.rows) {
+      continue;
+    }
+    if (std::isnan(cloud.at<cv::Vec3f>(points_in_rect[j])[0])) continue;
+    plane_point_cand.push_back(cloud.at<cv::Vec3f>(points_in_rect[j]));
+  }
+
+  if (plane_point_cand.size() < params_->min_points_in_rect) {
+    *right_found = false;
+    *left_found = false;
+    return;
+  }
+  // See if right plane is found by RANSAC.
+  *right_found = false;
+  if (plane_point_cand.size() > min_points_for_ransac) {
+    planeRANSAC(plane_point_cand, inliers_right);
+    if (inliers_right->size() >= min_inliers * plane_point_cand.size()) {
+      *right_found = true;
     }
   }
 }
@@ -2107,11 +2156,9 @@ bool LineDetector::checkIfValidLineWith2DInfo(const cv::Mat& cloud,
   }
 
   cv::Vec3f start_3D, end_3D;
-  cv::Vec4f start_3D_homo, end_3D_homo;
+
   start_3D = {(*line)[0], (*line)[1], (*line)[2]};
   end_3D = {(*line)[3], (*line)[4], (*line)[5]};
-  start_3D_homo = {(*line)[0], (*line)[1], (*line)[2], 1.0};
-  end_3D_homo = {(*line)[3], (*line)[4], (*line)[5], 1.0};
 
   double length = cv::norm(start_3D - end_3D);
 
@@ -2120,13 +2167,12 @@ bool LineDetector::checkIfValidLineWith2DInfo(const cv::Mat& cloud,
     return false;
   }
 
-  cv::Vec2f start_2D, end_2D;
-  cv::Mat start_2D_homo = camera_P * cv::Mat(start_3D_homo);
-  cv::Mat end_2D_homo = camera_P * cv::Mat(end_3D_homo);
-  start_2D = {start_2D_homo.at<float>(0, 0) / start_2D_homo.at<float>(2, 0),
-              start_2D_homo.at<float>(1, 0) / start_2D_homo.at<float>(2, 0)};
-  end_2D = {end_2D_homo.at<float>(0, 0) / end_2D_homo.at<float>(2, 0),
-            end_2D_homo.at<float>(1, 0) / end_2D_homo.at<float>(2, 0)};
+  cv::Vec4f line_3D_reprojected;
+
+  project3DLineTo2D(start_3D, end_3D, camera_P, &line_3D_reprojected);
+
+  cv::Vec2f start_2D({line_3D_reprojected[0], line_3D_reprojected[1]});
+  cv::Vec2f end_2D({line_3D_reprojected[2], line_3D_reprojected[3]});
 
   cv::Vec2f line_dir_true{line_2D[2] - line_2D[0], line_2D[3] - line_2D[1]};
   cv::Vec2f line_dir{end_2D[0] - start_2D[0], end_2D[1] - start_2D[1]};

@@ -635,6 +635,53 @@ class LineDetector {
                                std::vector<cv::Vec4f>* lines2D_out,
                                std::vector<LineWithPlanes>* lines3D);
 
+  // Given a line in 3D and a projection matrix returns a line in 2D.
+  //
+  // Input: line_3D:
+  //           or            3D line.
+  //        start_3D/end_3D:
+  //
+  //        camera_P:        Projection matrix.
+  //
+  // Output: line_2D:        2D line.
+  void project3DLineTo2D(const LineWithPlanes& line_3D, const cv::Mat& camera_P,
+                         cv::Vec4f* line_2D);
+  void project3DLineTo2D(const cv::Vec3f& start_3D, const cv::Vec3f& end_3D,
+                         const cv::Mat& camera_P, cv::Vec4f* line_2D);
+
+
+
+  // Given a 2D line and the point cloud image returns the inlier points around
+  // the line by fitting rectangles around it.
+  //
+  // Input: line_2D:              2D line.
+  //
+  //        cloud:                Point cloud image of type CV_32FC3.
+  //
+  //        (image):              RGB image, used if set_colors = True.
+  //
+  //        (set_colors):         True if assign color to lines3D.
+  //
+  // Output: (line_3D): 3D line to which to assign the colors.
+  //
+  //          inliers_right/left: inlier points to the line.
+  //
+  //          (rect_right/left):  rectangles (in 2D) fitted around the line.
+  //
+  //          (right/left_found): true if enough inliers points are found for
+  //                              the right/left plane.
+  void findInliersGiven2DLine(const cv::Vec4f& line_2D, const cv::Mat& cloud,
+                              std::vector<cv::Vec3f>* inliers_right,
+                              std::vector<cv::Vec3f>* inliers_left);
+  void findInliersGiven2DLine(const cv::Vec4f& line_2D, const cv::Mat& cloud,
+                              const cv::Mat& image, bool set_colors,
+                              LineWithPlanes* line_3D,
+                              std::vector<cv::Vec3f>* inliers_right,
+                              std::vector<cv::Vec3f>* inliers_left,
+                              std::vector<cv::Point2f>* rect_right,
+                              std::vector<cv::Point2f>* rect_left,
+                              bool* right_found, bool* left_found);
+
   // Projects 2D to 3D lines with a shortest is the best approach. Works in
   // general better than naive approach, but lines that lie on surfaces tend to
   // be drawn towards the camera.
