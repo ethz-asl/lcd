@@ -484,10 +484,10 @@ void ListenAndPublish::labelLinesWithInstances(
     // For intermediate storage:
     cv::Point2f point2D;
     unsigned short color;
-    // - Temporarily stores a planar/edge line.
-    std::vector<line_detection::LineWithPlanes> planar_or_edge_line;
-    // - Stores the instance label for planar/edge line.
-    std::vector<int> planar_or_edge_line_instance;
+    // - Temporarily stores a edge line.
+    std::vector<line_detection::LineWithPlanes> edge_line;
+    // - Stores the instance label for edge line.
+    std::vector<int> edge_line_instance;
     // - Stores the Hessian forms of the two inlier planes.
     cv::Vec4f hessian[2];
     // - Stores the distance from the origin to the plane considered.
@@ -498,12 +498,30 @@ void ListenAndPublish::labelLinesWithInstances(
     // - For intersection lines.
     cv::Vec3f start_line_before_start, end_line_before_start,
       start_line_after_end, end_line_after_end;
-    // Check which of the prolonged planes contain (enough) points that are valid
-    // fit to them.
+    // - Check which of the prolonged planes contain (enough) points that are
+    //   valid fit to them.
     bool right_plane_enough_valid_points_before_start;
     bool left_plane_enough_valid_points_before_start;
     bool right_plane_enough_valid_points_after_end;
     bool left_plane_enough_valid_points_after_end;
+    // - Temporarily stores the 3D line reprojected in 2D.
+    cv::Vec4f line_2D;
+    // - Temporarily stores the inliers with labels of both planes.
+    InliersWithLabels inliers_with_label_right;
+    InliersWithLabels inliers_with_label_left;
+    // - Most present instance label for each side.
+    unsigned short most_present_label_right, most_present_label_left;
+    // - Temporarily stores the inliers with labels of the prolonged planes.
+    InliersWithLabels inliers_with_label_right_before_start;
+    InliersWithLabels inliers_with_label_left_before_start;
+    InliersWithLabels inliers_with_label_right_after_end;
+    InliersWithLabels inliers_with_label_left_after_end;
+    // - Prolonged line.
+    line_detection::LineWithPlanes prolonged_line_before_start;
+    line_detection::LineWithPlanes prolonged_line_after_end;
+    // - Total occurrences in the prolonged lines of the most present labels.
+    int total_occurrences_most_present_label_right;
+    int total_occurrences_most_present_label_left;
 
     cv::Vec3f start, end, direction, point3D;
 
@@ -539,19 +557,84 @@ void ListenAndPublish::labelLinesWithInstances(
                                           &(labels->at(i)));
           break;
         case line_detection::LineType::PLANE:
+          // * Take the most two present instances in the two planes around the
+          //   line.
+          findInliersWithLabelsGivenPlanes(lines[i], lines[i].hessians[0],
+              lines[i].hessians[1], instances, camera_info,
+              &inliers_with_label_right, &inliers_with_label_left);
+          most_present_label_right =
+            inliers_with_label_right.getLabelByMajorityVote();
+          most_present_label_left =
+              inliers_with_label_left.getLabelByMajorityVote();
+          // * Check which of these two instances is more present on the prolonged
+          //   planes and assign the label of the most present instance.
+          start_line_before_start = start -
+              extension_length_for_intersection * direction;
+          end_line_before_start = start;
+          //   - Create prolonged line.
+          for (size_t j = 0; j < 6; ++j)
+            prolonged_line_before_start.line[j] = lines[i].line[j];
+          prolonged_line_before_start.colors = lines[i].colors;
+          prolonged_line_before_start.type = lines[i].type;
+          prolonged_line_before_start.hessians[0] = lines[i].hessians[0];
+          prolonged_line_before_start.hessians[1] = lines[i].hessians[1];
+          findInliersWithLabelsGivenPlanes(
+              prolonged_line_before_start, lines[i].hessians[0],
+              lines[i].hessians[1], instances, camera_info,
+              &inliers_with_label_right_before_start,
+              &inliers_with_label_left_before_start);
+          start_line_after_end = end;
+          end_line_after_end = end +
+              extension_length_for_intersection * direction;
+          //   - Create prolonged line.
+          for (size_t j = 0; j < 6; ++j)
+            prolonged_line_after_end.line[j] = lines[i].line[j];
+          prolonged_line_after_end.colors = lines[i].colors;
+          prolonged_line_after_end.type = lines[i].type;
+          prolonged_line_after_end.hessians[0] = lines[i].hessians[0];
+          prolonged_line_after_end.hessians[1] = lines[i].hessians[1];
+          findInliersWithLabelsGivenPlanes(prolonged_line_after_end,
+                                           lines[i].hessians[0],
+                                           lines[i].hessians[1], instances,
+                                           camera_info,
+                                           &inliers_with_label_right_after_end,
+                                           &inliers_with_label_left_after_end);
+          //   - Assign the label of the most present instance.
+          total_occurrences_most_present_label_right =
+              inliers_with_label_right_before_start.countLabelInInliers(
+                  most_present_label_right) +
+              inliers_with_label_left_before_start.countLabelInInliers(
+                  most_present_label_right) +
+              inliers_with_label_right_after_end.countLabelInInliers(
+                  most_present_label_right) +
+              inliers_with_label_left_after_end.countLabelInInliers(
+                  most_present_label_right);
+          total_occurrences_most_present_label_left =
+              inliers_with_label_right_before_start.countLabelInInliers(
+                  most_present_label_left) +
+              inliers_with_label_left_before_start.countLabelInInliers(
+                  most_present_label_left) +
+              inliers_with_label_right_after_end.countLabelInInliers(
+                  most_present_label_left) +
+              inliers_with_label_left_after_end.countLabelInInliers(
+                  most_present_label_left);
+          if (total_occurrences_most_present_label_right >
+              total_occurrences_most_present_label_left) {
+            labels->at(i) = most_present_label_right;
+          } else {
+            labels->at(i) = most_present_label_left;
+          }
+          break;
         case line_detection::LineType::EDGE:
-          // In case of a planar line, all points on the line should belong to
-          // the same instance and majority voting of the instances of a set of
-          // points in the line can therefore be applied. Likewise, for edge
-          // lines the two planes, although not parallel to each other, should
-          // still belong to the same object, by definition of edge line.
+          // For edge lines the two planes, although not parallel to each other,
+          // should still belong to the same object, by definition of edge line.
           // Therefore, the majority-vote approach can be applied.
-          planar_or_edge_line.clear();
-          planar_or_edge_line.push_back(lines[i]);
-          labelLinesWithInstancesByMajorityVoting(planar_or_edge_line,
-            instances, camera_info, &planar_or_edge_line_instance);
-          CHECK_EQ(planar_or_edge_line_instance.size(), 1);
-          labels->at(i) = planar_or_edge_line_instance[0];
+          edge_line.clear();
+          edge_line.push_back(lines[i]);
+          labelLinesWithInstancesByMajorityVoting(edge_line, instances,
+            camera_info, &edge_line_instance);
+          CHECK_EQ(edge_line_instance.size(), 1);
+          labels->at(i) = edge_line_instance[0];
           break;
         case line_detection::LineType::INTERSECT:
           // In case of an intersection line, there are two cases, which were
@@ -629,9 +712,9 @@ void ListenAndPublish::assignLabelOfInlierPlaneBasedOnDistance(
   const line_detection::LineWithPlanes& line, const cv::Mat& instances,
   sensor_msgs::CameraInfoConstPtr camera_info, bool furthest_plane,
   int* label) {
+  CHECK_NOTNULL(label);
   // Inliers with instance label for each plane.
-  std::vector<std::pair<cv::Vec3f, unsigned short>>
-    inliers_with_instance_label[2];
+  InliersWithLabels inliers_with_instance_label[2];
   // Mean point of inliers.
   cv::Vec3f mean_points[2];
   // Find the set of inliers with their instance labels for each
@@ -644,12 +727,7 @@ void ListenAndPublish::assignLabelOfInlierPlaneBasedOnDistance(
             << ", " << line.line[4] << ", " << line.line[5] << ").";
   // Find the mean point of each set of inliers.
   for (size_t i = 0; i < 2; ++i) {
-    mean_points[i] = {0.0f, 0.0f, 0.0f};
-    for (size_t j = 0; j < inliers_with_instance_label[i].size();
-      ++j) {
-        mean_points[i] += (inliers_with_instance_label[i][j].first /
-          float(inliers_with_instance_label[i].size()));
-    }
+    mean_points[i] = inliers_with_instance_label[i].findMeanPoint();
   }
   LOG(INFO) << "Found inliers mean points for line (" << line.line[0] << ", "
             << line.line[1]  << ", " << line.line[2] << ") -- (" << line.line[3]
@@ -658,17 +736,17 @@ void ListenAndPublish::assignLabelOfInlierPlaneBasedOnDistance(
     // Assign instance label of the inliers with mean point further from the
     // origin.
     if (cv::norm(mean_points[0]) > cv::norm(mean_points[1])) {
-      getLabelFromInliersByMajorityVote(inliers_with_instance_label[0], label);
+      *label = inliers_with_instance_label[0].getLabelByMajorityVote();
     } else {
-      getLabelFromInliersByMajorityVote(inliers_with_instance_label[1], label);
+      *label = inliers_with_instance_label[1].getLabelByMajorityVote();
     }
   } else {
     // Assign instance label of the inliers with mean point closer to the
     // origin.
     if (cv::norm(mean_points[0]) < cv::norm(mean_points[1])) {
-      getLabelFromInliersByMajorityVote(inliers_with_instance_label[0], label);
+      *label = inliers_with_instance_label[0].getLabelByMajorityVote();
     } else {
-      getLabelFromInliersByMajorityVote(inliers_with_instance_label[1], label);
+      *label = inliers_with_instance_label[1].getLabelByMajorityVote();
     }
   }
   //LOG(INFO) << "Found majority-vote label for line (" << line.line[0] << ", "
@@ -680,7 +758,7 @@ void ListenAndPublish::assignLabelOfInlierPlaneBasedOnDistance(
 void ListenAndPublish::findInliersWithLabelsGivenPlane(
     const line_detection::LineWithPlanes& line, const cv::Vec4f& plane,
     const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info,
-    std::vector<std::pair<cv::Vec3f, unsigned short>>* inliers) {
+    InliersWithLabels* inliers) {
   findInliersWithLabelsGivenPlanes(line, plane, plane, instances, camera_info,
                                    inliers, nullptr, true);
 }
@@ -689,9 +767,10 @@ void ListenAndPublish::findInliersWithLabelsGivenPlanes(
     const line_detection::LineWithPlanes& line, const cv::Vec4f& plane_1,
     const cv::Vec4f& plane_2, const cv::Mat& instances,
     sensor_msgs::CameraInfoConstPtr camera_info,
-    std::vector<std::pair<cv::Vec3f, unsigned short>>* inliers_1,
-    std::vector<std::pair<cv::Vec3f, unsigned short>>* inliers_2,
+    InliersWithLabels* inliers_right, InliersWithLabels* inliers_left,
     bool first_plane_only) {
+    CHECK_NOTNULL(inliers_right);
+    CHECK_NOTNULL(inliers_left);
 
     if (first_plane_only) {
       CHECK(line.hessians[0] == plane_1 || line.hessians[1] == plane_1);
@@ -762,7 +841,6 @@ void ListenAndPublish::findInliersWithLabelsGivenPlanes(
         line_detector_.get_line_detection_params();
     double max_deviation = params_.max_error_inlier_ransac;
     int valid_points_left_plane = 0, valid_points_right_plane = 0;
-    int prev_valid_points_left_plane, prev_valid_points_right_plane;
 
     std::vector<std::pair<cv::Vec3f, unsigned short>>::iterator it;
 
@@ -783,31 +861,13 @@ void ListenAndPublish::findInliersWithLabelsGivenPlanes(
       // Inliers
       if (valid_points_left_plane > valid_points_right_plane) {
           // Plane_1 coincides with left plane.
-          *inliers_1 = points_left_plane;
+          inliers_right->setInliersWithLabels(points_left_plane);
       } else {
           // Plane_1 coincides with right plane.
-          *inliers_1 = points_right_plane;
+          inliers_right->setInliersWithLabels(points_right_plane);
       }
     } else {
       // Find inliers for both planes.
-      // First combination: plane_1 -> left, plane_2 -> right
-      for (it = points_left_plane.begin(); it != points_left_plane.end();
-        ++it) {
-        if (line_detection::errorPointToPlane(plane_1, it->first) <
-          max_deviation)
-          ++valid_points_left_plane;
-      }
-      prev_valid_points_left_plane = valid_points_left_plane;
-      for (it = points_right_plane.begin(); it != points_right_plane.end();
-        ++it) {
-        if (line_detection::errorPointToPlane(plane_2, it->first) <
-          max_deviation)
-          ++valid_points_right_plane;
-      }
-      prev_valid_points_right_plane = valid_points_right_plane;
-      // Second combination: plane_2 -> left, plane_1 -> right
-      valid_points_left_plane = 0;
-      valid_points_right_plane = 0;
       for (it = points_left_plane.begin(); it != points_left_plane.end();
         ++it) {
         if (line_detection::errorPointToPlane(plane_2, it->first) <
@@ -821,27 +881,39 @@ void ListenAndPublish::findInliersWithLabelsGivenPlanes(
           ++valid_points_right_plane;
       }
 
-      if (valid_points_left_plane + valid_points_right_plane <
-          prev_valid_points_left_plane + prev_valid_points_right_plane) {
-          // Use the first combination
-          *inliers_1 = points_left_plane;
-          *inliers_2 = points_right_plane;
-      } else {
-          // Use the second combination
-          *inliers_1 = points_right_plane;
-          *inliers_2 = points_left_plane;
-      }
+      inliers_right->setInliersWithLabels(points_right_plane);
+      inliers_left->setInliersWithLabels(points_left_plane);
     }
 }
 
-void ListenAndPublish::getLabelFromInliersByMajorityVote(
-  const std::vector<std::pair<cv::Vec3f, unsigned short>>& inliers,
-  int* label) {
+InliersWithLabels::InliersWithLabels() {
+
+}
+
+int InliersWithLabels::countLabelInInliers(const unsigned short& label) {
+  int occurrences = 0;
+  for (auto const& inlier_with_label : inliers_with_labels_) {
+    if (inlier_with_label.second == label)
+      occurrences++;
+  }
+  return occurrences;
+}
+
+cv::Vec3f InliersWithLabels::findMeanPoint() {
+  cv::Vec3f mean_point = {0.0f, 0.0f, 0.0f};
+  for (size_t i = 0; i < inliers_with_labels_.size(); ++i) {
+      mean_point += (inliers_with_labels_[i].first /
+        float(inliers_with_labels_.size()));
+  }
+  return mean_point;
+}
+
+int InliersWithLabels::getLabelByMajorityVote() {
   // Take majority vote of the instances of the inliers.
   std::map<unsigned short, size_t> labels_count;
   unsigned short instance_label;
-  for (size_t i = 0; i < inliers.size(); ++i) {
-    instance_label = inliers[i].second;
+  for (size_t i = 0; i < inliers_with_labels_.size(); ++i) {
+    instance_label = inliers_with_labels_[i].second;
     if (labels_count.count(instance_label) == 0) {
       labels_count[instance_label] = 1;
     } else {
@@ -867,21 +939,21 @@ void ListenAndPublish::getLabelFromInliersByMajorityVote(
             << labels_count[most_frequent_label] << " occurrences.";
 
   // Return most frequent label.
-  (*label) = most_frequent_label;
+  return most_frequent_label;
 }
 
 void ListenAndPublish::labelLineGivenInlierPlane(
     const line_detection::LineWithPlanes& line, const cv::Vec4f& plane,
     const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info,
     int* label) {
-  // Points that are inliers to the plane. Each point is a pair of a cv::Vec3f
-  // (coordinates) and of an unsigned short representing the instance label.
-  std::vector<std::pair<cv::Vec3f, unsigned short>> inliers_to_plane;
+  CHECK_NOTNULL(label);
+  // Points that are inliers to the plane.
+  InliersWithLabels inliers_to_plane;
 
   findInliersWithLabelsGivenPlane(line, plane, instances, camera_info,
     &inliers_to_plane);
 
-  getLabelFromInliersByMajorityVote(inliers_to_plane, label);
+  *label = inliers_to_plane.getLabelByMajorityVote();
 }
 
 
@@ -958,6 +1030,12 @@ bool getDefaultPathsAndVariables(const std::string& path_or_variable_name,
     }
   }
   return false;
+}
+
+void InliersWithLabels::setInliersWithLabels(
+    const std::vector<std::pair<cv::Vec3f, unsigned short>>&
+        inliers_with_labels) {
+    inliers_with_labels_ = inliers_with_labels;
 }
 
 

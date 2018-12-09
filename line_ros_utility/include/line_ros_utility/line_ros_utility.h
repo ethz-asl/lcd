@@ -163,6 +163,37 @@ class EvalData {
   cv::Mat heat_map_;
 };
 
+// Class to handle inliers points with their labels.
+class InliersWithLabels {
+ public:
+   InliersWithLabels();
+
+   // Returns mean point of the set of inliers.
+   //
+   // Output: return: Mean point of the set of inliers.
+   cv::Vec3f findMeanPoint();
+   // Counts the occurrences of a label in the inliers.
+   //
+   // Input: label: Label of which to count the occurrences in the inliers.
+   int countLabelInInliers(const unsigned short& label);
+   // Sets inliers_with_labels_ to be inliers_with_labels.
+   //
+   // Input: inliers_with_labels: Inliers with corresponding labels.
+   void setInliersWithLabels(
+       const std::vector<std::pair<cv::Vec3f, unsigned short>>&
+           inliers_with_labels);
+
+   // Returns the instance label corresponding to the majority vote of the
+   // instances of the inliers.
+   //
+   // Output: return: Most frequent instance label among the inlier points.
+   int getLabelByMajorityVote();
+
+ private:
+   std::vector<std::pair<cv::Vec3f, unsigned short>> inliers_with_labels_;
+};
+
+
 // The main class that has the full utility of line_detection, line_clustering
 // and line_ros_utility implemented. Fully functional in a ros node.
 class ListenAndPublish {
@@ -273,49 +304,37 @@ class ListenAndPublish {
 
   // Given one or both the inlier planes of a line, returns the set of inlier
   // points (with the instance of each inlier point) associated to the plane(s).
-  // Input: line:               Input line.
+  // Input: line:                Input line.
   //
-  //        plane:              Plane(s) inlier to the input line.
-  //              or
-  //        plane_1/plane_2:
+  //        plane:               Plane(s) inlier to the input line. NOTE: When
+  //              or             first_plane_only is false, plane_1 should be
+  //        plane_1/plane_2:     the right plane and plane_2 the left plane.
   //
-  //        instances:          Image that labels objects with a different value
-  //                            for each instance. This image must be registered
-  //                            with the depth image where the point cloud was
-  //                            extracted.
+  //        instances:           Image that labels objects with a different
+  //                             value for each instance. This image must be
+  //                             registered with the depth image where the point
+  //                             cloud was extracted.
   //
-  //        camera_info:        This is used to reproject 3D points onto the
-  //                            instances image.
+  //        camera_info:         This is used to reproject 3D points onto the
+  //                             instances image.
   //
-  //        (first_plane_only): True if inliers should be obtained only for the
-  //                            first of the two planes. Used for overloading
-  //                            to have the single-plane version.
+  //        (first_plane_only):  True if inliers should be obtained only for the
+  //                             first of the two planes. Used for overloading
+  //                             to have the single-plane version.
   //
-  // Output: inliers:           Inlier points associated to the plane(s).
+  // Output: inliers:            Inlier points associated to the plane(s).
   //                 or
-  //         inliers_1/2:
+  //         inliers_right/left:
   void findInliersWithLabelsGivenPlane(
       const line_detection::LineWithPlanes& line, const cv::Vec4f& plane,
       const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info,
-      std::vector<std::pair<cv::Vec3f, unsigned short>>* inliers);
+      InliersWithLabels* inliers);
   void findInliersWithLabelsGivenPlanes(
       const line_detection::LineWithPlanes& line, const cv::Vec4f& plane_1,
       const cv::Vec4f& plane_2, const cv::Mat& instances,
       sensor_msgs::CameraInfoConstPtr camera_info,
-      std::vector<std::pair<cv::Vec3f, unsigned short>>* inliers_1,
-      std::vector<std::pair<cv::Vec3f, unsigned short>>* inliers_2,
+      InliersWithLabels* inliers_right, InliersWithLabels* inliers_left,
       bool first_plane_only = false);
-
-  // Given a set of inliers to the line, returns the instance label
-  // corresponding to the majority vote of the instances of the inliers.
-  // Input: inliers: Vector of inlier points, each in the form of a pair
-  //                 (cv::Vec3f, unsigned short), where the first element of the
-  //                 pair is the 3D point and the second is the instance label.
-  //
-  // Output: label: Most frequent instance label among the inlier points.
-  void getLabelFromInliersByMajorityVote(
-      const std::vector<std::pair<cv::Vec3f, unsigned short>>& inliers,
-      int* label);
 
   // Given a 3D line and one of its two inlier planes, computes the instance of
   // the line by taking the majority vote of the instances of the its inlier
