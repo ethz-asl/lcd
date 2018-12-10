@@ -566,33 +566,37 @@ void ListenAndPublish::labelLinesWithInstances(
             inliers_with_label_right.getLabelByMajorityVote();
           most_present_label_left =
               inliers_with_label_left.getLabelByMajorityVote();
-          // * Check which of these two instances is more present on the prolonged
-          //   planes and assign the label of the most present instance.
+          // * Check which of these two instances is more present on the
+          //   prolonged planes and assign the label of the most present
+          //   instance.
           start_line_before_start = start -
               extension_length_for_intersection * direction;
           end_line_before_start = start;
           //   - Create prolonged line.
-          for (size_t j = 0; j < 6; ++j)
-            prolonged_line_before_start.line[j] = lines[i].line[j];
+          for (size_t j = 0; j < 3; ++j) {
+            prolonged_line_before_start.line[j] = start_line_before_start[j];
+            prolonged_line_before_start.line[j + 3] = end_line_before_start[j];
+          }
           prolonged_line_before_start.colors = lines[i].colors;
           prolonged_line_before_start.type = lines[i].type;
-          prolonged_line_before_start.hessians[0] = lines[i].hessians[0];
-          prolonged_line_before_start.hessians[1] = lines[i].hessians[1];
+          prolonged_line_before_start.hessians = lines[i].hessians;
           findInliersWithLabelsGivenPlanes(
               prolonged_line_before_start, lines[i].hessians[0],
               lines[i].hessians[1], instances, camera_info,
               &inliers_with_label_right_before_start,
               &inliers_with_label_left_before_start);
+
           start_line_after_end = end;
           end_line_after_end = end +
               extension_length_for_intersection * direction;
           //   - Create prolonged line.
-          for (size_t j = 0; j < 6; ++j)
-            prolonged_line_after_end.line[j] = lines[i].line[j];
+          for (size_t j = 0; j < 3; ++j) {
+            prolonged_line_after_end.line[j] = start_line_after_end[j];
+            prolonged_line_after_end.line[j + 3] = end_line_after_end[j];
+          }
           prolonged_line_after_end.colors = lines[i].colors;
           prolonged_line_after_end.type = lines[i].type;
-          prolonged_line_after_end.hessians[0] = lines[i].hessians[0];
-          prolonged_line_after_end.hessians[1] = lines[i].hessians[1];
+          prolonged_line_after_end.hessians = lines[i].hessians;
           findInliersWithLabelsGivenPlanes(prolonged_line_after_end,
                                            lines[i].hessians[0],
                                            lines[i].hessians[1], instances,
@@ -609,6 +613,10 @@ void ListenAndPublish::labelLinesWithInstances(
                   most_present_label_right) +
               inliers_with_label_left_after_end.countLabelInInliers(
                   most_present_label_right);
+          LOG(INFO) << "The label most present on the right plane ("
+                    << most_present_label_right << ") has "
+                    << total_occurrences_most_present_label_right
+                    << " occurrences in the 4 prolonged planes.";
           total_occurrences_most_present_label_left =
               inliers_with_label_right_before_start.countLabelInInliers(
                   most_present_label_left) +
@@ -618,6 +626,10 @@ void ListenAndPublish::labelLinesWithInstances(
                   most_present_label_left) +
               inliers_with_label_left_after_end.countLabelInInliers(
                   most_present_label_left);
+          LOG(INFO) << "The label most present on the left plane ("
+                    << most_present_label_left << ") has "
+                    << total_occurrences_most_present_label_left
+                    << " occurrences in the 4 prolonged planes.";
           if (total_occurrences_most_present_label_right >
               total_occurrences_most_present_label_left) {
             labels->at(i) = most_present_label_right;
@@ -909,6 +921,7 @@ cv::Vec3f InliersWithLabels::findMeanPoint() {
 }
 
 int InliersWithLabels::getLabelByMajorityVote() {
+  CHECK(inliers_with_labels_.size() > 0);
   // Take majority vote of the instances of the inliers.
   std::map<unsigned short, size_t> labels_count;
   unsigned short instance_label;
@@ -929,7 +942,6 @@ int InliersWithLabels::getLabelByMajorityVote() {
   unsigned short most_frequent_label = it_labels->first;
   it_labels++;
   for (it_labels; it_labels != labels_count.end(); ++it_labels) {
-    //LOG(INFO) << "Comparing label " << it_labels->first;
     // Compare the frequency counts.
     if (it_labels->second > labels_count[most_frequent_label])
       most_frequent_label = it_labels->first;
