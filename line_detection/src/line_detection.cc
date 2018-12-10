@@ -928,6 +928,7 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
 bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                                       const std::vector<cv::Vec3f>& points2,
                                       const cv::Vec6f& line_guess,
+                                      const cv::Vec4f& reference_line_2D,
                                       const cv::Mat& cloud,
                                       const cv::Mat& camera_P,
                                       const bool planes_found,
@@ -987,7 +988,8 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       enough_num_inliers =
           adjustLineUsingInliers(points, start_guess, end_guess, &start, &end);
       // Fix orientation w.r.t. reference line if needed
-      adjustLineOrientationGivenReferenceLine(line_guess, &start, &end);
+      adjustLineOrientationGiven2DReferenceLine(reference_line_2D, camera_P,
+                                                &start, &end);
 
       line->line = {start[0], start[1], start[2], end[0], end[1], end[2]};
       line->type = LineType::PLANE;
@@ -1017,7 +1019,8 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       enough_num_inliers =
           adjustLineUsingInliers(points, start_guess, end_guess, &start, &end);
       // Fix orientation w.r.t. reference line if needed
-      adjustLineOrientationGivenReferenceLine(line_guess, &start, &end);
+      adjustLineOrientationGiven2DReferenceLine(reference_line_2D, camera_P,
+                                                &start, &end);
 
       if (!enough_num_inliers)
         return false;
@@ -1109,7 +1112,8 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     enough_num_inliers =
         adjustLineUsingInliers(*points, start_guess, end_guess, &start, &end);
     // Fix orientation w.r.t. reference line if needed
-    adjustLineOrientationGivenReferenceLine(line_guess, &start, &end);
+    adjustLineOrientationGiven2DReferenceLine(reference_line_2D, camera_P,
+                                              &start, &end);
 
 
     line->line = {start[0], start[1], start[2], end[0], end[1], end[2]};
@@ -1762,8 +1766,9 @@ void LineDetector::project2Dto3DwithPlanes(
     }
 
     // Find 3D line on planes.
-    if (find3DlineOnPlanes(inliers_right, inliers_left, lines3D_cand[i], cloud,
-                           camera_P, planes_found, &line3D_true)) {
+    if (find3DlineOnPlanes(inliers_right, inliers_left, lines3D_cand[i],
+                           lines2D[i], cloud, camera_P, planes_found,
+                           &line3D_true)) {
       // Only push back the reliably found lines.
       lines3D->push_back(line3D_true);
       lines2D_out->push_back(lines2D[i]);
@@ -2434,6 +2439,31 @@ bool LineDetector::adjustLineUsingInliers(const std::vector<cv::Vec3f>& points,
     return true;
   }
 }
+
+void LineDetector::adjustLineOrientationGiven2DReferenceLine(
+    const cv::Vec4f& reference_line, const cv::Mat& camera_P, cv::Vec3f* start,
+    cv::Vec3f* end) {
+  cv::Vec3f temp_endpoint;
+  cv::Vec4f reprojected_line;
+  cv::Vec2f ref_start({reference_line[0], reference_line[1]});
+  cv::Vec2f ref_end({reference_line[2], reference_line[3]});
+
+  // Project 3D line to 2D.
+  project3DLineTo2D(*start, *end, camera_P, &reprojected_line);
+
+  cv::Vec2f start_2D({reprojected_line[0], reprojected_line[1]});
+  cv::Vec2f end_2D({reprojected_line[2], reprojected_line[3]});
+
+  if (cv::norm(start_2D - ref_end) < cv::norm(start_2D - ref_start) &&
+      cv::norm(end_2D - ref_start) < cv::norm(end_2D - ref_end)) {
+    // Switch the 3D endpoints.
+    LOG(INFO) << "Switching endpoints.";
+    temp_endpoint = *start;
+    *start = *end;
+    *end = temp_endpoint;
+  }
+}
+
 
 void LineDetector::adjustLineOrientationGivenReferenceLine(
     const cv::Vec6f& reference_line, cv::Vec3f* start, cv::Vec3f* end) {

@@ -488,6 +488,10 @@ class LineDetector {
   //
   //         line_guess:         Initial guess of the line.
   //
+  //         reference_line_2D:  Original line in 2D, used as reference to
+  //                             change the orientation of the 3D line while
+  //                             finding it, if needed.
+  //
   //         cloud:              Point cloud as CV_32FC3.
   //
   //         camera_P:           Camera projection matrix.
@@ -499,6 +503,7 @@ class LineDetector {
   bool find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                           const std::vector<cv::Vec3f>& points2,
                           const cv::Vec6f& line_guess,
+                          const cv::Vec4f& reference_line_2D,
                           const cv::Mat& cloud, const cv::Mat& camera_P,
                           const bool planes_found, LineWithPlanes* line);
 
@@ -872,17 +877,29 @@ class LineDetector {
                               const cv::Vec3f& end_in, cv::Vec3f* start_out,
                               cv::Vec3f* end_out);
 
+
   // It might happen that when adjusting line using inliers the orientation of
   // the resulting line changes w.r.t. to the original lines. It might, i.e.,
   // happen that what was defined to be the start in the original line is closer
   // to the end of the adjusted line and what was defined to be the end in the
   // original line is closer to the start of the adjusted line. If this is the
-  // case, this function switches start and end.
+  // case, these functions switch start and end.
   //
-  // Input: reference_line: Original reference line.
+  // * 2D version
+  //   Input: reference_line: 2D original reference line.
   //
-  // Output: start,end:     Endpoints of the input line, switched if needed to
-  //                        match the orientation of the reference line.
+  //          camera_P:       Projection matrix.
+  //
+  //   Output: start,end:     3D endpoints of the input line, switched if needed
+  //                          to match the orientation of the reference line.
+  // * 3D version
+  //   Input: reference_line: 3D original reference line.
+  //
+  //   Output: start,end:     3D endpoints of the input line, switched if needed
+  //                          to match the orientation of the reference line.
+  void adjustLineOrientationGiven2DReferenceLine(
+      const cv::Vec4f& reference_line, const cv::Mat& camera_P,
+      cv::Vec3f* start, cv::Vec3f* end);
   void adjustLineOrientationGivenReferenceLine(const cv::Vec6f& reference_line,
                                                cv::Vec3f* start,
                                                cv::Vec3f* end);
