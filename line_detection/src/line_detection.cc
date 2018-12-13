@@ -131,8 +131,17 @@ void findXCoordOfPixelsOnVector(const cv::Point2f& start,
 
 void findPointsInRectangle(std::vector<cv::Point2f> corners,
                            std::vector<cv::Point2i>* points) {
+                           std::vector<cv::Point2i>* points, bool verbose) {
+  std::vector<cv::Point2f> corners_copy = corners;
+  findPointsInRectangle(&corners_copy, points, verbose);
+}
+
+
+void findPointsInRectangle(std::vector<cv::Point2f>* corners,
+                           std::vector<cv::Point2i>* points, bool verbose) {
   CHECK_NOTNULL(points);
-  CHECK_EQ(corners.size(), 4)
+  CHECK_NOTNULL(corners);
+  CHECK_EQ(corners->size(), 4)
       << "The rectangle must be defined by exactly 4 corner points.";
   // Find the relative positions of the points.
   // int upper, lower, left, right, store_i;
@@ -147,47 +156,62 @@ void findPointsInRectangle(std::vector<cv::Point2f> corners,
   // Check all y values against all others.
   for (size_t i = 0; i < 4; ++i) {
     for(size_t j = i+1; j < 4; ++j) {
-      if (corners[i].y == corners[j].y){
+      if (corners->at(i).y == corners->at(j).y){
         some_points_have_equal_height = true;
         break;
       }
     }
   }
+
   // Do the rotation.
   if (some_points_have_equal_height) {
     constexpr float kRotationDeg = 0.1;
     const float rotation_rad = degToRad(kRotationDeg);
+    if (verbose) {
+      LOG(INFO) << kRotationDeg << " degrees correspond to " << rotation_rad
+                << " radians, the cosine of which is " << cos(rotation_rad)
+                << " and the sine of which is " << sin(rotation_rad) << ".";
+    }
     for (size_t i = 0u; i < 4u; ++i)
-      corners[i] = {
-          cos(rotation_rad) * corners[i].x - sin(rotation_rad) * corners[i].y,
-          cos(rotation_rad) * corners[i].x + sin(rotation_rad) * corners[i].y};
+      corners->at(i) = {
+          cos(rotation_rad) * corners->at(i).x - sin(rotation_rad) *
+          corners->at(i).y, sin(rotation_rad) * corners->at(i).x +
+          cos(rotation_rad) * corners->at(i).y};
   }
+
   // The points are set to lowest, highest, most right and most left in this
   // order. It does work because the preprocessing done guarantees that no two
   // points have the same y coordinate.
   cv::Point2f upper, lower, left, right;
-  upper = corners[0];
+  upper = corners->at(0);
   for (int i = 1; i < 4; ++i) {
-    if (upper.y > corners[i].y) {
-      upper = corners[i];
+    if (upper.y > corners->at(i).y) {
+      upper = corners->at(i);
     }
   }
   lower.y = -1e6;
   for (int i = 0; i < 4; ++i) {
-    if (lower.y < corners[i].y && corners[i] != upper) {
-      lower = corners[i];
+    if (lower.y < corners->at(i).y && corners->at(i) != upper) {
+      lower = corners->at(i);
     }
   }
   left.x = 1e6;
   for (int i = 0; i < 4; ++i) {
-    if (left.x > corners[i].x && corners[i] != upper && corners[i] != lower) {
-      left = corners[i];
+    if (left.x > corners->at(i).x && corners->at(i) != upper &&
+        corners->at(i) != lower) {
+      left = corners->at(i);
     }
   }
   for (int i = 0; i < 4; ++i) {
-    if (corners[i] != left && corners[i] != upper && corners[i] != lower) {
-      right = corners[i];
+    if (corners->at(i) != left && corners->at(i) != upper && corners->at(i) != lower) {
+      right = corners->at(i);
     }
+  }
+  if (verbose) {
+    LOG(INFO) << "Lower point is (" << lower.x << ", " << lower.y << ")\n"
+              << "Upper point is (" << upper.x << ", " << upper.y << ")\n"
+              << "Leftmost point is (" << left.x << ", " << left.y << ")\n"
+              << "Rightmost point is (" << right.x << ", " << right.y << ").";
   }
   // With the ordering given, the border pixels can be found as pixels, that
   // lie on the border vectors.
@@ -1736,6 +1760,8 @@ void LineDetector::project2Dto3DwithPlanes(
 
   find3DlinesRated(cloud, lines2D_shrunk, &lines3D_cand, &rating);
 
+  // Initialize the number of lines successfully projected to 3D to 0.
+  num_lines_successfully_projected_to_3D = 0;
   // Loop over all 2D lines.
   for (size_t i = 0; i < lines2D.size(); ++i) {
     // If cannot find valid 3D start and end points for the 2D line.
@@ -1780,6 +1806,7 @@ void LineDetector::project2Dto3DwithPlanes(
         cv::imshow("Line with rectangles", image_of_line_with_rectangles);
         cv::waitKey();
       }
+      num_lines_successfully_projected_to_3D++;
     }
   }
 }

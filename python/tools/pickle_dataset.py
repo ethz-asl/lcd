@@ -72,7 +72,7 @@ def pickle_images(input_text_file, output_pickle_file, dataset_name):
                     data_dict[dataset_name][trajectory_number][
                         frame_number]['depth'][line_number]['labels'] = \
                         [float(i) for i in split_line[1:]]
-    # Convert defualtdict to dicts
+    # Convert defaultdict to dicts
     def defaultdict_to_dict(dictionary):
         # Found image
         if (not isinstance(dictionary, dict)) and (not isinstance(

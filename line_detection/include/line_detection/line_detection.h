@@ -308,9 +308,15 @@ void findXCoordOfPixelsOnVector(const cv::Point2f& start,
 //                  parallelogram. If that is not given, the outcome of the
 //                  function depends on the ordering of the corner point and
 //                  might be wrong.
+//        verbose:  True if information about the rectangle should be printed,
+//                  false otherwise.
 // Output: points:  A vector of pixel coordinates.
 void findPointsInRectangle(std::vector<cv::Point2f> corners,
-                           std::vector<cv::Point2i>* points);
+                           std::vector<cv::Point2i>* points,
+                           bool verbose = false);
+void findPointsInRectangle(std::vector<cv::Point2f>* corners,
+                           std::vector<cv::Point2i>* points,
+                           bool verbose = false);
 
 // Takes two planes and computes the intersection line. This function takes
 // already the direction of the line (which could be computed from the two
@@ -987,6 +993,10 @@ private:
   // | indices       |    None.                                                |
   // |_______________|_________________________________________________________|
   int occurrences_config_prolonged_plane[2][2][2][2];
+
+  // Index for the lines successfully projected from 2D to 3D (makes mapping
+  // with the line labelled by line_ros_utility easier).
+  int num_lines_successfully_projected_to_3D;
 
   // Resets the statistics about the number of lines of each type detected and
   // the number of occurrences of each case of the prolonged lines. (Done at

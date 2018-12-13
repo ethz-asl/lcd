@@ -126,7 +126,7 @@ def get_origin_virtual_camera(line, distance, debug=False):
     if line[n] == 0:  # dicontinuty line
         if debug is True:
             print("disconti")
-        # discontinuty line only has one valid surface normal, the other one is [0, 0, 0, 0]
+        # discontinuity line only has one valid surface normal, the other one is [0, 0, 0, 0]
         if np.linalg.norm(plane1_normal) <= 0.001:
             z_cand = [plane2_normal, -plane2_normal]
         if np.linalg.norm(plane2_normal) <= 0.001:
