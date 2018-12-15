@@ -8,6 +8,7 @@
 #include <fstream>
 #include <limits>
 #include <random>
+#include <utility>
 #include <vector>
 
 #include <opencv2/core.hpp>
@@ -134,7 +135,7 @@ bool areLinesEqual2D(const cv::Vec4f line1, const cv::Vec4f line2);
 // Returns value if: lower < value < upper
 // Returns lower if: value < lower
 // Returns upper if: upper < value
-inline double checkInBoundary(const double value, const double lower,
+inline double fitToBoundary(const double value, const double lower,
                               const double upper) {
   if (value < lower) {
     return lower;
@@ -145,7 +146,7 @@ inline double checkInBoundary(const double value, const double lower,
   }
 }
 
-inline int checkInBoundaryInt(const int value, const int lower,
+inline int fitToBoundaryInt(const int value, const int lower,
                               const int upper) {
   if (value < lower) {
     return lower;
@@ -154,6 +155,49 @@ inline int checkInBoundaryInt(const int value, const int lower,
   } else {
     return value;
   }
+}
+
+float roundValue(const float& value, int decimal=5) {
+  CHECK(decimal <= 6 && decimal >= 0);
+  return floor(value * pow(10, decimal) + 0.5) / pow(10, decimal);
+}
+
+cv::Point2f roundPoint(const cv::Point2f& point, int decimal=5) {
+  CHECK(decimal <= 6 && decimal >= 0);
+  return {roundValue(point.x, decimal), roundValue(point.y, decimal)};
+}
+
+bool inline checkEqualFloats(const float& num_1, const float& num_2) {
+  // Partially based on The art of computer programming by Donald Knuth.
+  float epsilon = 1e-5;
+  return (fabs(num_1 - num_2) <= ((fabs(num_1) < fabs(num_2) ?  fabs(num_2):
+          fabs(num_1)) * epsilon));
+}
+
+bool inline checkEqualPoints(const cv::Point2f& point_1,
+                             const cv::Point2f& point_2) {
+  return (checkEqualFloats(point_1.x, point_2.x) &&
+          checkEqualFloats(point_1.y, point_2.y));
+}
+
+bool inline checkPointInBounds(const cv::Point2f& point, size_t x_max,
+                              size_t y_max) {
+  CHECK(x_max > 0);
+  CHECK(y_max > 0);
+  double x_bound = static_cast<double>(x_max + 1e-9);
+  double y_bound = static_cast<double>(y_max + 1e-9);
+
+  return (point.x >= 0.0f && point.x <= x_bound && point.y >= 0.0f &&
+          point.y <= y_bound);
+}
+
+// Binary function to compare two intersection points found in the method
+// fitLineToBoundsWithDirection of LineDetector. Used for sorting (cf.
+// method).
+inline bool compareIntersectionPoints(
+    const std::pair<cv::Point2f, double> point_1,
+    const std::pair<cv::Point2f, double> point_2) {
+  return point_1.second < point_2.second;
 }
 
 inline cv::Vec3f crossProduct(const cv::Vec3f a, const cv::Vec3f b) {
@@ -446,12 +490,32 @@ class LineDetector {
   void paintLines(const std::vector<cv::Vec4f>& lines, cv::Mat* image,
                   cv::Vec3b color = {255, 0, 0});
 
-  // This function checks for all lines, if their start and end points are
-  // within the borders of an image. It returns a vector with the same amount of
-  // lines in the same order. Only start or end points that were out of the
-  // image border are shifted into it.
-  std::vector<cv::Vec4f> checkLinesInBounds(
-      const std::vector<cv::Vec4f>& lines2D, size_t x_max, size_t y_max);
+  // These functions check for a single or multiple lines, if its/their start
+  // and end points are within the borders of an image. They return a single
+  // line/a vector with the same amount of lines in the same order.
+  // Only start or end points that were out of the image border are shifted into
+  // it.
+  // Input: line2D/lines2D:   Line/vector of lines that should be (in case)
+  //                          shifted into the image borders.
+  //
+  //        x_max/y_max:      Boundaries of the image along the x/y direction.
+  //
+  //        (keep_direction): True if the direction of the original line should
+  //                          be kept, False if values outside the bounds should
+  //                          just be substituted with the nearest boundary
+  //                          value.
+  //
+  // Output: return: Single line/vector of lines shifted into the image borders.
+  cv::Vec4f fitLineToBounds(const cv::Vec4f& line2D, size_t x_max,
+                              size_t y_max, bool keep_direction=true);
+  std::vector<cv::Vec4f> fitLinesToBounds(
+      const std::vector<cv::Vec4f>& lines2D, size_t x_max, size_t y_max,
+      bool keep_direction=true);
+  // Called by the checkLine(s)InBounds functions above. Returns a line
+  // "cropped" so as to fit in the image bounds, while keeping the direction of
+  // the original line.
+  cv::Vec4f fitLineToBoundsWithDirection(const cv::Vec4f& line2D,
+                                           size_t x_max, size_t y_max);
 
   // Finds two rectangles left and right of a line defined by 4 corner points.
   // Input:   line:   The 2D line defined as (start, end).
@@ -622,7 +686,7 @@ class LineDetector {
                                std::vector<LineWithPlanes>* lines3D);
 
   // (Deprecated.) Old version of project2Dto3DwithPlanes. It's here for
-  // backcomptability concerns.
+  // backcompatibility concerns.
   void project2Dto3DwithPlanes(const cv::Mat& cloud, const cv::Mat& image,
                                const std::vector<cv::Vec4f>& lines2D_in,
                                const bool set_colors,

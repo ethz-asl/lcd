@@ -1,5 +1,6 @@
 #include "line_detection/line_detection.h"
 
+#include <algorithm>
 #include <cstdlib>
 
 namespace line_detection {
@@ -33,7 +34,7 @@ bool findIntersectionBetweenPlaneAndLine(const cv::Vec4f& plane,
   c = normal_vector[2];
   // Check that the line is not parallel to the plane, i.e., that it is not
   // perpendicular to the normal vector.
-  if (normal_vector.dot(line_direction) == 0.)
+  if (checkEqualFloats(normal_vector.dot(line_direction), 0.0f))
     return false;
   float gamma = -d / (a * line_direction[0] + b * line_direction[1] +
     c * line_direction[3]);
@@ -114,8 +115,9 @@ void findXCoordOfPixelsOnVector(const cv::Point2f& start,
   x_start = floor(start.x) + 0.5;
   width = floor(end.x) - floor(start.x);
   CHECK(height > 0) << "Important: the following statement must hold: start.y "
-                       "< end.y. "
-                    << height;
+                       "< end.y. We have bottom = " << end.y << " -> "
+                    << bottom << ", top = " << start.y << " -> " << top
+                    << " and therefore height = bottom - top = " << height;
   if (height == 1) {
     if (left_side) {
       x_coord->push_back(floor(start.x));
@@ -130,7 +132,6 @@ void findXCoordOfPixelsOnVector(const cv::Point2f& start,
 }
 
 void findPointsInRectangle(std::vector<cv::Point2f> corners,
-                           std::vector<cv::Point2i>* points) {
                            std::vector<cv::Point2i>* points, bool verbose) {
   std::vector<cv::Point2f> corners_copy = corners;
   findPointsInRectangle(&corners_copy, points, verbose);
@@ -156,7 +157,7 @@ void findPointsInRectangle(std::vector<cv::Point2f>* corners,
   // Check all y values against all others.
   for (size_t i = 0; i < 4; ++i) {
     for(size_t j = i+1; j < 4; ++j) {
-      if (corners->at(i).y == corners->at(j).y){
+      if (checkEqualFloats(corners->at(i).y, corners->at(j).y)){
         some_points_have_equal_height = true;
         break;
       }
@@ -171,12 +172,24 @@ void findPointsInRectangle(std::vector<cv::Point2f>* corners,
       LOG(INFO) << kRotationDeg << " degrees correspond to " << rotation_rad
                 << " radians, the cosine of which is " << cos(rotation_rad)
                 << " and the sine of which is " << sin(rotation_rad) << ".";
+      LOG(INFO) << "Before rotation:";
+      for (size_t i = 0u; i < 4u; ++i) {
+        LOG(INFO) << "* (" << corners->at(i).x << ", " << corners->at(i).y
+                  << ").";
+      }
     }
     for (size_t i = 0u; i < 4u; ++i)
       corners->at(i) = {
           cos(rotation_rad) * corners->at(i).x - sin(rotation_rad) *
           corners->at(i).y, sin(rotation_rad) * corners->at(i).x +
           cos(rotation_rad) * corners->at(i).y};
+    if(verbose) {
+      LOG(INFO) << "After rotation:";
+      for (size_t i = 0u; i < 4u; ++i) {
+        LOG(INFO) << "* (" << corners->at(i).x << ", " << corners->at(i).y
+                  << ").";
+      }
+    }
   }
 
   // The points are set to lowest, highest, most right and most left in this
@@ -738,22 +751,179 @@ double LineDetector::findAndRate3DLine(const cv::Mat& point_cloud,
   return findAndRate3DLine(point_cloud, line2D, line3D, &num_points);
 }
 
-std::vector<cv::Vec4f> LineDetector::checkLinesInBounds(
-    const std::vector<cv::Vec4f>& lines2D, size_t x_max, size_t y_max) {
+cv::Vec4f LineDetector::fitLineToBounds(const cv::Vec4f& line2D, size_t x_max,
+                                          size_t y_max, bool keep_direction) {
   CHECK(x_max > 0);
   CHECK(y_max > 0);
+
+  if (keep_direction) {
+    return fitLineToBoundsWithDirection(line2D, x_max, y_max);
+  } else {
+    // Old version of the code. Here for backcompatibility.
+    double x_bound = static_cast<double>(x_max) - 1e-9;
+    double y_bound = static_cast<double>(y_max) - 1e-9;
+    return {static_cast<float>(fitToBoundary(line2D[0], 0.0, x_bound)),
+      static_cast<float>(fitToBoundary(line2D[1], 0.0, y_bound)),
+      static_cast<float>(fitToBoundary(line2D[2], 0.0, x_bound)),
+      static_cast<float>(fitToBoundary(line2D[3], 0.0, y_bound))};
+ }
+}
+
+std::vector<cv::Vec4f> LineDetector::fitLinesToBounds(
+    const std::vector<cv::Vec4f>& lines2D, size_t x_max, size_t y_max,
+    bool keep_direction) {
   std::vector<cv::Vec4f> new_lines;
   new_lines.reserve(lines2D.size());
-  double x_bound = static_cast<double>(x_max) - 1e-9;
-  double y_bound = static_cast<double>(y_max) - 1e-9;
+
   for (size_t i = 0; i < lines2D.size(); ++i) {
-    new_lines.push_back(
-        {static_cast<float>(checkInBoundary(lines2D[i][0], 0.0, x_bound)),
-         static_cast<float>(checkInBoundary(lines2D[i][1], 0.0, y_bound)),
-         static_cast<float>(checkInBoundary(lines2D[i][2], 0.0, x_bound)),
-         static_cast<float>(checkInBoundary(lines2D[i][3], 0.0, y_bound))});
+    new_lines.push_back(fitLineToBounds(lines2D[i], x_max, y_max,
+                                          keep_direction));
   }
   return new_lines;
+}
+
+cv::Vec4f LineDetector::fitLineToBoundsWithDirection(
+     const cv::Vec4f& line2D, size_t x_max, size_t y_max) {
+  CHECK(x_max > 0);
+  CHECK(y_max > 0);
+  double x_bound = static_cast<double>(x_max);
+  double y_bound = static_cast<double>(y_max);
+
+  // Round start and end to the same decimal.
+  cv::Point2f start = roundPoint({line2D[0], line2D[1]});
+  cv::Point2f end = roundPoint({line2D[2], line2D[3]});
+
+  bool start_is_inside_the_image = checkPointInBounds(start, x_max, y_max);
+  bool end_is_inside_the_image = checkPointInBounds(end, x_max, y_max);
+
+  // If the line is already inside the image return it as it is.
+  if (start_is_inside_the_image && end_is_inside_the_image) {
+    return line2D;
+  }
+
+  // Idea: find the (up to) four intersection points of the line with the lines
+  // x = 0, y = 0, x = x_bound, y = y_bound, that denote the boundaries of the
+  // image. In the arrays defined below the intersection with x = 0 has index 0,
+  // the intersection with y = 0 has index 1, the intersection with x = x_bound
+  // has index 2 and the intersection with y = y_bound has index 3.
+  bool intersection_point_exists[4] = {true, true, true, true};
+  cv::Point2f intersection_points[4];
+  // Express line in the form y = m * x + b. => The four intersection points
+  // will have the following form, if they exist:
+  // * 0: (x_0, y_0) = (0, b)
+  // * 1: (x_1, y_1) = (-b / m, 0)
+  // * 2: (x_2, y_2) = (x_max, m * x_max + b)
+  // * 3: (x_3, y_3) = ((y_max - b) / m, y_max)
+  double m, b;
+  if (checkEqualFloats(end.x, start.x)) {
+    //If end.x == start.x (vertical line) it is not possible to express the line
+    // slope-intercept form (infinite m). Line is of the form x = end.x =
+    // = start.x => Distinguish this case.
+    // Intersections 0 and 2: with x = 0 and x = x_bound. Either they are null
+    // (no points) or they contain the entire line. => Set the two intersections
+    // to not exist.
+    intersection_point_exists[0] = false;
+    intersection_point_exists[2] = false;
+    // Intersections 1 and 3: with y = 0 and y = y_bound. Easy.
+    intersection_points[1] = {end.x, 0.0f};
+    intersection_points[3] = {end.x, static_cast<float>(y_bound)};
+  } else {
+    // Retrieve m and b.
+    m = (end.y - start.y) / (end.x - start.x);
+    b = (end.x * start.y - start.x * end.y) / (end.x - start.x);
+    intersection_points[0] = {0.0f, static_cast<float>(b)};
+    intersection_points[2] = {static_cast<float>(x_bound),
+                              static_cast<float>(m * x_bound + b)};
+    if (checkEqualFloats(end.y, start.y)) {
+      // m = 0 => Horizontal line. Intersections with y = 0 and y = y_bound are
+      // either null (no points) or contain the entire line. => Set the two
+      // intersections to not exist.
+      intersection_point_exists[1] = false;
+      intersection_point_exists[3] = false;
+    } else {
+      intersection_points[1] = {static_cast<float>(-b / m), 0.0f};
+      intersection_points[3] = {static_cast<float>((y_bound - b) / m),
+                                static_cast<float>(y_bound)};
+    }
+  }
+  // Among the (up to) four intersection points there will be only up to two
+  // unique points that are actual intersections of the line segment with the
+  // image boundaries, rather than intersections (with the image boundaries) of
+  // the infinite line that contains the line segment. To check for which points
+  // this is the case, the point must be "inside" the line segment, between the
+  // two endpoints. Defining the intersection point with the name "point", the
+  // above can be checked by verifying that the three vectors (end - start),
+  // (point - start) and (end - point) all have the same orientation.
+  // Each true intersection point is also associated to a number between 0 and
+  // 1, that represents its normalized distance from the start point (0.0:
+  // coincides with start point, 1.0: coincides with end point).
+  std::vector<std::pair<cv::Point2f, double>> true_intersection_points;
+  bool intersection_coincides_with_endpoint;
+  bool intersection_is_between_endpoints;
+  for (size_t i = 0; i < 4; ++i) {
+    if (intersection_point_exists[i]) {
+      intersection_coincides_with_endpoint =
+          (checkEqualPoints(end, intersection_points[i]) ||
+           checkEqualPoints(start, intersection_points[i]));
+      intersection_is_between_endpoints =
+          (((end - start).dot(intersection_points[i] - start) > 0) &&
+           ((end - start).dot(end - intersection_points[i]) > 0));
+      if ((intersection_coincides_with_endpoint ||
+           intersection_is_between_endpoints) &&
+           checkPointInBounds(intersection_points[i], x_max, y_max)) {
+          true_intersection_points.push_back(
+              std::make_pair(
+                intersection_points[i],
+                cv::norm(intersection_points[i] - start) / cv::norm(end - start)
+              ));
+      }
+    }
+  }
+  // Sort points based on normalized distance.
+  std::sort(true_intersection_points.begin(), true_intersection_points.end(),
+            compareIntersectionPoints);
+  // Remove duplicates if any (possible for instance if an intersection point is
+  // (x, y) with x in {0, x_bound} and y in {0, y_bound}.
+  for (std::vector <std::pair<cv::Point2f, double>>::iterator it_1 =
+           true_intersection_points.begin(); it_1 !=
+               true_intersection_points.end(); ++it_1) {
+    for (std::vector <std::pair<cv::Point2f, double>>::iterator it_2 = it_1 + 1;
+             it_2 != true_intersection_points.end();) {
+      if (checkEqualPoints(it_1->first, it_2->first)) {
+        it_2 = true_intersection_points.erase(it_2);
+      } else {
+        ++it_2;
+      }
+    }
+  }
+  // Substitute endpoints out of bounds with the corresponding intersection
+  // point.
+  if (!start_is_inside_the_image && !end_is_inside_the_image) {
+    CHECK(true_intersection_points.size() == 0 ||
+          true_intersection_points.size() == 2);
+    if (true_intersection_points.size() == 0) {
+      // Line segment does not go through the image at all => Return zero-length
+      // line.
+      return {0.0f, 0.0f, 0.0f, 0.0f};
+    }
+    // Line segment goes through the image.
+    return {static_cast<float>(true_intersection_points[0].first.x),
+            static_cast<float>(true_intersection_points[0].first.y),
+            static_cast<float>(true_intersection_points[1].first.x),
+            static_cast<float>(true_intersection_points[1].first.y)};
+  } else if (start_is_inside_the_image && !end_is_inside_the_image) {
+    CHECK(true_intersection_points.size() == 1);
+    return {static_cast<float>(start.x), static_cast<float>(start.y),
+            static_cast<float>(true_intersection_points[0].first.x),
+            static_cast<float>(true_intersection_points[0].first.y)};
+  } else if (!start_is_inside_the_image && end_is_inside_the_image) {
+    CHECK(true_intersection_points.size() == 1);
+    return {static_cast<float>(true_intersection_points[0].first.x),
+            static_cast<float>(true_intersection_points[0].first.y),
+            static_cast<float>(end.x), static_cast<float>(end.y)};
+  } else {
+    LOG(ERROR) << "This case should have been already evaluated.";
+  }
 }
 
 bool LineDetector::getRectanglesFromLine(const cv::Vec4f& line,
@@ -988,7 +1158,7 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
   if (fabs((mean1 - mean2).dot(normal1)) < params_->max_dist_between_planes &&
       fabs((mean1 - mean2).dot(normal2)) < params_->max_dist_between_planes &&
       planes_found) {
-    // Concatenate the two set of points. For surface and intersection line,
+    // Concatenate the two sets of points. For surface and intersection line,
     // points1 and points2 are different and thus no repetition of points. The
     // latter is also ensured by the fact that planes_found is True.
     std::vector<cv::Vec3f> points;
@@ -1628,7 +1798,7 @@ void LineDetector::project2Dto3DwithPlanes(
   // This is a first guess of the 3D lines. They are used in some cases, where
   // the lines cannot be found by intersecting planes.
   std::vector<cv::Vec4f> lines2D =
-      checkLinesInBounds(lines2D_in, cloud.cols, cloud.rows);
+      fitLinesToBounds(lines2D_in, cloud.cols, cloud.rows);
 
   find3DlinesRated(cloud, lines2D, &lines3D_cand, &rating);
   // Loop over all 2D lines.
@@ -1738,7 +1908,7 @@ void LineDetector::project2Dto3DwithPlanes(
   // This is a first guess of the 3D lines. They are used in some cases, where
   // the lines cannot be found by intersecting planes.
   std::vector<cv::Vec4f> lines2D =
-      checkLinesInBounds(lines2D_in, cloud.cols, cloud.rows);
+      fitLinesToBounds(lines2D_in, cloud.cols, cloud.rows);
 
   //LOG(INFO) << "2D lines before shrinkage:";
   //std::vector<cv::Vec4f>::iterator line;
@@ -1967,7 +2137,7 @@ void LineDetector::find3DlinesByShortest(const cv::Mat& cloud,
   int cols = cloud.cols;
   int rows = cloud.rows;
   // The actual patch size wil be bigger. The number of pixels within a patch
-  // is euqal to (2*patch_size + 1)^2. And because for every pixel in the
+  // is equal to (2*patch_size + 1)^2. And because for every pixel in the
   // start patch the distance to every pixel in the end patch is computed, the
   // complexity is proportional to (2*patch_size + 1)^4.
   int patch_size = 1;
@@ -1986,14 +2156,14 @@ void LineDetector::find3DlinesByShortest(const cv::Mat& cloud,
     y_opt_end = lines2D[i][3];
     // This checks are used to make sure, that we do not try to access a
     // point not within the image.
-    x_min_start = checkInBoundaryInt(x_opt_start - patch_size, 0, rows - 1);
-    x_max_start = checkInBoundaryInt(x_opt_start + patch_size, 0, rows - 1);
-    y_min_start = checkInBoundaryInt(y_opt_start - patch_size, 0, cols - 1);
-    y_max_start = checkInBoundaryInt(y_opt_start + patch_size, 0, cols - 1);
-    x_min_end = checkInBoundaryInt(x_opt_end - patch_size, 0, rows - 1);
-    x_max_end = checkInBoundaryInt(x_opt_end + patch_size, 0, rows - 1);
-    y_min_end = checkInBoundaryInt(y_opt_end - patch_size, 0, cols - 1);
-    y_max_end = checkInBoundaryInt(y_opt_end + patch_size, 0, cols - 1);
+    x_min_start = fitToBoundaryInt(x_opt_start - patch_size, 0, rows - 1);
+    x_max_start = fitToBoundaryInt(x_opt_start + patch_size, 0, rows - 1);
+    y_min_start = fitToBoundaryInt(y_opt_start - patch_size, 0, cols - 1);
+    y_max_start = fitToBoundaryInt(y_opt_start + patch_size, 0, cols - 1);
+    x_min_end = fitToBoundaryInt(x_opt_end - patch_size, 0, rows - 1);
+    x_max_end = fitToBoundaryInt(x_opt_end + patch_size, 0, rows - 1);
+    y_min_end = fitToBoundaryInt(y_opt_end - patch_size, 0, cols - 1);
+    y_max_end = fitToBoundaryInt(y_opt_end + patch_size, 0, cols - 1);
     // For every pixel in start patch.
     for (int x_start = x_min_start; x_start <= x_max_start; ++x_start) {
       for (int y_start = y_min_start; y_start <= y_max_start; ++y_start) {
@@ -2055,28 +2225,28 @@ void LineDetector::find3DlinesRated(const cv::Mat& cloud,
     line.x = lines2D[i][2] - lines2D[i][0];
     line.y = lines2D[i][3] - lines2D[i][1];
     double line_normalizer = sqrt(line.x * line.x + line.y * line.y);
-    upper_line2D[0] = checkInBoundary(
+    upper_line2D[0] = fitToBoundary(
         floor(lines2D[i][0]) + floor(line.y / line_normalizer + 0.5), 0.0,
         cols - 1);
-    upper_line2D[1] = checkInBoundary(
+    upper_line2D[1] = fitToBoundary(
         floor(lines2D[i][1]) + floor(-line.x / line_normalizer + 0.5), 0.0,
         rows - 1);
-    upper_line2D[2] = checkInBoundary(
+    upper_line2D[2] = fitToBoundary(
         floor(lines2D[i][2]) + floor(line.y / line_normalizer + 0.5), 0.0,
         cols - 1);
-    upper_line2D[3] = checkInBoundary(
+    upper_line2D[3] = fitToBoundary(
         floor(lines2D[i][3]) + floor(-line.x / line_normalizer + 0.5), 0.0,
         rows - 1);
-    lower_line2D[0] = checkInBoundary(
+    lower_line2D[0] = fitToBoundary(
         floor(lines2D[i][0]) + floor(-line.y / line_normalizer + 0.5), 0.0,
         cols - 1);
-    lower_line2D[1] = checkInBoundary(
+    lower_line2D[1] = fitToBoundary(
         floor(lines2D[i][1]) + floor(line.x / line_normalizer + 0.5), 0.0,
         rows - 1);
-    lower_line2D[2] = checkInBoundary(
+    lower_line2D[2] = fitToBoundary(
         floor(lines2D[i][2]) + floor(-line.y / line_normalizer + 0.5), 0.0,
         cols - 1);
-    lower_line2D[3] = checkInBoundary(
+    lower_line2D[3] = fitToBoundary(
         floor(lines2D[i][3]) + floor(line.x / line_normalizer + 0.5), 0.0,
         rows - 1);
     rate_low = findAndRate3DLine(cloud, lower_line2D, &lower_line3D);
@@ -2340,10 +2510,10 @@ bool LineDetector::checkIfValidLineDiscont(const cv::Mat& cloud,
     start.x += floor(dir.x / sqrt(dir.x * dir.x + dir.y * dir.y) + 0.5);
     start.y += floor(dir.y / sqrt(dir.x * dir.x + dir.y * dir.y) + 0.5);
     // We need to be within the boundaries defined previously.
-    x_from = checkInBoundary(start.x - patch_size, x_min, x_max);
-    x_to = checkInBoundary(start.x + patch_size, x_min, x_max);
-    y_from = checkInBoundary(start.y - patch_size, y_min, y_max);
-    y_to = checkInBoundary(start.y + patch_size, y_min, y_max);
+    x_from = fitToBoundary(start.x - patch_size, x_min, x_max);
+    x_to = fitToBoundary(start.x + patch_size, x_min, x_max);
+    y_from = fitToBoundary(start.y - patch_size, y_min, y_max);
+    y_to = fitToBoundary(start.y + patch_size, y_min, y_max);
     // Count is used to count the number of pixels that were added to the mean
     // so that we can effectively build the mean from the sum.
     count = 0;
@@ -2484,7 +2654,6 @@ void LineDetector::adjustLineOrientationGiven2DReferenceLine(
   if (cv::norm(start_2D - ref_end) < cv::norm(start_2D - ref_start) &&
       cv::norm(end_2D - ref_start) < cv::norm(end_2D - ref_end)) {
     // Switch the 3D endpoints.
-    LOG(INFO) << "Switching endpoints.";
     temp_endpoint = *start;
     *start = *end;
     *end = temp_endpoint;
@@ -2501,7 +2670,6 @@ void LineDetector::adjustLineOrientationGivenReferenceLine(
 
   if (cv::norm(*start - ref_end) < cv::norm(*start - ref_start) &&
       cv::norm(*end - ref_start) < cv::norm(*end - ref_end)) {
-    LOG(INFO) << "Switching endpoints.";
     temp_endpoint = *start;
     *start = *end;
     *end = temp_endpoint;

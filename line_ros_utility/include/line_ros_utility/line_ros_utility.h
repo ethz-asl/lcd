@@ -70,9 +70,9 @@ void storeLines3DinMarkerMsg(const std::vector<cv::Vec6f>& lines3D,
 //                                 the input variable.
 // Return value: true if variable is successfully retrieved, false otherwise.
 bool getDefaultPathsAndVariables(const std::string& path_or_variable_name,
-                                std::string* path_or_variable_value);
+                                 std::string* path_or_variable_value);
 bool getDefaultPathsAndVariables(const std::string& path_or_variable_name,
-                                int* path_or_variable_value);
+                                 int* path_or_variable_value);
 
 // This class helps publishing several different clusters of lines in
 // different colors, so that they are visualized by rviz. IMPORTANT: This

@@ -433,9 +433,9 @@ void ListenAndPublish::labelLinesWithInstancesByMajorityVoting(
       point2D =
           camera_model.project3dToPixel({point3D[0], point3D[1], point3D[2]});
       // Check that the point2D lies within the image boundaries.
-      point2D.x = line_detection::checkInBoundary(floor(point2D.x), 0,
+      point2D.x = line_detection::fitToBoundary(floor(point2D.x), 0,
                                                   instances.cols - 1);
-      point2D.y = line_detection::checkInBoundary(floor(point2D.y), 0,
+      point2D.y = line_detection::fitToBoundary(floor(point2D.y), 0,
                                                   instances.rows - 1);
       // Get the color of the pixel.
       // color = instances.at<cv::Vec3b>(point2D);
@@ -789,8 +789,7 @@ void ListenAndPublish::findInliersWithLabelsGivenPlanes(
     } else {
       // Both planes for which we want the inliers should be inlier planes of
       // the line.
-      CHECK((line.hessians[0] == plane_1 && line.hessians[1] == plane_2) ||
-            (line.hessians[0] == plane_2 && line.hessians[1] == plane_1));
+      CHECK(line.hessians[0] == plane_1 && line.hessians[1] == plane_2);
     }
 
     CHECK_EQ(instances.type(), CV_16UC1);
@@ -805,8 +804,30 @@ void ListenAndPublish::findInliersWithLabelsGivenPlanes(
     cv::Vec3f end = {line.line[3], line.line[4], line.line[5]};
     cv::Point2f start_2D = camera_model.project3dToPixel({start[0], start[1],
                                                           start[2]});
-    cv::Point2f end_2D = camera_model.project3dToPixel({end[0], end[1], end[2]});
+    cv::Point2f end_2D = camera_model.project3dToPixel({end[0], end[1],
+                                                        end[2]});
     cv::Vec4f line_2D = {start_2D.x, start_2D.y, end_2D.x, end_2D.y};
+    // Fit line to the image bounds.
+    line_2D = line_detector_.fitLineToBounds(line_2D, instances.cols,
+                                               instances.rows);
+    // At this point it might be the case that the line has collapsed to a
+    // single point, for instance in the case when calling this function on a
+    // prolonged line that falls completely outside the image bounds. The latter
+    // might be the case if for instance the original line (the one that gets
+    // prolonged) has an endpoint on the image bounds. In this case, there are
+    // no points in the degenerate rectangles around the line and therefore no
+    // inliers either.
+    start_2D = {line_2D[0], line_2D[1]};
+    end_2D = {line_2D[2], line_2D[3]};
+    double line_length = cv::norm(end_2D - start_2D);
+    if (line_length < 1e-5) {
+      // Line collapsed to a point => Return empty vectors as inliers.
+      inliers_right->setInliersWithLabels(
+          std::vector<std::pair<cv::Vec3f, unsigned short>>());
+      inliers_left->setInliersWithLabels(
+          std::vector<std::pair<cv::Vec3f, unsigned short>>());
+      return;
+    }
 
     // Take rectangles and find points within them.
     std::vector<cv::Point2f> rect_left, rect_right;
