@@ -1133,7 +1133,6 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
   if (N1 < 3 || N2 < 3) return false;
   cv::Vec3f mean1, mean2, normal1, normal2;
   line->hessians.resize(2);
-  // cv::Vec4f hessian1, hessian2;
   // Fit a plane model to the two sets of points individually.
   if (!hessianNormalFormOfPlane(points1, &(line->hessians[0])))
     LOG(WARNING) << "find3DlineOnPlanes: search for hessian failed.";
@@ -1150,6 +1149,10 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
   // To consider a line found as valid. It should have enough number of inliers
   // and enough inliers around line's center.
   bool enough_num_inliers, enough_inliers_around_center;
+  // Endpoints of the line after readjustment through inliers.
+  cv::Vec3f start_readjusted_line, end_readjusted_line;
+  // Readjusted line reprojected to the image plane.
+  cv::Vec4f readjusted_line_reprojected;
 
   // If the distance along the plane1/2's normal direction between the two
   // sets of points is small and both support planes for the line are found,
@@ -1178,18 +1181,35 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       cv::Vec3f start_guess(line_guess[0], line_guess[1], line_guess[2]);
       cv::Vec3f end_guess(line_guess[3], line_guess[4], line_guess[5]);
 
-      cv::Vec3f start, end;
+
       enough_num_inliers =
-          adjustLineUsingInliers(points, start_guess, end_guess, &start, &end);
+          adjustLineUsingInliers(points, start_guess, end_guess,
+                                 &start_readjusted_line, &end_readjusted_line);
       // Fix orientation w.r.t. reference line if needed
       adjustLineOrientationGiven2DReferenceLine(reference_line_2D, camera_P,
-                                                &start, &end);
+                                                &start_readjusted_line,
+                                                &end_readjusted_line);
 
-      line->line = {start[0], start[1], start[2], end[0], end[1], end[2]};
+      line->line = {start_readjusted_line[0], start_readjusted_line[1],
+                    start_readjusted_line[2], end_readjusted_line[0],
+                    end_readjusted_line[1], end_readjusted_line[2]};
       line->type = LineType::PLANE;
 
+      // Project line re-adjusted through inliers in 2D and add it to the
+      // background image.
+      project3DLineTo2D(*line, camera_P, &readjusted_line_reprojected);
+      readjusted_line_reprojected = fitLineToBounds(
+          readjusted_line_reprojected, cloud.cols, cloud.rows);
+      fitLineToBounds(readjusted_line_reprojected, cloud.cols, cloud.rows);
+      if (visualization_mode_on_) {
+       // Update background image.
+        background_image_ = getImageOfLine(readjusted_line_reprojected,
+                                           background_image_, 1);
+      }
+
       enough_inliers_around_center =
-          checkIfValidLineUsingInliers(points, start, end);
+          checkIfValidLineUsingInliers(points, start_readjusted_line,
+                                       end_readjusted_line);
 
       if (enough_num_inliers && enough_inliers_around_center) {
         num_planar_lines++;
@@ -1209,39 +1229,45 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       cv::Vec3f start_guess = x_0;
       cv::Vec3f end_guess = x_0 + direction;
 
-      cv::Vec3f start, end;
       enough_num_inliers =
-          adjustLineUsingInliers(points, start_guess, end_guess, &start, &end);
+          adjustLineUsingInliers(points, start_guess, end_guess,
+                                 &start_readjusted_line, &end_readjusted_line);
       // Fix orientation w.r.t. reference line if needed
       adjustLineOrientationGiven2DReferenceLine(reference_line_2D, camera_P,
-                                                &start, &end);
+                                                &start_readjusted_line,
+                                                &end_readjusted_line);
 
       if (!enough_num_inliers)
         return false;
       enough_inliers_around_center =
-          checkIfValidLineUsingInliers(points, start, end);
+          checkIfValidLineUsingInliers(points, start_readjusted_line,
+                                       end_readjusted_line);
       if (!enough_inliers_around_center)
         return false;
 
-      line->line = {start[0], start[1], start[2], end[0], end[1], end[2]};
+      line->line = {start_readjusted_line[0], start_readjusted_line[1],
+                    start_readjusted_line[2], end_readjusted_line[0],
+                    end_readjusted_line[1], end_readjusted_line[2]};
 
       cv::Vec3f start_guess_init = {line_guess[0], line_guess[1],
                                     line_guess[2]};
       cv::Vec3f end_guess_init = {line_guess[3], line_guess[4], line_guess[5]};
-      if (visualization_mode_on_) {
-        displayLineWithPointsAndPlanes(start, end, start_guess_init,
-                                       end_guess_init, points1, points2,
-                                       line->hessians[0], line->hessians[1]);
-      }
       // Project line re-adjusted through inliers in 2D and add it to the
       // background image.
-      cv::Vec4f line_2D;
-      project3DLineTo2D(*line, camera_P, &line_2D);
-
-
+      project3DLineTo2D(*line, camera_P, &readjusted_line_reprojected);
+      readjusted_line_reprojected = fitLineToBounds(
+          readjusted_line_reprojected, cloud.cols, cloud.rows);
       if (visualization_mode_on_) {
-       // Update background image
-        background_image_ = getImageOfLine(line_2D, background_image_, 1);
+       // Update background image.
+        background_image_ = getImageOfLine(readjusted_line_reprojected,
+                                           background_image_, 1);
+        LOG(INFO) << "* Displaying candidate edge/intersection line in 3D with "
+                  << "inliers.";
+        displayLineWithPointsAndPlanes(start_readjusted_line,
+                                       end_readjusted_line, start_guess_init,
+                                       end_guess_init, points1, points2,
+                                       line->hessians[0], line->hessians[1]);
+
       }
 
       // Line can now be either an edge or on an intersection line.
@@ -1302,19 +1328,33 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     start_guess = nearest_point;
     end_guess = nearest_point + direction;
 
-    cv::Vec3f start, end;
     enough_num_inliers =
-        adjustLineUsingInliers(*points, start_guess, end_guess, &start, &end);
+        adjustLineUsingInliers(*points, start_guess, end_guess,
+                               &start_readjusted_line, &end_readjusted_line);
     // Fix orientation w.r.t. reference line if needed
     adjustLineOrientationGiven2DReferenceLine(reference_line_2D, camera_P,
-                                              &start, &end);
+                                              &start_readjusted_line,
+                                              &end_readjusted_line);
 
 
-    line->line = {start[0], start[1], start[2], end[0], end[1], end[2]};
+    line->line = {start_readjusted_line[0], start_readjusted_line[1],
+                  start_readjusted_line[2], end_readjusted_line[0],
+                  end_readjusted_line[1], end_readjusted_line[2]};
     line->type = LineType::DISCONT;
+    // Project line re-adjusted through inliers in 2D and add it to the
+    // background image.
+    project3DLineTo2D(*line, camera_P, &readjusted_line_reprojected);
+    readjusted_line_reprojected = fitLineToBounds(
+        readjusted_line_reprojected, cloud.cols, cloud.rows);
+    if (visualization_mode_on_) {
+     // Update background image.
+      background_image_ = getImageOfLine(readjusted_line_reprojected,
+                                         background_image_, 1);
+    }
 
     enough_inliers_around_center =
-        checkIfValidLineUsingInliers(*points, start, end);
+        checkIfValidLineUsingInliers(*points, start_readjusted_line,
+                                     end_readjusted_line);
     if (enough_num_inliers && enough_inliers_around_center) {
       num_discontinuity_lines++;
       return true;
@@ -1394,16 +1434,7 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
       cloud, camera_P, start_line_after_end, end_line_after_end, line->hessians,
       &right_plane_enough_valid_points_after_end,
       &left_plane_enough_valid_points_after_end);
-  // Show image with two prolonged lines.
-  cv::Mat img_for_display = background_image_;
-  if (visualization_mode_on_) {
-    cv::resize(background_image_, img_for_display,
-               img_for_display.size() * scale_factor_for_visualization);
-    cv::imshow("Line with rectangles and prolonged line/planes",
-                img_for_display);
-    cv::waitKey();
-  }
-
+  
   // Convert booleans to string.
   std::string point_planes_config;
   point_planes_config.push_back(
@@ -1959,6 +1990,13 @@ void LineDetector::project2Dto3DwithPlanes(
       //background_image_ = getImageOfLineWithRectangles(lines2D[i],
       //                                    rect_left, rect_right, 1);
       background_image_ = image;
+      // Display 2D image with rectangles.
+      LOG(INFO) << "* Displaying new candidate line in 2D.";
+      image_of_line_with_rectangles = getImageOfLineWithRectangles(lines2D[i],
+                                          rect_left, rect_right,
+                                          background_image_);
+      cv::imshow("Line with rectangles", image_of_line_with_rectangles);
+      cv::waitKey();
     }
 
     // Find 3D line on planes.
@@ -1969,11 +2007,39 @@ void LineDetector::project2Dto3DwithPlanes(
       lines3D->push_back(line3D_true);
       lines2D_out->push_back(lines2D[i]);
       if (visualization_mode_on_) {
-        // Display 2D image with rectangles
+        cv::Vec4f reprojected_line;
+        cv::Vec3f start_3D({line3D_true.line[0], line3D_true.line[1],
+                            line3D_true.line[2]});
+        cv::Vec3f end_3D({line3D_true.line[3], line3D_true.line[4],
+                          line3D_true.line[5]});
+
+        project3DLineTo2D(start_3D, end_3D, camera_P, &reprojected_line);
+        reprojected_line = fitLineToBounds(reprojected_line, image.cols,
+                                           image.rows);
+
+        LOG(INFO) << "** Candidate line was successfully projected to 3D with "
+                  << "index " << num_lines_successfully_projected_to_3D
+                  << ":\n   - 2D: (" << lines2D[i][0]  << ", " << lines2D[i][1]
+                  << ") -- (" << lines2D[i][2] << ", " << lines2D[i][3]
+                  << ").\n   - 3D before adjustment: (" << lines3D_cand[i][0]
+                  << ", " << lines3D_cand[i][1] << ", " << lines3D_cand[i][2]
+                  << ") -- (" << lines3D_cand[i][3] << ", "
+                  << lines3D_cand[i][4] << ", " << lines3D_cand[i][5]
+                  << ").\n   - 3D after adjustment: (" << line3D_true.line[0]
+                  << ", " << line3D_true.line[1] << ", " << line3D_true.line[2]
+                  << ") -- (" << line3D_true.line[3] << ", "
+                  << line3D_true.line[4] << ", " << line3D_true.line[5]
+                  << ").\n   - 2D after reprojection: (" << reprojected_line[0]
+                  << ", " << reprojected_line[1] << ") -- ("
+                  << reprojected_line[2] << ", " << reprojected_line[3] << ").";
+        // Display original line/rectangles overlapped with the reprojection
+        // of the line adjusted with inliers and the prolonged line/
+        // rectangles (if any).
         image_of_line_with_rectangles = getImageOfLineWithRectangles(lines2D[i],
                                             rect_left, rect_right,
                                             background_image_);
-        cv::imshow("Line with rectangles", image_of_line_with_rectangles);
+        cv::imshow("Line with rectangles + reprojected line + prolonged line ("
+                   "if any)", image_of_line_with_rectangles);
         cv::waitKey();
       }
       num_lines_successfully_projected_to_3D++;
