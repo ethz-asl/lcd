@@ -944,19 +944,19 @@ bool LineDetector::getRectanglesFromLine(const cv::Vec4f& line,
   cv::Point2f line_dir = end - start;
   cv::Point2f go_left(-line_dir.y, line_dir.x);
   cv::Point2f go_right(line_dir.y, -line_dir.x);
-  double norm = sqrt(pow(line_dir.x, 2) + pow(line_dir.y, 2));
+  double norm = cv::norm(line_dir);
   if (eff_rect_size > norm * relative_rect_size)
     eff_rect_size = norm * relative_rect_size;
   rect_left->resize(4);
   (*rect_left)[0] = start + offset / norm * go_left;
-  (*rect_left)[1] = start + eff_rect_size / norm * go_left;
+  (*rect_left)[1] = start + (offset + eff_rect_size) / norm * go_left;
   (*rect_left)[2] = end + offset / norm * go_left;
-  (*rect_left)[3] = end + eff_rect_size / norm * go_left;
+  (*rect_left)[3] = end + (offset + eff_rect_size) / norm * go_left;
   rect_right->resize(4);
   (*rect_right)[0] = start + offset / norm * go_right;
-  (*rect_right)[1] = start + eff_rect_size / norm * go_right;
+  (*rect_right)[1] = start + (offset + eff_rect_size) / norm * go_right;
   (*rect_right)[2] = end + offset / norm * go_right;
-  (*rect_right)[3] = end + eff_rect_size / norm * go_right;
+  (*rect_right)[3] = end + (offset + eff_rect_size) / norm * go_right;
   // TODO(ff): Check if function needs to be of non void return type.
 }
 
