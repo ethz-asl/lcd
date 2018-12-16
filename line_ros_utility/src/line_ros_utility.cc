@@ -880,7 +880,71 @@ void ListenAndPublish::findInliersWithLabelsGivenPlanes(
 
       inliers_right->setInliersWithLabels(valid_points_right_plane);
       inliers_left->setInliersWithLabels(valid_points_left_plane);
+
+      if (inliers_visualization_mode_on_) {
+        display2DLineWithRectangleInliers(line_2D, valid_points_right_plane,
+                                          valid_points_left_plane,
+                                          instances, camera_info);
+      }
     }
+}
+
+void ListenAndPublish::display2DLineWithRectangleInliers(
+    const cv::Vec4f& line_2D,
+    const std::vector<std::pair<cv::Vec3f, unsigned short>>& inliers_right,
+    const std::vector<std::pair<cv::Vec3f, unsigned short>>& inliers_left,
+    const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info) {
+    // Create vectors of inliers without labels.
+    std::vector<cv::Vec3f> inliers_right_without_labels,
+                           inliers_left_without_labels;
+    for (const auto& it : inliers_right)
+      inliers_right_without_labels.push_back(it.first);
+    for (const auto& it: inliers_left)
+      inliers_left_without_labels.push_back(it.first);
+    display2DLineWithRectangleInliers(line_2D, inliers_right_without_labels,
+                                      inliers_left_without_labels, instances,
+                                      camera_info);
+}
+
+void ListenAndPublish::display2DLineWithRectangleInliers(
+    const cv::Vec4f& line_2D, const std::vector<cv::Vec3f>& inliers_right,
+    const std::vector<cv::Vec3f>& inliers_left, const cv::Mat& instances,
+    sensor_msgs::CameraInfoConstPtr camera_info) {
+  cv::Point2f start_2D = {line_2D[0], line_2D[1]};
+  cv::Point2f end_2D = {line_2D[2], line_2D[3]};
+  // Camera model for reprojection.
+  image_geometry::PinholeCameraModel camera_model;
+  camera_model.fromCameraInfo(camera_info);
+  // Display image of line with inliers
+  cv::Mat background_image(instances.rows, instances.cols, CV_8UC3);
+  cv_image_.copyTo(background_image);
+  // Set right inliers to cyan, left to magenta.
+  cv::Point2f inlier_2D;
+  size_t i, j;
+  for (const auto& it : inliers_right) {
+    inlier_2D = camera_model.project3dToPixel({it[0], it[1], it[2]});
+    i = static_cast<size_t>(inlier_2D.y);
+    j = static_cast<size_t>(inlier_2D.x);
+    background_image.at<cv::Vec3b>(i, j)[0] = 255;
+    background_image.at<cv::Vec3b>(i, j)[1] = 255;
+    background_image.at<cv::Vec3b>(i, j)[2] = 0;
+  }
+  for (const auto& it: inliers_left) {
+    inlier_2D = camera_model.project3dToPixel({it[0], it[1], it[2]});
+    i = static_cast<size_t>(inlier_2D.y);
+    j = static_cast<size_t>(inlier_2D.x);
+    background_image.at<cv::Vec3b>(i, j)[0] = 255;
+    background_image.at<cv::Vec3b>(i, j)[1] = 0;
+    background_image.at<cv::Vec3b>(i, j)[2] = 255;
+  }
+  // Draw line on top.
+  cv::line(background_image, start_2D, end_2D, CV_RGB(255, 0, 0));  // Red
+  // Resize image.
+  cv::resize(background_image, background_image,
+             background_image.size() * scale_factor_for_visualization);
+  // Display image.
+  cv::imshow("Line with inliers", background_image);
+  cv::waitKey();
 }
 
 void ListenAndPublish::displayLabelledLineOnInstanceImage(
@@ -901,8 +965,8 @@ void ListenAndPublish::displayLabelledLineOnInstanceImage(
   cv::Vec4f line_2D = {start_2D.x, start_2D.y, end_2D.x, end_2D.y};
   // Fit line to the image bounds.
   line_2D = line_detector_.fitLineToBounds(line_2D, instances.cols,
-                                             instances.rows);
-  // Use the original image to be the background image.
+                                           instances.rows);
+  // Use the original image as background image.
   cv::Mat background_image(rows, cols, CV_8UC3);
   image.copyTo(background_image);
   // Set all pixels with the same instance as the line to green.

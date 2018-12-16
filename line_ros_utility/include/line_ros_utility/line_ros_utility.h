@@ -362,16 +362,42 @@ class ListenAndPublish {
                                  sensor_msgs::CameraInfoConstPtr camera_info,
                                  int* label);
 
+  // Displays the original image with the 2D line and the valid inliers in the
+  // two rectangles fitted around the line.
+  // Input: line_2D:            2D line.
+  //
+  //        inliers_right/left: (Depending on the two overloads, either a vector
+  //                             points or a vector of pairs point-label).
+  //                            Inliers fitted on the right/left rectangle, as
+  //                            3D points.
+  //
+  //        instances:  Image that labels objects with a different value for
+  //                    each instance. This image must be registered with the
+  //                    depth image where the point cloud was extracted.
+  //
+  //        camera_info: This is used to reproject 3D points onto the
+  //                     instances image.
+  void display2DLineWithRectangleInliers(
+      const cv::Vec4f& line_2D,
+      const std::vector<cv::Vec3f>& inliers_right,
+      const std::vector<cv::Vec3f>& inliers_left, const cv::Mat& instances,
+      sensor_msgs::CameraInfoConstPtr camera_info);
+  void display2DLineWithRectangleInliers(
+      const cv::Vec4f& line_2D,
+      const std::vector<std::pair<cv::Vec3f, unsigned short>>& inliers_right,
+      const std::vector<std::pair<cv::Vec3f, unsigned short>>& inliers_left,
+      const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info);
+
   // Displays a labelled line on top of an image in which all pixels that
   // correspond to points that have the same instance label as the line are
   // displayed in green and all the others have their original RGB color.
-  // Input: line:      Labelled line.
+  // Input: line:        Labelled line.
   //
-  //        label:     Instance label of the line.
+  //        label:       Instance label of the line.
   //
-  //        image:     Original RGB image.
+  //        image:       Original RGB image.
   //
-  //        instances: Instances image.
+  //        instances:   Instances image.
   //
   //        camera_info: This is used to reproject 3D points onto the
   //                     instances image.
@@ -384,6 +410,8 @@ class ListenAndPublish {
   // True if lines should be displayed, once labelled, overlapped on the
   // instance image.
   bool labelled_line_visualization_mode_on_ = true;
+  // True if the inliers found around the line should be displayed.
+  bool inliers_visualization_mode_on_ = true;
   // Data storage.
   size_t iteration_;
   cv::Mat cv_image_;
