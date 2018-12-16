@@ -559,6 +559,10 @@ void ListenAndPublish::labelLinesWithInstances(
                                           &(labels->at(i)));
           break;
         case line_detection::LineType::PLANE:
+        case line_detection::LineType::INTERSECT:
+          // Both planar and intersection lines should be assigned the label of
+          // the object that, if removed, would cause the line to disappear. To
+          // do so, the following approach is used:
           // * Take the most two present instances in the two planes around the
           //   line.
           findInliersWithLabelsGivenPlanes(lines[i], lines[i].hessians[0],
@@ -646,64 +650,14 @@ void ListenAndPublish::labelLinesWithInstances(
           edge_line.clear();
           edge_line.push_back(lines[i]);
           labelLinesWithInstancesByMajorityVoting(edge_line, instances,
-            camera_info, &edge_line_instance);
+                                                  camera_info,
+                                                  &edge_line_instance);
           CHECK_EQ(edge_line_instance.size(), 1);
           labels->at(i) = edge_line_instance[0];
           break;
-        case line_detection::LineType::INTERSECT:
-          // In case of an intersection line, there are two cases, which were
-          // already distincted in the detection part. If, when prolonging the
-          // line, points are found only in one of the two inlier planes, take
-          // the points on this plane and majority-vote their instances. If
-          // instead this is not possible, and therefore the type was assigned
-          // to the line by looking at the convexity/concavity of the angle
-          // between the two planes, take the plane that is further away and
-          // majority-vote the instances of the points on it.
-
-          start_line_before_start = start -
-              extension_length_for_intersection * direction;
-          end_line_before_start = start;
-
-          start_line_after_end = end;
-          end_line_after_end = end +
-              extension_length_for_intersection * direction;
-
-          line_detector_.setVisualizationMode(false);
-          line_detector_.checkIfValidPointsOnPlanesGivenProlongedLine(
-              cv_cloud_, camera_P_, start_line_before_start,
-              end_line_before_start, lines[i].hessians,
-              &right_plane_enough_valid_points_before_start,
-              &left_plane_enough_valid_points_before_start);
-          line_detector_.checkIfValidPointsOnPlanesGivenProlongedLine(
-              cv_cloud_, camera_P_, start_line_after_end,
-              end_line_after_end, lines[i].hessians,
-              &right_plane_enough_valid_points_after_end,
-              &left_plane_enough_valid_points_after_end);
-
-          /*if (line_type_determinable_before_start &&
-              !line_type_determinable_after_end) {
-            CHECK(lines[i].type == line_type_before_start);
-            plane_in_object_owning_line =
-                plane_in_object_owning_line_before_start;
-          } else if (!line_type_determinable_before_start &&
-                     line_type_determinable_after_end) {
-            CHECK(lines[i].type == line_type_after_end);
-            plane_in_object_owning_line =
-                plane_in_object_owning_line_after_end;
-          } else if (line_type_determinable_before_start &&
-                     line_type_determinable_after_end &&
-                     (line_type_before_start == line_type_after_end)) {
-            CHECK(lines[i].type == line_type_before_start);
-            plane_in_object_owning_line =
-                plane_in_object_owning_line_before_start;
-          } else {
-            LOG(INFO) << "Not able to assign label of intersection line based "
-                      << "on prolonged lines. Assigning label of plane "
-                      << "furthest away.";
-            assignLabelOfFurthestInlierPlane(lines[i], instances, camera_info,
-                                             &(labels->at(i)));
-          }*/
-          break;
+        default:
+          ROS_ERROR("Found line type that is not any of PLANE, DISCONT, EDGE, "
+                    "INTERSECTION.");
       }
     }
 }

@@ -342,18 +342,18 @@ cv::Mat getImageOfLineWithRectangles(const cv::Vec4f& line,
            CV_RGB(0, 0, 255));  // Blue
   // Left rectangle
   cv::line(img_for_display, rect_left[0], rect_left[1],
-           CV_RGB(255, 0, 255)); // Purple
+           CV_RGB(255, 0, 255)); // Magenta
   cv::line(img_for_display, rect_left[2], rect_left[3],
-           CV_RGB(255, 0, 255)); // Purple
+           CV_RGB(255, 0, 255)); // Magenta
   cv::line(img_for_display, rect_left[1], rect_left[3],
-           CV_RGB(255, 0, 255)); // Purple
+           CV_RGB(255, 0, 255)); // Magenta
   // Left rectangle
   cv::line(img_for_display, rect_right[0], rect_right[1],
-           CV_RGB(255, 255, 0)); // Cyan
+           CV_RGB(0, 255, 255)); // Cyan
   cv::line(img_for_display, rect_right[2], rect_right[3],
-           CV_RGB(255, 255, 0)); // Cyan
+           CV_RGB(0, 255, 255)); // Cyan
   cv::line(img_for_display, rect_right[1], rect_right[3],
-           CV_RGB(255, 255, 0)); // Cyan
+           CV_RGB(0, 255, 255)); // Cyan
   cv::resize(img_for_display, img_for_display,
     img_for_display.size()*scale_factor);
   return img_for_display;
@@ -884,10 +884,10 @@ cv::Vec4f LineDetector::fitLineToBoundsWithDirection(
             compareIntersectionPoints);
   // Remove duplicates if any (possible for instance if an intersection point is
   // (x, y) with x in {0, x_bound} and y in {0, y_bound}.
-  for (std::vector <std::pair<cv::Point2f, double>>::iterator it_1 =
+  for (std::vector<std::pair<cv::Point2f, double>>::iterator it_1 =
            true_intersection_points.begin(); it_1 !=
                true_intersection_points.end(); ++it_1) {
-    for (std::vector <std::pair<cv::Point2f, double>>::iterator it_2 = it_1 + 1;
+    for (std::vector<std::pair<cv::Point2f, double>>::iterator it_2 = it_1 + 1;
              it_2 != true_intersection_points.end();) {
       if (checkEqualPoints(it_1->first, it_2->first)) {
         it_2 = true_intersection_points.erase(it_2);
