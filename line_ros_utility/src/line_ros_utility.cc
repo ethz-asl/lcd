@@ -659,6 +659,12 @@ void ListenAndPublish::labelLinesWithInstances(
           ROS_ERROR("Found line type that is not any of PLANE, DISCONT, EDGE, "
                     "INTERSECTION.");
       }
+      if (labelled_line_visualization_mode_on_) {
+        // Display labelled line.
+        displayLabelledLineOnInstanceImage(
+            lines[i], static_cast<unsigned short>(labels->at(i)), cv_image_,
+            instances, camera_info);
+      }
     }
 }
 
@@ -873,6 +879,51 @@ void ListenAndPublish::findInliersWithLabelsGivenPlanes(
       inliers_right->setInliersWithLabels(points_right_plane);
       inliers_left->setInliersWithLabels(points_left_plane);
     }
+}
+
+void ListenAndPublish::displayLabelledLineOnInstanceImage(
+    const line_detection::LineWithPlanes& line, const unsigned short& label,
+    const cv::Mat& image, const cv::Mat& instances,
+    sensor_msgs::CameraInfoConstPtr camera_info) {
+  int cols = image.cols;
+  int rows = image.rows;
+  image_geometry::PinholeCameraModel camera_model;
+  camera_model.fromCameraInfo(camera_info);
+  // Project the line in 2D.
+  cv::Point2f start_2D = camera_model.project3dToPixel({line.line[0],
+                                                        line.line[1],
+                                                        line.line[2]});
+  cv::Point2f end_2D = camera_model.project3dToPixel({line.line[3],
+                                                      line.line[4],
+                                                      line.line[5]});
+  cv::Vec4f line_2D = {start_2D.x, start_2D.y, end_2D.x, end_2D.y};
+  // Fit line to the image bounds.
+  line_2D = line_detector_.fitLineToBounds(line_2D, instances.cols,
+                                             instances.rows);
+  // Use the original image to be the background image.
+  cv::Mat background_image(rows, cols, CV_8UC3);
+  image.copyTo(background_image);
+  // Set all pixels with the same instance as the line to green.
+  for (size_t i = 0; i < instances.rows; ++i) {
+    for (size_t j = 0; j < instances.cols; ++j) {
+      if (instances.at<unsigned short>(i, j) == label) {
+        background_image.at<cv::Vec3b>(i, j)[0] = 0;
+        background_image.at<cv::Vec3b>(i, j)[1] = 255;
+        background_image.at<cv::Vec3b>(i, j)[2] = 0;
+      }
+    }
+  }
+  // Draw line on top.
+  cv::line(background_image, cv::Point(line_2D[0], line_2D[1]),
+           cv::Point(line_2D[2], line_2D[3]),
+           CV_RGB(255, 0, 0));  // Red
+  // Resize image.
+  cv::resize(background_image, background_image,
+             background_image.size() * scale_factor_for_visualization);
+  // Display image.
+  cv::imshow("Labelled line with pixels of the same instance",
+             background_image);
+  cv::waitKey();
 }
 
 InliersWithLabels::InliersWithLabels() {

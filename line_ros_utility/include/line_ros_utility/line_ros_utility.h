@@ -29,6 +29,10 @@
 #include <line_ros_utility/RequestDecisionPath.h>
 #include <line_ros_utility/TreeRequest.h>
 
+// Factor that defines by how many times the image is enlarged when displaying a
+// labelled line on an instance image.
+constexpr int scale_factor_for_visualization = 4;
+
 namespace line_ros_utility {
 
 typedef message_filters::sync_policies::ExactTime<
@@ -358,6 +362,28 @@ class ListenAndPublish {
                                  sensor_msgs::CameraInfoConstPtr camera_info,
                                  int* label);
 
+  // Displays a labelled line on top of an image in which all pixels that
+  // correspond to points that have the same instance label as the line are
+  // displayed in green and all the others have their original RGB color.
+  // Input: line:      Labelled line.
+  //
+  //        label:     Instance label of the line.
+  //
+  //        image:     Original RGB image.
+  //
+  //        instances: Instances image.
+  //
+  //        camera_info: This is used to reproject 3D points onto the
+  //                     instances image.
+  void displayLabelledLineOnInstanceImage(
+      const line_detection::LineWithPlanes& line, const unsigned short& label,
+      const cv::Mat& image, const cv::Mat& instances,
+      sensor_msgs::CameraInfoConstPtr camera_info);
+
+ private:
+  // True if lines should be displayed, once labelled, overlapped on the
+  // instance image.
+  bool labelled_line_visualization_mode_on_ = true;
   // Data storage.
   size_t iteration_;
   cv::Mat cv_image_;
