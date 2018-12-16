@@ -609,7 +609,7 @@ void ListenAndPublish::labelLinesWithInstances(
                                            camera_info,
                                            &inliers_with_label_right_after_end,
                                            &inliers_with_label_left_after_end);
-          //   - Assign the label of the most present instance.
+          //   - Assign the label of the least present instance.
           total_occurrences_most_present_label_right =
               inliers_with_label_right_before_start.countLabelInInliers(
                   most_present_label_right) +
@@ -636,7 +636,7 @@ void ListenAndPublish::labelLinesWithInstances(
                     << most_present_label_left << ") has "
                     << total_occurrences_most_present_label_left
                     << " occurrences in the 4 prolonged planes.";
-          if (total_occurrences_most_present_label_right >
+          if (total_occurrences_most_present_label_right <
               total_occurrences_most_present_label_left) {
             labels->at(i) = most_present_label_right;
           } else {
@@ -696,16 +696,10 @@ void ListenAndPublish::assignLabelOfInlierPlaneBasedOnDistance(
   findInliersWithLabelsGivenPlanes(line, line.hessians[0], line.hessians[1],
     instances, camera_info, &inliers_with_instance_label[0],
     &inliers_with_instance_label[1]);
-  LOG(INFO) << "Found inlier(s) for line (" << line.line[0] << ", "
-            << line.line[1]  << ", " << line.line[2] << ") -- (" << line.line[3]
-            << ", " << line.line[4] << ", " << line.line[5] << ").";
   // Find the mean point of each set of inliers.
   for (size_t i = 0; i < 2; ++i) {
     mean_points[i] = inliers_with_instance_label[i].findMeanPoint();
   }
-  LOG(INFO) << "Found inliers mean points for line (" << line.line[0] << ", "
-            << line.line[1]  << ", " << line.line[2] << ") -- (" << line.line[3]
-            << ", " << line.line[4] << ", " << line.line[5] << ").";
   if (furthest_plane) {
     // Assign instance label of the inliers with mean point further from the
     // origin.
@@ -798,6 +792,8 @@ void ListenAndPublish::findInliersWithLabelsGivenPlanes(
     // an unsigned short representing the instance label.
     std::vector<std::pair<cv::Vec3f, unsigned short>> points_left_plane,
                                                       points_right_plane;
+    std::vector<std::pair<cv::Vec3f, unsigned short>> valid_points_left_plane,
+                                                      valid_points_right_plane;
     unsigned short instance_label;
 
     line_detector_.getRectanglesFromLine(line_2D, &rect_left, &rect_right);
@@ -812,21 +808,21 @@ void ListenAndPublish::findInliersWithLabelsGivenPlanes(
       if (std::isnan(cv_cloud_.at<cv::Vec3f>(points_in_rect[j])[0])) continue;
       instance_label = instances.at<unsigned short>(points_in_rect[j]);
       points_left_plane.push_back(
-        std::make_pair(instances.at<cv::Vec3f>(points_in_rect[j]),
+        std::make_pair(cv_cloud_.at<cv::Vec3f>(points_in_rect[j]),
                        instance_label));
     }
     // (Right side)
     line_detection::findPointsInRectangle(rect_right, &points_in_rect);
     points_right_plane.clear();
     for (size_t j = 0; j < points_in_rect.size(); ++j) {
-      if (points_in_rect[j].x < 0 || points_in_rect[j].x >= cv_cloud_.cols ||
-          points_in_rect[j].y < 0 || points_in_rect[j].y >= cv_cloud_.rows) {
+      if (points_in_rect[j].x < 0 || points_in_rect[j].x >= instances.cols ||
+          points_in_rect[j].y < 0 || points_in_rect[j].y >= instances.rows) {
         continue;
       }
       if (std::isnan(cv_cloud_.at<cv::Vec3f>(points_in_rect[j])[0])) continue;
       instance_label = instances.at<unsigned short>(points_in_rect[j]);
       points_right_plane.push_back(
-        std::make_pair(instances.at<cv::Vec3f>(points_in_rect[j]),
+        std::make_pair(cv_cloud_.at<cv::Vec3f>(points_in_rect[j]),
         instance_label));
     }
 
@@ -835,7 +831,7 @@ void ListenAndPublish::findInliersWithLabelsGivenPlanes(
     line_detection::LineDetectionParams params =
         line_detector_.get_line_detection_params();
     double max_deviation = params_.max_error_inlier_ransac;
-    int valid_points_left_plane = 0, valid_points_right_plane = 0;
+    int num_valid_points_left_plane = 0, num_valid_points_right_plane = 0;
 
     std::vector<std::pair<cv::Vec3f, unsigned short>>::iterator it;
 
@@ -844,40 +840,46 @@ void ListenAndPublish::findInliersWithLabelsGivenPlanes(
       for (it = points_left_plane.begin(); it != points_left_plane.end();
         ++it) {
         if (line_detection::errorPointToPlane(plane_1, it->first) <
-          max_deviation)
-          ++valid_points_left_plane;
+          max_deviation) {
+          valid_points_left_plane.push_back(*it);
+        }
       }
       for (it = points_right_plane.begin(); it != points_right_plane.end();
         ++it) {
         if (line_detection::errorPointToPlane(plane_1, it->first) <
-          max_deviation)
-          ++valid_points_right_plane;
+          max_deviation) {
+          valid_points_right_plane.push_back(*it);
+        }
       }
+      num_valid_points_left_plane = valid_points_left_plane.size();
+      num_valid_points_right_plane = valid_points_right_plane.size();
       // Inliers
-      if (valid_points_left_plane > valid_points_right_plane) {
+      if (num_valid_points_left_plane > num_valid_points_right_plane) {
           // Plane_1 coincides with left plane.
-          inliers_right->setInliersWithLabels(points_left_plane);
+          inliers_right->setInliersWithLabels(valid_points_left_plane);
       } else {
           // Plane_1 coincides with right plane.
-          inliers_right->setInliersWithLabels(points_right_plane);
+          inliers_right->setInliersWithLabels(valid_points_right_plane);
       }
     } else {
       // Find inliers for both planes.
       for (it = points_left_plane.begin(); it != points_left_plane.end();
         ++it) {
         if (line_detection::errorPointToPlane(plane_2, it->first) <
-          max_deviation)
-          ++valid_points_left_plane;
+          max_deviation) {
+          valid_points_left_plane.push_back(*it);
+        }
       }
       for (it = points_right_plane.begin(); it != points_right_plane.end();
         ++it) {
         if (line_detection::errorPointToPlane(plane_1, it->first) <
-          max_deviation)
-          ++valid_points_right_plane;
+          max_deviation) {
+          valid_points_right_plane.push_back(*it);
+        }
       }
 
-      inliers_right->setInliersWithLabels(points_right_plane);
-      inliers_left->setInliersWithLabels(points_left_plane);
+      inliers_right->setInliersWithLabels(valid_points_right_plane);
+      inliers_left->setInliersWithLabels(valid_points_left_plane);
     }
 }
 
