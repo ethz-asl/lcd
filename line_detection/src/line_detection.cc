@@ -1128,6 +1128,14 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                                       const bool planes_found,
                                       LineWithPlanes* line) {
   CHECK_NOTNULL(line);
+  // To consider a line found as valid. It should have enough number of inliers
+  // and enough inliers around line's center.
+  bool enough_num_inliers, enough_inliers_around_center;
+  // Endpoints of the line after readjustment through inliers.
+  cv::Vec3f start_readjusted_line, end_readjusted_line;
+  // Readjusted line reprojected to the image plane.
+  cv::Vec4f readjusted_line_reprojected;
+
   size_t N1 = points1.size();
   size_t N2 = points2.size();
   if (N1 < 3 || N2 < 3) return false;
@@ -1145,14 +1153,6 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
   // Compute mean points of the two sets.
   mean1 = computeMean(points1);
   mean2 = computeMean(points2);
-
-  // To consider a line found as valid. It should have enough number of inliers
-  // and enough inliers around line's center.
-  bool enough_num_inliers, enough_inliers_around_center;
-  // Endpoints of the line after readjustment through inliers.
-  cv::Vec3f start_readjusted_line, end_readjusted_line;
-  // Readjusted line reprojected to the image plane.
-  cv::Vec4f readjusted_line_reprojected;
 
   // If the distance along the plane1/2's normal direction between the two
   // sets of points is small and both support planes for the line are found,
@@ -1195,13 +1195,13 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                     end_readjusted_line[1], end_readjusted_line[2]};
       line->type = LineType::PLANE;
 
-      // Project line re-adjusted through inliers in 2D and add it to the
-      // background image.
-      project3DLineTo2D(*line, camera_P, &readjusted_line_reprojected);
-      readjusted_line_reprojected = fitLineToBounds(
-          readjusted_line_reprojected, cloud.cols, cloud.rows);
-      fitLineToBounds(readjusted_line_reprojected, cloud.cols, cloud.rows);
       if (visualization_mode_on_) {
+        // Project line re-adjusted through inliers in 2D and add it to the
+        // background image.
+        project3DLineTo2D(*line, camera_P, &readjusted_line_reprojected);
+        readjusted_line_reprojected = fitLineToBounds(
+            readjusted_line_reprojected, cloud.cols, cloud.rows);
+        fitLineToBounds(readjusted_line_reprojected, cloud.cols, cloud.rows);
        // Update background image.
         background_image_ = getImageOfLine(readjusted_line_reprojected,
                                            background_image_, 1);
@@ -1252,12 +1252,13 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       cv::Vec3f start_guess_init = {line_guess[0], line_guess[1],
                                     line_guess[2]};
       cv::Vec3f end_guess_init = {line_guess[3], line_guess[4], line_guess[5]};
-      // Project line re-adjusted through inliers in 2D and add it to the
-      // background image.
-      project3DLineTo2D(*line, camera_P, &readjusted_line_reprojected);
-      readjusted_line_reprojected = fitLineToBounds(
-          readjusted_line_reprojected, cloud.cols, cloud.rows);
+
       if (visualization_mode_on_) {
+        // Project line re-adjusted through inliers in 2D and add it to the
+        // background image.
+        project3DLineTo2D(*line, camera_P, &readjusted_line_reprojected);
+        readjusted_line_reprojected = fitLineToBounds(
+            readjusted_line_reprojected, cloud.cols, cloud.rows);
        // Update background image.
         background_image_ = getImageOfLine(readjusted_line_reprojected,
                                            background_image_, 1);
@@ -1267,7 +1268,6 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                                        end_readjusted_line, start_guess_init,
                                        end_guess_init, points1, points2,
                                        line->hessians[0], line->hessians[1]);
-
       }
 
       // Line can now be either an edge or on an intersection line.
@@ -1297,7 +1297,8 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     // The fitting is done in 3 steps:
     //  1.  Project the line_guess onto the plane fitted to the point set.
     //  2.  Find the line parallel to the projected one that goes through the
-    //      point in the set of the points that is nearest to the line.
+    //      point (among those in the set of points) that is nearest to the
+    //      line.
     //  3.  From all points in the set: Project them on to the line and choose
     //      the combination of start/end point that maximizes the line
     //      distance.
@@ -1341,12 +1342,13 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                   start_readjusted_line[2], end_readjusted_line[0],
                   end_readjusted_line[1], end_readjusted_line[2]};
     line->type = LineType::DISCONT;
-    // Project line re-adjusted through inliers in 2D and add it to the
-    // background image.
-    project3DLineTo2D(*line, camera_P, &readjusted_line_reprojected);
-    readjusted_line_reprojected = fitLineToBounds(
-        readjusted_line_reprojected, cloud.cols, cloud.rows);
+
     if (visualization_mode_on_) {
+      // Project line re-adjusted through inliers in 2D and add it to the
+      // background image.
+      project3DLineTo2D(*line, camera_P, &readjusted_line_reprojected);
+      readjusted_line_reprojected = fitLineToBounds(
+          readjusted_line_reprojected, cloud.cols, cloud.rows);
      // Update background image.
       background_image_ = getImageOfLine(readjusted_line_reprojected,
                                          background_image_, 1);
@@ -1372,7 +1374,7 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
   // convex angle, set the line type to be EDGE, otherwise both EDGE and
   // INTERSECTION line type are possible and a further test is required.
   // Let us note that a plane admits two different orientations, i.e., given the
-  // direction of its normal vector, the latteassignEdger can point either "towards" the
+  // direction of its normal vector, the latter can point either "towards" the
   // camera or in the opposite way.
   directHessianTowardsOrigin(&(line->hessians[0]));
   directHessianTowardsOrigin(&(line->hessians[1]));
@@ -1391,17 +1393,21 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
         return true;
       }
   } else {
-    // This case should never be entered
+    // This case should never be entered, but it sometimes happen, for
+    // configurations in which it is not possible to determine convexity/
+    // concavity.
     return false;
   }
   // Concave => Use the following method: prolonge the line from its endpoints,
-  // and prolonge the inlier planes as well. If on any on the two sides one of
-  // the two prolonged inlier planes contains points while the other is empty,
-  // then the line is an intersection line (one of the two objects in contact
-  // with each other reaches its boundary). If none of the two sides is of this
-  // type, but for at least one side both the prolonged inlier planes contain
-  // points, than the line is of type edge. If this is not the case either,
-  // there is not enough information to determine the type of the line.
+  // and prolonge the inlier planes as well. If for both sides the two inlier
+  // plane both contain no points than the line is assigned the EDGE type. (As
+  // an example, consider an armchair and look at the line between the seating
+  // cushion and the cushion that holds a person's back. Prolonging the planes
+  // that correspond to the two cushions, no inlier point are found but only the
+  // points of the two lateral cushions that hold a person's arms. The line is
+  // indeed an edge line. This example also works for a chair with no armrests:
+  // prolonging the same planes no nearby points at all are found.) In all other
+  // cases the line is assigned the INTERSECTION type.
   LOG(INFO) << "Line with concave planes. Using method of prolonged lines to "
             << "determine edge/intersection line type.";
 
@@ -1434,7 +1440,7 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
       cloud, camera_P, start_line_after_end, end_line_after_end, line->hessians,
       &right_plane_enough_valid_points_after_end,
       &left_plane_enough_valid_points_after_end);
-  
+
   // Convert booleans to string.
   std::string point_planes_config;
   point_planes_config.push_back(
@@ -1462,6 +1468,9 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
       occurrences_config_prolonged_plane[1][0][1][0]++;
     } else if (point_planes_config == "1001" || point_planes_config == "0110") {
       occurrences_config_prolonged_plane[1][0][0][1]++;
+      LOG(WARNING) << "Note: The current line (of intersection type) has one "
+                   << "strange configurations for inliers in the prolonged "
+                   << "planes (" << point_planes_config << ")";
     } else if (point_planes_config == "1110" || point_planes_config == "1101" ||
                point_planes_config == "1011" || point_planes_config == "0111") {
       occurrences_config_prolonged_plane[1][1][1][0]++;
@@ -1529,15 +1538,15 @@ bool LineDetector::determineConvexityFromViewpointGivenLineAndInlierPoints(
     halfplane_2_is_behind_plane_1 = false;
   // Infer convexity/concavity.
   if (halfplane_1_is_behind_plane_2 && halfplane_2_is_behind_plane_1) {
-      // Convex angle
+      // Convex angle.
       *convex_true_concave_false = true;
       return true;
   } else if (!halfplane_1_is_behind_plane_2 && !halfplane_2_is_behind_plane_1) {
-      // Concave angle
+      // Concave angle.
       *convex_true_concave_false = false;
       return true;
   } else {
-    // This case should never be entered
+    // This case should never be entered.
     LOG(ERROR) << "Error in determining the concavity/convexity of the angle "
                << "between the two planes around the line with the following "
                << "3D coordinates: (" << line.line[0] << ", " << line.line[1]
@@ -1574,16 +1583,16 @@ bool LineDetector::determineConvexityFromViewpointGivenLineAndMeanPoints(
                         mean_of_mean_points[2], 1.0};
   if (line.hessians[0].dot(mean_hom) > 0 &&
       line.hessians[1].dot(mean_hom) > 0) {
-      // Concave angle
+      // Concave angle.
       *convex_true_concave_false = false;
       return true;
   } else if (line.hessians[0].dot(mean_hom) < 0 &&
       line.hessians[1].dot(mean_hom) < 0) {
-      // Convex angle
+      // Convex angle.
       *convex_true_concave_false = true;
       return true;
   } else {
-    // This case should never be entered
+    // This case should never be entered.
     LOG(ERROR) << "Error in determining the concavity/convexity of the angle "
                << "between the two planes around the line with the following "
                << "3D coordinates: (" << line.line[0] << ", " << line.line[1]

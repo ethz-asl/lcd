@@ -397,7 +397,6 @@ void ListenAndPublish::masterCallback(
   ++iteration_;
 }
 
-// DEPRECATED
 void ListenAndPublish::labelLinesWithInstancesByMajorityVoting(
     const std::vector<line_detection::LineWithPlanes>& lines,
     const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info,
