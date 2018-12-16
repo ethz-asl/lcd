@@ -34,6 +34,9 @@ def get_plane(hessian, x, y):
 
 def normalize_hessian(hessian):
     norm = np.linalg.norm(np.array(hessian[:3]))
+    # Discontinuity lines are assigned null hessians.
+    if (norm < 1e-5):
+      return hessian
     return hessian / norm
 
 
@@ -46,6 +49,10 @@ def get_mean_point(points):
 
 def project_point_on_plane(hessian, point):
     a, b, c, d = normalize_hessian(hessian)
+    norm = np.linalg.norm(np.array(hessian[:3]))
+    # Discontinuity lines are assigned null hessians.
+    if (norm < 1e-5):
+      return point
     normal = np.array([a, b, c])
     for non_zero in range(3):
         if abs(normal[non_zero]) > 0.1:
@@ -101,7 +108,7 @@ def plot():
     x, y = np.meshgrid(
         np.linspace(min_x, max_x, 100), np.linspace(min_y, max_y, 100))
 
-    plot_ = plt.figure().gca(projection='3d')
+    plot_ = plt.figure("3D line with inliers").gca(projection='3d')
 
     # Plot line
     start = np.array(data['start']) * scale_factor
@@ -135,9 +142,9 @@ def plot():
     #    x, y, get_plane(hessian_2, x, y), alpha=0.9, rcount=1, ccount=1)
 
     # Plot inliers for first plane
-    plot_.scatter(inliers_1[:, 0], inliers_1[:, 1], inliers_1[:, 2])
+    plot_.scatter(inliers_1[:, 0], inliers_1[:, 1], inliers_1[:, 2], c='cyan')
     # Plot inliers for second plane
-    plot_.scatter(inliers_2[:, 0], inliers_2[:, 1], inliers_2[:, 2])
+    plot_.scatter(inliers_2[:, 0], inliers_2[:, 1], inliers_2[:, 2], c='magenta')
     # Plot first projected mean
     plot_.scatter(
         mean_point_1_proj[0],

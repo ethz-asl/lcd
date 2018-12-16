@@ -315,7 +315,7 @@ cv::Mat getImageOfLine(const cv::Vec4f& line, const cv::Mat background_image,
    // Line
    cv::line(img_for_display, cv::Point(start[0], start[1]),
             cv::Point(end[0], end[1]),
-            cv::Scalar(255, 0, 0));  // Red
+            CV_RGB(255, 0, 0));  // Red
   // Resize image
    cv::resize(img_for_display, img_for_display,
      img_for_display.size()*scale_factor);
@@ -339,21 +339,21 @@ cv::Mat getImageOfLineWithRectangles(const cv::Vec4f& line,
   // Line
   cv::line(img_for_display, cv::Point(start[0], start[1]),
            cv::Point(end[0], end[1]),
-           cv::Scalar(0, 0, 0));  // Black
+           CV_RGB(0, 0, 255));  // Blue
   // Left rectangle
   cv::line(img_for_display, rect_left[0], rect_left[1],
-           cv::Scalar(255, 0, 255)); // Purple
+           CV_RGB(255, 0, 255)); // Purple
   cv::line(img_for_display, rect_left[2], rect_left[3],
-           cv::Scalar(255, 0, 255)); // Purple
+           CV_RGB(255, 0, 255)); // Purple
   cv::line(img_for_display, rect_left[1], rect_left[3],
-           cv::Scalar(255, 0, 255)); // Purple
+           CV_RGB(255, 0, 255)); // Purple
   // Left rectangle
   cv::line(img_for_display, rect_right[0], rect_right[1],
-           cv::Scalar(255, 255, 0)); // Cyan
+           CV_RGB(255, 255, 0)); // Cyan
   cv::line(img_for_display, rect_right[2], rect_right[3],
-           cv::Scalar(255, 255, 0)); // Cyan
+           CV_RGB(255, 255, 0)); // Cyan
   cv::line(img_for_display, rect_right[1], rect_right[3],
-           cv::Scalar(255, 255, 0)); // Cyan
+           CV_RGB(255, 255, 0)); // Cyan
   cv::resize(img_for_display, img_for_display,
     img_for_display.size()*scale_factor);
   return img_for_display;
@@ -1135,6 +1135,11 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
   cv::Vec3f start_readjusted_line, end_readjusted_line;
   // Readjusted line reprojected to the image plane.
   cv::Vec4f readjusted_line_reprojected;
+  // Endpoints of the given line guess.
+  cv::Vec3f start_guess_init = {line_guess[0], line_guess[1],
+                                line_guess[2]};
+  cv::Vec3f end_guess_init = {line_guess[3], line_guess[4], line_guess[5]};
+
 
   size_t N1 = points1.size();
   size_t N2 = points2.size();
@@ -1202,9 +1207,14 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
         readjusted_line_reprojected = fitLineToBounds(
             readjusted_line_reprojected, cloud.cols, cloud.rows);
         fitLineToBounds(readjusted_line_reprojected, cloud.cols, cloud.rows);
-       // Update background image.
+        // Update background image.
         background_image_ = getImageOfLine(readjusted_line_reprojected,
                                            background_image_, 1);
+        LOG(INFO) << "* Displaying candidate planar line in 3D with inliers.";
+        displayLineWithPointsAndPlanes(start_readjusted_line,
+                                       end_readjusted_line, start_guess_init,
+                                       end_guess_init, points1, points2,
+                                       line->hessians[0], line->hessians[1]);
       }
 
       enough_inliers_around_center =
@@ -1212,6 +1222,7 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                                        end_readjusted_line);
 
       if (enough_num_inliers && enough_inliers_around_center) {
+        LOG(INFO) << "* Line is assigned PLANE type.";
         num_planar_lines++;
         return true;
       } else {
@@ -1248,10 +1259,6 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       line->line = {start_readjusted_line[0], start_readjusted_line[1],
                     start_readjusted_line[2], end_readjusted_line[0],
                     end_readjusted_line[1], end_readjusted_line[2]};
-
-      cv::Vec3f start_guess_init = {line_guess[0], line_guess[1],
-                                    line_guess[2]};
-      cv::Vec3f end_guess_init = {line_guess[3], line_guess[4], line_guess[5]};
 
       if (visualization_mode_on_) {
         // Project line re-adjusted through inliers in 2D and add it to the
@@ -1349,15 +1356,22 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       project3DLineTo2D(*line, camera_P, &readjusted_line_reprojected);
       readjusted_line_reprojected = fitLineToBounds(
           readjusted_line_reprojected, cloud.cols, cloud.rows);
-     // Update background image.
+      // Update background image.
       background_image_ = getImageOfLine(readjusted_line_reprojected,
                                          background_image_, 1);
+      LOG(INFO) << "* Displaying candidate discontinuity line in 3D with "
+                << "inliers.";
+      displayLineWithPointsAndPlanes(start_readjusted_line,
+                                     end_readjusted_line, start_guess_init,
+                                     end_guess_init, points1, points2,
+                                     line->hessians[0], line->hessians[1]);
     }
 
     enough_inliers_around_center =
         checkIfValidLineUsingInliers(*points, start_readjusted_line,
                                      end_readjusted_line);
     if (enough_num_inliers && enough_inliers_around_center) {
+      LOG(INFO) << "* Line is assigned DISCONT type.";
       num_discontinuity_lines++;
       return true;
     } else {
@@ -1459,6 +1473,9 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
     num_edge_lines++;
     occurrences_config_prolonged_plane[0][0][0][0]++;
   } else {
+    LOG(INFO) << "The current line (of intersection type) has the following "
+              << "configuration for inliers in the prolonged planes (LRLR): "
+              << point_planes_config;
     if (point_planes_config == "0001" || point_planes_config == "0010" ||
         point_planes_config == "0100" || point_planes_config == "1000") {
       occurrences_config_prolonged_plane[1][0][0][0]++;
@@ -1468,9 +1485,7 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
       occurrences_config_prolonged_plane[1][0][1][0]++;
     } else if (point_planes_config == "1001" || point_planes_config == "0110") {
       occurrences_config_prolonged_plane[1][0][0][1]++;
-      LOG(WARNING) << "Note: The current line (of intersection type) has one "
-                   << "strange configurations for inliers in the prolonged "
-                   << "planes (" << point_planes_config << ")";
+      LOG(WARNING) << "Note: The configuration is one of the strange ones.";
     } else if (point_planes_config == "1110" || point_planes_config == "1101" ||
                point_planes_config == "1011" || point_planes_config == "0111") {
       occurrences_config_prolonged_plane[1][1][1][0]++;
@@ -2390,6 +2405,8 @@ void LineDetector::runCheckOn3DLines(
                                    &(line_cand.line))) {
       lines3D_out->push_back(line_cand);
       lines2D_out->push_back(line_cand_2D);
+    } else {
+      LOG(INFO) << "Line " << i << " is discarded after check with 2D info.";
     }
   }
 }
@@ -2459,6 +2476,8 @@ bool LineDetector::checkIfValidLineWith2DInfo(const cv::Mat& cloud,
   if (cv::norm(line_dir) / cv::norm(line_dir_true) > kLengthDifference) {
     return false;
   }
+  //TODO(fmilano): this is not enough! It sometimes happen that the reprojected
+  // line is much shorter than the original one, not the opposite.
 
   // Check difference of angle.
   constexpr double kAngleDifference = 0.95;

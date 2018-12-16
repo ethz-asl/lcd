@@ -275,7 +275,7 @@ void ListenAndPublish::publish() {
 }
 
 void ListenAndPublish::printNumberOfLines() {
-  ROS_INFO("Lines kept after projection: %lu/%lu", lines3D_with_planes_.size(),
+  ROS_INFO("Total number of lines kept: %lu/%lu", lines3D_with_planes_.size(),
            lines2D_.size());
 }
 
@@ -346,8 +346,11 @@ void ListenAndPublish::masterCallback(
   ROS_INFO("**** New Image**** Frame %lu****", iteration_);
   detectLines();
   projectTo3D();
-  ROS_INFO("Kept lines: %lu/%lu", lines3D_temp_wp_.size(), lines2D_.size());
+  ROS_INFO("Lines successfully projected to 3D: %lu/%lu",
+           lines3D_temp_wp_.size(), lines2D_.size());
   checkLines();
+  ROS_INFO("Lines kept after check: %lu/%lu",
+           lines3D_with_planes_.size(), lines3D_temp_wp_.size());
 
   CHECK_EQ(static_cast<int>(lines3D_with_planes_.size()),
            static_cast<int>(lines2D_kept_.size()));
