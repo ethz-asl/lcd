@@ -359,8 +359,6 @@ cv::Mat getImageOfLineWithRectangles(const cv::Vec4f& line,
   return img_for_display;
 }
 
-
-
 void displayLineWithPointsAndPlanes(const cv::Vec3f& start,
                                     const cv::Vec3f& end,
                                     const cv::Vec3f& start_guess,
@@ -1323,31 +1321,12 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     }
     line->hessians[abs(idx - 1)] = {0.0f, 0.0f, 0.0f, 0.0f};
 
-    start_guess = projectPointOnPlane(line->hessians[idx], start_guess);
-    end_guess = projectPointOnPlane(line->hessians[idx], end_guess);
-
-    cv::Vec3f direction = end_guess - start_guess;
-    normalizeVector3D(&direction);
-
-    cv::Vec3f nearest_point;
-    getNearestPointToLine(*points, start_guess, end_guess, &nearest_point);
-
-    // Update start point guess of the line as the nearest point
-    start_guess = nearest_point;
-    end_guess = nearest_point + direction;
-
-    enough_num_inliers =
-        adjustLineUsingInliers(*points, start_guess, end_guess,
-                               &start_readjusted_line, &end_readjusted_line);
-    // Fix orientation w.r.t. reference line if needed
+    // Fix orientation w.r.t. reference line if needed.
     adjustLineOrientationGiven2DReferenceLine(reference_line_2D, camera_P,
-                                              &start_readjusted_line,
-                                              &end_readjusted_line);
+                                              &start_guess, &end_guess);
 
-
-    line->line = {start_readjusted_line[0], start_readjusted_line[1],
-                  start_readjusted_line[2], end_readjusted_line[0],
-                  end_readjusted_line[1], end_readjusted_line[2]};
+    line->line = {start_guess[0], start_guess[1], start_guess[2], end_guess[0],
+                  end_guess[1], end_guess[2]};
     line->type = LineType::DISCONT;
 
     if (visualization_mode_on_) {
@@ -1361,16 +1340,14 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                                          background_image_, 1);
       LOG(INFO) << "* Displaying candidate discontinuity line in 3D with "
                 << "inliers.";
-      displayLineWithPointsAndPlanes(start_readjusted_line,
-                                     end_readjusted_line, start_guess_init,
+      displayLineWithPointsAndPlanes(start_guess, end_guess, start_guess_init,
                                      end_guess_init, points1, points2,
                                      line->hessians[0], line->hessians[1]);
     }
 
     enough_inliers_around_center =
-        checkIfValidLineUsingInliers(*points, start_readjusted_line,
-                                     end_readjusted_line);
-    if (enough_num_inliers && enough_inliers_around_center) {
+        checkIfValidLineUsingInliers(*points, start_guess, end_guess);
+    if (enough_inliers_around_center) {
       LOG(INFO) << "* Line is assigned DISCONT type.";
       num_discontinuity_lines++;
       return true;
