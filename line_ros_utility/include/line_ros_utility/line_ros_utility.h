@@ -187,6 +187,13 @@ class InliersWithLabels {
        const std::vector<std::pair<cv::Vec3f, unsigned short>>&
            inliers_with_labels);
 
+  // Returns the inliers with labels on the two planes.
+  //
+  // Output: inliers_with_labels: Vector of pair (3D point, label) that stores
+  //                              the inliers with their labels.
+   void getInliersWithLabels(
+       std::vector<std::pair<cv::Vec3f, unsigned short>>* inliers_with_labels);
+
    // Returns the instance label corresponding to the majority vote of the
    // instances of the inliers.
    //

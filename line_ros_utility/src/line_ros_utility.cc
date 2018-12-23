@@ -739,7 +739,6 @@ void ListenAndPublish::findInliersWithLabelsGivenPlanes(
     bool first_plane_only) {
     CHECK_NOTNULL(inliers_right);
     CHECK_NOTNULL(inliers_left);
-
     if (first_plane_only) {
       CHECK(line.hessians[0] == plane_1 || line.hessians[1] == plane_1);
     } else {
@@ -777,6 +776,7 @@ void ListenAndPublish::findInliersWithLabelsGivenPlanes(
     end_2D = {line_2D[2], line_2D[3]};
     double line_length = cv::norm(end_2D - start_2D);
     if (line_length < 1e-5) {
+      LOG(INFO) << "Discarding line because too short in 2D.";
       // Line collapsed to a point => Return empty vectors as inliers.
       inliers_right->setInliersWithLabels(
           std::vector<std::pair<cv::Vec3f, unsigned short>>());
@@ -1142,6 +1142,12 @@ void InliersWithLabels::setInliersWithLabels(
     const std::vector<std::pair<cv::Vec3f, unsigned short>>&
         inliers_with_labels) {
     inliers_with_labels_ = inliers_with_labels;
+}
+
+void InliersWithLabels::getInliersWithLabels(
+    std::vector<std::pair<cv::Vec3f, unsigned short>>* inliers_with_labels) {
+  CHECK_NOTNULL(inliers_with_labels);
+  *inliers_with_labels = inliers_with_labels_;
 }
 
 
