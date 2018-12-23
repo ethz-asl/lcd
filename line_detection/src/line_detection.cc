@@ -2450,11 +2450,15 @@ bool LineDetector::checkIfValidLineWith2DInfo(const cv::Mat& cloud,
 
   // Check difference of length.
   constexpr double kLengthDifference = 1.5;
-  if (cv::norm(line_dir) / cv::norm(line_dir_true) > kLengthDifference) {
+  if (cv::norm(line_dir) / cv::norm(line_dir_true) > kLengthDifference ||
+      cv::norm(line_dir_true) / cv::norm(line_dir) > kLengthDifference) {
     return false;
   }
-  //TODO(fmilano): this is not enough! It sometimes happen that the reprojected
-  // line is much shorter than the original one, not the opposite.
+
+  // Reject line if its reprojection in 2D is too short.
+  if(cv::norm(line_dir) < params_->min_pixel_length_line_3D_reprojected) {
+    return false;
+  }
 
   // Check difference of angle.
   constexpr double kAngleDifference = 0.95;

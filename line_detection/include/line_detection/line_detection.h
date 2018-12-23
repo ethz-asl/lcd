@@ -98,6 +98,8 @@ struct LineDetectionParams {
   unsigned int min_points_in_line = 10;
   // default = 0.01: LineDetector::checkIfValidLineWith2DInfo
   double min_length_line_3D = 0.01;
+  // default = 2.0: LineDetector::checkIfValidLineWith2DInfo
+  double min_pixel_length_line_3D_reprojected = 2.0;
   // default = 0.1: LineDetector::assignEdgeOrIntersectionLineType
   double extension_length_for_edge_or_intersection = 0.08;
   // default = 10: LineDetector::checkIfValidPointsOnPlanesGivenProlongedLine
@@ -946,7 +948,6 @@ class LineDetector {
                               const cv::Vec3f& start_in,
                               const cv::Vec3f& end_in, cv::Vec3f* start_out,
                               cv::Vec3f* end_out);
-
 
   // It might happen that when adjusting line using inliers the orientation of
   // the resulting line changes w.r.t. to the original lines. It might, i.e.,
