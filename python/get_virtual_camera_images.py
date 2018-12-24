@@ -35,8 +35,8 @@ def get_virtual_camera_images():
 
     # Virtual camera model
     camera_model = scenenet_utils.get_camera_model()
-    distance = 3
     # Distance between virtual camera origin and line's center
+    distance = 1
     for frame_id in range(300):
         photo_id = frame_id * 25
 
@@ -49,7 +49,6 @@ def get_virtual_camera_images():
             cv2.IMREAD_UNCHANGED)
 
         pcl = scenenet_utils.rgbd_to_pcl(rgb_image, depth_image, camera_model)
-
         path_to_lines = os.path.join(
             path_to_lines_root, 'lines_with_labels_{0}.txt'.format(frame_id))
 
@@ -65,20 +64,47 @@ def get_virtual_camera_images():
         for i in range(lines_count):
             T, _ = scenenet_utils.virtual_camera_pose(data_lines[i, :],
                                                       distance)
-            pcl_from_line_view = scenenet_utils.pcl_transform(pcl, T)
+            # Draw the line in the virtual camera image.
+            start_point = data_lines[i, :3]
+            end_point = data_lines[i, 3:6]
+            line_3D = np.hstack([start_point, [0, 0, 255]])
+
+            num_points_in_line = 1000
+            for idx in range(num_points_in_line):
+                line_3D = np.vstack([
+                    line_3D,
+                    np.hstack([(start_point + idx / float(num_points_in_line) *
+                                (end_point - start_point)), [0, 0, 255]])
+                ])
+            pcl_from_line_view = scenenet_utils.pcl_transform(
+                np.vstack([pcl, line_3D]), T)
             rgb_image_from_line_view, depth_image_from_line_view = \
                 scenenet_utils.project_pcl_to_image(pcl_from_line_view,
                                                     camera_model)
+            # Inpaint the virtual camera image.
+            reds = rgb_image_from_line_view[:, :, 2]
+            greens = rgb_image_from_line_view[:, :, 1]
+            blues = rgb_image_from_line_view[:, :, 0]
 
+            mask = ((greens != 0) | (reds != 0) | (blues != 0)) * 1
+            mask = np.array(mask, dtype=np.uint8)
+            kernel = np.ones((5, 5), np.uint8)
+            dilated_mask = cv2.dilate(mask, kernel, iterations=1) - mask
+
+            dst_rgb = cv2.inpaint(rgb_image_from_line_view, dilated_mask, 10,
+                                  cv2.INPAINT_TELEA)
+            dst_depth = cv2.inpaint(depth_image_from_line_view, dilated_mask,
+                                    10, cv2.INPAINT_TELEA)
+            # Print images to file.
             cv2.imwrite(
-                os.path.join(
-                    output_path, 'traj_{0}/frame_{1}/rgb/{2}.png'.format(
-                        trajectory, frame_id, i)), rgb_image_from_line_view)
+                os.path.join(output_path,
+                             'traj_{0}/frame_{1}/rgb/{2}.png'.format(
+                                 trajectory, frame_id, i)), dst_rgb)
             cv2.imwrite(
                 os.path.join(output_path,
                              'traj_{0}/frame_{1}/depth/{2}.png'.format(
                                  trajectory, frame_id, i)),
-                depth_image_from_line_view.astype(np.uint16))
+                dst_depth.astype(np.uint16))
 
         print('Generated virtual camera images for frame {0}'.format(frame_id))
 
@@ -116,7 +142,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     if (args.trajectory and args.scenenetscripts_path and args.dataset_name and
-            args.dataset_path and args.linesandimagesfolder_path):  # All arguments passed
+            args.dataset_path and
+            args.linesandimagesfolder_path):  # All arguments passed
         trajectory = int(args.trajectory)
         scenenetscripts_path = args.scenenetscripts_path
         dataset_name = args.dataset_name

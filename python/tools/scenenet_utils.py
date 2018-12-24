@@ -123,24 +123,24 @@ def get_origin_virtual_camera(line, distance, debug=False):
 
     # Get possible virtual camera optical axis, store them in the list z_cand
     n = -2  # value of n depends on the data format for line, n indicate line's type
-    if line[n] == 0:  # dicontinuty line
+    if line[n] == 0:  # discontinuity line
         if debug is True:
             print("disconti")
-        # discontinuity line only has one valid surface normal, the other one is [0, 0, 0, 0]
+        # Discontinuity line only has one valid surface normal, the other one is [0, 0, 0, 0]
         if np.linalg.norm(plane1_normal) <= 0.001:
             z_cand = [plane2_normal, -plane2_normal]
         if np.linalg.norm(plane2_normal) <= 0.001:
             z_cand = [plane1_normal, -plane1_normal]
 
-    if line[n] == 1:  # plane(surface) line
+    if line[n] == 1:  # Plane (surface) line
         if debug is True:
             print("plane")
         # Surface line has 2 similar surface normals, thus we can always take only plane 1's normal
         z_cand = [plane1_normal, -plane1_normal]
 
-    if line[n] == 2:  # intersection line
+    if line[n] == 2 or line[n] == 3:  # Edge (2) or intersection line (3)
         if debug is True:
-            print("inter")
+            print("edge/inter")
         z1 = (plane1_normal + plane2_normal) / \
             np.linalg.norm(plane1_normal + plane2_normal)
         z2 = (plane1_normal - plane2_normal) / \
