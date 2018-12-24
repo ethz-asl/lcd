@@ -1134,9 +1134,9 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
   // Readjusted line reprojected to the image plane.
   cv::Vec4f readjusted_line_reprojected;
   // Endpoints of the given line guess.
-  cv::Vec3f start_guess_init = {line_guess[0], line_guess[1],
+  cv::Vec3f start_init_guess = {line_guess[0], line_guess[1],
                                 line_guess[2]};
-  cv::Vec3f end_guess_init = {line_guess[3], line_guess[4], line_guess[5]};
+  cv::Vec3f end_init_guess = {line_guess[3], line_guess[4], line_guess[5]};
 
 
   size_t N1 = points1.size();
@@ -1180,13 +1180,8 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     // Hessian normal form, their dot product is the cosine of the angle between
     // them.
     if (fabs(normal1.dot(normal2)) > kAngleDifference) {
-      // Get the initial line guess
-      cv::Vec3f start_guess(line_guess[0], line_guess[1], line_guess[2]);
-      cv::Vec3f end_guess(line_guess[3], line_guess[4], line_guess[5]);
-
-
       enough_num_inliers =
-          adjustLineUsingInliers(points, start_guess, end_guess,
+          adjustLineUsingInliers(points, start_init_guess, end_init_guess,
                                  &start_readjusted_line, &end_readjusted_line);
       // Fix orientation w.r.t. reference line if needed
       adjustLineOrientationGiven2DReferenceLine(reference_line_2D, camera_P,
@@ -1210,8 +1205,8 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                                            background_image_, 1);
         LOG(INFO) << "* Displaying candidate planar line in 3D with inliers.";
         displayLineWithPointsAndPlanes(start_readjusted_line,
-                                       end_readjusted_line, start_guess_init,
-                                       end_guess_init, points1, points2,
+                                       end_readjusted_line, start_init_guess,
+                                       end_init_guess, points1, points2,
                                        line->hessians[0], line->hessians[1]);
       }
 
@@ -1270,8 +1265,8 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
         LOG(INFO) << "* Displaying candidate edge/intersection line in 3D with "
                   << "inliers.";
         displayLineWithPointsAndPlanes(start_readjusted_line,
-                                       end_readjusted_line, start_guess_init,
-                                       end_guess_init, points1, points2,
+                                       end_readjusted_line, start_init_guess,
+                                       end_init_guess, points1, points2,
                                        line->hessians[0], line->hessians[1]);
       }
 
@@ -1307,8 +1302,8 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     //  3.  From all points in the set: Project them on to the line and choose
     //      the combination of start/end point that maximizes the line
     //      distance.
-    cv::Vec3f start_guess(line_guess[0], line_guess[1], line_guess[2]);
-    cv::Vec3f end_guess(line_guess[3], line_guess[4], line_guess[5]);
+    cv::Vec3f start_guess;
+    cv::Vec3f end_guess;
 
     const std::vector<cv::Vec3f>* points;
     int idx;
@@ -1319,13 +1314,37 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       idx = 1;
       points = &points2;
     }
+    // Consider only plane to which the line is assigned (the plane closer to
+    // the origin) and do not consider the other plane at all, setting its
+    // hessian explicitly to all zeros.
+    line->hessians[abs(idx - 1)] = {0.0f, 0.0f, 0.0f, 0.0f};
+
+    start_guess = projectPointOnPlane(line->hessians[idx], start_init_guess);
+    end_guess = projectPointOnPlane(line->hessians[idx], end_init_guess);
+
+    cv::Vec3f direction = end_guess - start_guess;
+    normalizeVector3D(&direction);
+
+    cv::Vec3f nearest_point;
+    getNearestPointToLine(*points, start_guess, end_guess, &nearest_point);
+
+    // Update start point guess of the line as the nearest point
+    start_guess = nearest_point;
+    end_guess = nearest_point + direction;
+
+    enough_num_inliers =
+       adjustLineUsingInliers(*points, start_guess, end_guess,
+                              &start_readjusted_line, &end_readjusted_line);
 
     // Fix orientation w.r.t. reference line if needed.
     adjustLineOrientationGiven2DReferenceLine(reference_line_2D, camera_P,
-                                              &start_guess, &end_guess);
+                                              &start_readjusted_line,
+                                              &end_readjusted_line);
 
-    line->line = {start_guess[0], start_guess[1], start_guess[2], end_guess[0],
-                  end_guess[1], end_guess[2]};
+
+    line->line = {start_readjusted_line[0], start_readjusted_line[1],
+                  start_readjusted_line[2], end_readjusted_line[0],
+                  end_readjusted_line[1], end_readjusted_line[2]};
     line->type = LineType::DISCONT;
 
     if (visualization_mode_on_) {
@@ -1339,14 +1358,16 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                                          background_image_, 1);
       LOG(INFO) << "* Displaying candidate discontinuity line in 3D with "
                 << "inliers.";
-      displayLineWithPointsAndPlanes(start_guess, end_guess, start_guess_init,
-                                     end_guess_init, points1, points2,
-                                     line->hessians[0], line->hessians[1]);
+      displayLineWithPointsAndPlanes(start_readjusted_line, end_readjusted_line,
+                                     start_init_guess, end_init_guess, points1,
+                                     points2, line->hessians[0],
+                                     line->hessians[1]);
     }
 
     enough_inliers_around_center =
-        checkIfValidLineUsingInliers(*points, start_guess, end_guess);
-    if (enough_inliers_around_center) {
+        checkIfValidLineUsingInliers(*points, start_readjusted_line,
+                                     end_readjusted_line);
+    if (enough_num_inliers && enough_inliers_around_center) {
       LOG(INFO) << "* Line is assigned DISCONT type.";
       num_discontinuity_lines++;
       return true;

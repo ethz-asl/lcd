@@ -511,6 +511,7 @@ void ListenAndPublish::labelLinesWithInstances(
     // - Temporarily stores the inliers with labels of both planes.
     InliersWithLabels inliers_with_label_right;
     InliersWithLabels inliers_with_label_left;
+    InliersWithLabels inliers_with_label_discont;
     // - Most present instance label for each side.
     unsigned short most_present_label_right, most_present_label_left;
     // - Temporarily stores the inliers with labels of the prolonged planes.
@@ -524,6 +525,9 @@ void ListenAndPublish::labelLinesWithInstances(
     // - Total occurrences in the prolonged lines of the most present labels.
     int total_occurrences_most_present_label_right;
     int total_occurrences_most_present_label_left;
+    // - Used to retrieve the index of the plane closest to the origin, for
+    //   discontinuity lines.
+    int idx_closest_to_origin;
 
     cv::Vec3f start, end, direction, point3D;
 
@@ -554,9 +558,24 @@ void ListenAndPublish::labelLinesWithInstances(
         case line_detection::LineType::DISCONT:
           // In case of a discontinuity line, the line should be assigned to
           // belong to the frontmost object, i.e., it should have the same
-          // instance label as its inliers furthest forward.
-          assignLabelOfClosestInlierPlane(lines[i], instances, camera_info,
-                                          &(labels->at(i)));
+          // instance label as its inliers furthest forward. Since when the line
+          // was detected the other plane, i.e. the one furthest behind, was
+          // assigned to have null hessian, one can simply look at the hessian
+          // to find the right plane.
+          if (lines[i].hessians[0] == cv::Vec4f({0.0f, 0.0f, 0.0f, 0.0f})) {
+            idx_closest_to_origin = 1;
+          } else
+              if (lines[i].hessians[1] == cv::Vec4f({0.0f, 0.0f, 0.0f, 0.0f})) {
+            idx_closest_to_origin = 0;
+          } else {
+            ROS_ERROR("Unable to find the plane closest to the origin for the "
+                      "given intersection line. Please make sure that the "
+                      "correct version of the line_dectection module is used.");
+          }
+          findInliersWithLabelsGivenPlane(
+              lines[i], lines[i].hessians[idx_closest_to_origin], instances,
+              camera_info, &inliers_with_label_discont);
+          labels->at(i) = inliers_with_label_discont.getLabelByMajorityVote();
           break;
         case line_detection::LineType::PLANE:
         case line_detection::LineType::INTERSECT:
@@ -727,8 +746,9 @@ void ListenAndPublish::findInliersWithLabelsGivenPlane(
     const line_detection::LineWithPlanes& line, const cv::Vec4f& plane,
     const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info,
     InliersWithLabels* inliers) {
+  InliersWithLabels inliers_discarded;
   findInliersWithLabelsGivenPlanes(line, plane, plane, instances, camera_info,
-                                   inliers, nullptr, true);
+                                   inliers, &inliers_discarded, true);
 }
 
 void ListenAndPublish::findInliersWithLabelsGivenPlanes(

@@ -34,8 +34,7 @@ def get_plane(hessian, x, y):
 
 def normalize_hessian(hessian):
     norm = np.linalg.norm(np.array(hessian[:3]))
-    # Discontinuity lines are assigned null hessians in a previous
-    # implementation.
+    # Discontinuity lines are assigned one null hessian.
     if (norm < 1e-5):
       return hessian
     return hessian / norm
@@ -51,8 +50,7 @@ def get_mean_point(points):
 def project_point_on_plane(hessian, point):
     a, b, c, d = normalize_hessian(hessian)
     norm = np.linalg.norm(np.array(hessian[:3]))
-    # Discontinuity lines are assigned null hessians in a previous
-    # implementation.
+    # Discontinuity lines are assigned one null hessian.
     if (norm < 1e-5):
       return point
     normal = np.array([a, b, c])
