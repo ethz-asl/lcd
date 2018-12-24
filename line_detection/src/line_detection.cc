@@ -1319,7 +1319,6 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       idx = 1;
       points = &points2;
     }
-    line->hessians[abs(idx - 1)] = {0.0f, 0.0f, 0.0f, 0.0f};
 
     // Fix orientation w.r.t. reference line if needed.
     adjustLineOrientationGiven2DReferenceLine(reference_line_2D, camera_P,
@@ -2007,32 +2006,32 @@ void LineDetector::project2Dto3DwithPlanes(
       // Only push back the reliably found lines.
       lines3D->push_back(line3D_true);
       lines2D_out->push_back(lines2D[i]);
+      cv::Vec4f reprojected_line;
+      cv::Vec3f start_3D({line3D_true.line[0], line3D_true.line[1],
+                          line3D_true.line[2]});
+      cv::Vec3f end_3D({line3D_true.line[3], line3D_true.line[4],
+                        line3D_true.line[5]});
+
+      project3DLineTo2D(start_3D, end_3D, camera_P, &reprojected_line);
+
+      LOG(INFO) << "** Candidate line was successfully projected to 3D with "
+                << "index " << num_lines_successfully_projected_to_3D
+                << ":\n   - 2D: (" << lines2D[i][0]  << ", " << lines2D[i][1]
+                << ") -- (" << lines2D[i][2] << ", " << lines2D[i][3]
+                << ").\n   - 3D before adjustment: (" << lines3D_cand[i][0]
+                << ", " << lines3D_cand[i][1] << ", " << lines3D_cand[i][2]
+                << ") -- (" << lines3D_cand[i][3] << ", "
+                << lines3D_cand[i][4] << ", " << lines3D_cand[i][5]
+                << ").\n   - 3D after adjustment: (" << line3D_true.line[0]
+                << ", " << line3D_true.line[1] << ", " << line3D_true.line[2]
+                << ") -- (" << line3D_true.line[3] << ", "
+                << line3D_true.line[4] << ", " << line3D_true.line[5]
+                << ").\n   - 2D after reprojection: (" << reprojected_line[0]
+                << ", " << reprojected_line[1] << ") -- ("
+                << reprojected_line[2] << ", " << reprojected_line[3] << ").";
+
       if (visualization_mode_on_) {
-        cv::Vec4f reprojected_line;
-        cv::Vec3f start_3D({line3D_true.line[0], line3D_true.line[1],
-                            line3D_true.line[2]});
-        cv::Vec3f end_3D({line3D_true.line[3], line3D_true.line[4],
-                          line3D_true.line[5]});
 
-        project3DLineTo2D(start_3D, end_3D, camera_P, &reprojected_line);
-        reprojected_line = fitLineToBounds(reprojected_line, image.cols,
-                                           image.rows);
-
-        LOG(INFO) << "** Candidate line was successfully projected to 3D with "
-                  << "index " << num_lines_successfully_projected_to_3D
-                  << ":\n   - 2D: (" << lines2D[i][0]  << ", " << lines2D[i][1]
-                  << ") -- (" << lines2D[i][2] << ", " << lines2D[i][3]
-                  << ").\n   - 3D before adjustment: (" << lines3D_cand[i][0]
-                  << ", " << lines3D_cand[i][1] << ", " << lines3D_cand[i][2]
-                  << ") -- (" << lines3D_cand[i][3] << ", "
-                  << lines3D_cand[i][4] << ", " << lines3D_cand[i][5]
-                  << ").\n   - 3D after adjustment: (" << line3D_true.line[0]
-                  << ", " << line3D_true.line[1] << ", " << line3D_true.line[2]
-                  << ") -- (" << line3D_true.line[3] << ", "
-                  << line3D_true.line[4] << ", " << line3D_true.line[5]
-                  << ").\n   - 2D after reprojection: (" << reprojected_line[0]
-                  << ", " << reprojected_line[1] << ") -- ("
-                  << reprojected_line[2] << ", " << reprojected_line[3] << ").";
         // Display original line/rectangles overlapped with the reprojection
         // of the line adjusted with inliers and the prolonged line/
         // rectangles (if any).

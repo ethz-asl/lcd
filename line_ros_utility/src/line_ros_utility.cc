@@ -870,6 +870,23 @@ void ListenAndPublish::findInliersWithLabelsGivenPlanes(
           valid_points_left_plane.push_back(*it);
         }
       }
+      // The following is a trick that should in principle be never used, but
+      // is in fact sometimes needed. What might happen, indeed, is that the 3D
+      // line, used in the ground-truth labelling part, does not match the
+      // original 2D line when reprojected (due to the readjustment via
+      // inliers), in such a way that in the rectangles no inliers with the
+      // original hessians are found. The latter might also happen in cases in
+      // which no readjustment is done (e.g., for discontinuity lines). Indeed,
+      // reprojecting a 3D point in 2D with the image_geometry method
+      // project3dToPixel, points are mapped to strictly integer pixel
+      // coordinates, whereas coordinates for the original 2D lines are in
+      // general not integer. If this is the case (that no inliers are found in
+      // one rectangle), all points in that rectangle are assumed to be inliers.
+      if (valid_points_right_plane.size() == 0)
+         valid_points_right_plane = points_right_plane;
+      if (valid_points_left_plane.size() == 0)
+         valid_points_left_plane = points_left_plane;
+
       for (it = points_right_plane.begin(); it != points_right_plane.end();
         ++it) {
         if (line_detection::errorPointToPlane(plane_1, it->first) <

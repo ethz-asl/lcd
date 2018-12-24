@@ -34,7 +34,8 @@ def get_plane(hessian, x, y):
 
 def normalize_hessian(hessian):
     norm = np.linalg.norm(np.array(hessian[:3]))
-    # Discontinuity lines are assigned null hessians.
+    # Discontinuity lines are assigned null hessians in a previous
+    # implementation.
     if (norm < 1e-5):
       return hessian
     return hessian / norm
@@ -50,7 +51,8 @@ def get_mean_point(points):
 def project_point_on_plane(hessian, point):
     a, b, c, d = normalize_hessian(hessian)
     norm = np.linalg.norm(np.array(hessian[:3]))
-    # Discontinuity lines are assigned null hessians.
+    # Discontinuity lines are assigned null hessians in a previous
+    # implementation.
     if (norm < 1e-5):
       return point
     normal = np.array([a, b, c])
@@ -97,13 +99,13 @@ def plot():
     mean_of_means = get_mean_point([mean_point_1_proj, mean_point_2_proj])
 
     # Create grid for x and y
-    min_x = int(np.floor(min(min(inliers_1[:, 0]), min(inliers_2[:, 0]))))
+    min_x = min(min(inliers_1[:, 0]), min(inliers_2[:, 0]))
     #min_x = min(0, min_x)
-    min_y = int(np.floor(min(min(inliers_1[:, 1]), min(inliers_2[:, 1]))))
+    min_y = min(min(inliers_1[:, 1]), min(inliers_2[:, 1]))
     #min_y = min(0, min_y)
-    max_x = int(np.ceil(max(max(inliers_1[:, 0]), max(inliers_2[:, 0]))))
+    max_x = max(max(inliers_1[:, 0]), max(inliers_2[:, 0]))
     #max_x = max(0, max_x)
-    max_y = int(np.ceil(max(max(inliers_1[:, 1]), max(inliers_2[:, 1]))))
+    max_y = max(max(inliers_1[:, 1]), max(inliers_2[:, 1]))
     #max_y = max(0, max_y)
     x, y = np.meshgrid(
         np.linspace(min_x, max_x, 100), np.linspace(min_y, max_y, 100))
