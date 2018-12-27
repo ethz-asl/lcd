@@ -1319,19 +1319,15 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     // hessian explicitly to all zeros.
     line->hessians[abs(idx - 1)] = {0.0f, 0.0f, 0.0f, 0.0f};
 
-    /*start_guess = projectPointOnPlane(line->hessians[idx], start_init_guess);
-    end_guess = projectPointOnPlane(line->hessians[idx], end_init_guess);*/
-
     cv::Vec3f direction = end_guess - start_guess;
     normalizeVector3D(&direction);
 
-    // Find the points among the inliers to the plane that, when seen in 2D, are
-    // the best fit as endpoints of the reference 2D line, i.e., are the closest
-    // to the border where the discontinuity is.
+    // Adjust the discontinuity line by forcing that it should be on the plane
+    // selected above and that should be close to the inliers that in 2D are
+    // close to its projection.
     fitDiscontLineToInliers(*points, start_init_guess, end_init_guess,
                             line->hessians[idx], camera_P,
                             &start_readjusted_line, &end_readjusted_line);
-
 
     // Fix orientation w.r.t. reference line if needed.
     adjustLineOrientationGiven2DReferenceLine(reference_line_2D, camera_P,
