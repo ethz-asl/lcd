@@ -957,6 +957,35 @@ class LineDetector {
                               const cv::Vec3f& end_in, cv::Vec3f* start_out,
                               cv::Vec3f* end_out);
 
+  // Given a reference discontinuity line and a set of points that lie on the
+  // plane to which the line should be assigned (i.e., the frontmost of the two
+  // inlier planes, in the current implementation), returns the 3D endpoints
+  // of the input line fitted to the given points. The endpoints are selected
+  // among the given inlier points.
+  //
+  // Input: points:            Set of inlier points among which the output
+  //                           endpoints should be selected.
+  //
+  //        start_ref:         Start point of the reference discontinuity line.
+  //
+  //        end_ref:           End point of the reference discontinuity line.
+  //
+  //        hessian:           Hessian of the plane to which the line should be
+  //                           assigned.
+  //
+  //        camera_P:          Projection matrix.
+  //
+  // Output: start_out:        Start point of the line after adjusting.
+  //
+  //         end_out:          End point of the line after adjusting.
+  void fitDiscontLineToInliers(const std::vector<cv::Vec3f>& points,
+                               const cv::Vec3f& start_ref,
+                               const cv::Vec3f& end_ref,
+                               const cv::Vec4f& hessian,
+                               const cv::Mat& camera_P, cv::Vec3f* start_out,
+                               cv::Vec3f* end_out);
+
+
   // It might happen that when adjusting line using inliers the orientation of
   // the resulting line changes w.r.t. to the original lines. It might, i.e.,
   // happen that what was defined to be the start in the original line is closer

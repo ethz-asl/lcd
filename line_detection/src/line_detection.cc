@@ -1319,28 +1319,24 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     // hessian explicitly to all zeros.
     line->hessians[abs(idx - 1)] = {0.0f, 0.0f, 0.0f, 0.0f};
 
-    start_guess = projectPointOnPlane(line->hessians[idx], start_init_guess);
-    end_guess = projectPointOnPlane(line->hessians[idx], end_init_guess);
+    /*start_guess = projectPointOnPlane(line->hessians[idx], start_init_guess);
+    end_guess = projectPointOnPlane(line->hessians[idx], end_init_guess);*/
 
     cv::Vec3f direction = end_guess - start_guess;
     normalizeVector3D(&direction);
 
-    cv::Vec3f nearest_point;
-    getNearestPointToLine(*points, start_guess, end_guess, &nearest_point);
+    // Find the points among the inliers to the plane that, when seen in 2D, are
+    // the best fit as endpoints of the reference 2D line, i.e., are the closest
+    // to the border where the discontinuity is.
+    fitDiscontLineToInliers(*points, start_init_guess, end_init_guess,
+                            line->hessians[idx], camera_P,
+                            &start_readjusted_line, &end_readjusted_line);
 
-    // Update start point guess of the line as the nearest point
-    start_guess = nearest_point;
-    end_guess = nearest_point + direction;
-
-    enough_num_inliers =
-       adjustLineUsingInliers(*points, start_guess, end_guess,
-                              &start_readjusted_line, &end_readjusted_line);
 
     // Fix orientation w.r.t. reference line if needed.
     adjustLineOrientationGiven2DReferenceLine(reference_line_2D, camera_P,
                                               &start_readjusted_line,
                                               &end_readjusted_line);
-
 
     line->line = {start_readjusted_line[0], start_readjusted_line[1],
                   start_readjusted_line[2], end_readjusted_line[0],
@@ -1367,7 +1363,7 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     enough_inliers_around_center =
         checkIfValidLineUsingInliers(*points, start_readjusted_line,
                                      end_readjusted_line);
-    if (enough_num_inliers && enough_inliers_around_center) {
+    if (enough_inliers_around_center) {
       LOG(INFO) << "* Line is assigned DISCONT type.";
       num_discontinuity_lines++;
       return true;
@@ -2732,6 +2728,42 @@ bool LineDetector::adjustLineUsingInliers(const std::vector<cv::Vec3f>& points,
     return true;
   }
 }
+
+void LineDetector::fitDiscontLineToInliers(const std::vector<cv::Vec3f>& points,
+                                           const cv::Vec3f& start_ref,
+                                           const cv::Vec3f& end_ref,
+                                           const cv::Vec4f& hessian,
+                                           const cv::Mat& camera_P,
+                                           cv::Vec3f* start_out,
+                                           cv::Vec3f* end_out) {
+  CHECK_NOTNULL(start_out);
+  CHECK_NOTNULL(end_out);
+  CHECK(points.size() >= 2);
+  cv::Vec2f start_ref_2D, end_ref_2D;
+  project3DPointTo2D(start_ref, camera_P, &start_ref_2D);
+  project3DPointTo2D(end_ref, camera_P, &end_ref_2D);
+
+  double min_dist_from_start_ref = 1e9;
+  double min_dist_from_end_ref = 1e9;
+  // For temporary storage.
+  cv::Vec2f point_2D;
+  double temp_dist_from_start_ref, temp_dist_from_end_ref;
+  // Find the two inlier points the projection of which is closer to the
+  // endpoints of the projection of the reference line.
+  for (auto& point : points) {
+    project3DPointTo2D(point, camera_P, &point_2D);
+    temp_dist_from_start_ref = cv::norm(start_ref_2D - point_2D);
+    temp_dist_from_end_ref = cv::norm(end_ref_2D - point_2D);
+    if (temp_dist_from_start_ref < min_dist_from_start_ref) {
+      *start_out = point;
+      min_dist_from_start_ref = temp_dist_from_start_ref;
+    } else if (temp_dist_from_end_ref < min_dist_from_end_ref) {
+      *end_out = point;
+      min_dist_from_end_ref = temp_dist_from_end_ref;
+    }
+  }
+}
+
 
 void LineDetector::adjustLineOrientationGiven2DReferenceLine(
     const cv::Vec4f& reference_line, const cv::Mat& camera_P, cv::Vec3f* start,
