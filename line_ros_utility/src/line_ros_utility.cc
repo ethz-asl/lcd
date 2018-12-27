@@ -183,9 +183,15 @@ void ListenAndPublish::start() {
 
 void ListenAndPublish::detectLines() {
   // Detect lines on image.
-  lines2D_.clear();
+  std::vector<cv::Vec4f> lines2D_not_fused;
+
   start_time_ = std::chrono::system_clock::now();
-  line_detector_.detectLines(cv_img_gray_, detector_method_, &lines2D_);
+  line_detector_.detectLines(cv_img_gray_, detector_method_,
+                             &lines2D_not_fused);
+  ROS_INFO("Lines found before fusing: %d", lines2D_not_fused.size());
+  lines2D_.clear();
+  line_detector_.fuseLines2D(lines2D_not_fused, &lines2D_);
+  ROS_INFO("Lines found after fusing: %d", lines2D_.size());
   end_time_ = std::chrono::system_clock::now();
   elapsed_seconds_ = end_time_ - start_time_;
   ROS_INFO("Detecting lines 2D: %f", elapsed_seconds_.count());

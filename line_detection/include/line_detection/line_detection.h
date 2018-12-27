@@ -487,7 +487,7 @@ class LineDetector {
                           const cv::Mat& point_cloud,
                           std::vector<cv::Vec6f>* lines3D);
 
-  // This function clusters nearby lines in line_in and summarizes it as one
+  // This function clusters nearby lines in line_in and summarizes them as one
   // line. All new lines are stored in lines_out.
   void fuseLines2D(const std::vector<cv::Vec4f>& lines_in,
                    std::vector<cv::Vec4f>* lines_out);

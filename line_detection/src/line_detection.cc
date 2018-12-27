@@ -95,7 +95,7 @@ bool areLinesEqual2D(const cv::Vec4f line1, const cv::Vec4f line2) {
   // return true. Note that since we want angle_difference ~= 0 it must hold
   // that cos(angle_difference) ~= 1 => cos^2(angle_difference) ~= 1.
   constexpr double kCosSqAngleDifference = 0.95;
-  constexpr double kMinDistance = 0.5;
+  constexpr double kMinDistance = 1.5;
   if (cos_sq_angle_difference > kCosSqAngleDifference &&
       min_dist < kMinDistance) {
     return true;
@@ -590,6 +590,7 @@ void LineDetector::fuseLines2D(const std::vector<cv::Vec4f>& lines_in,
     if (*(line_index.begin()) != static_cast<int>(i)) {
       continue;
     } else {
+      // Start a new cluster.
       line_cluster.push_back(lines_in[i]);
       line_index.pop_front();
     }
