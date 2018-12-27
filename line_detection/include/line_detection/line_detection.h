@@ -712,6 +712,16 @@ class LineDetector {
                                std::vector<cv::Vec4f>* lines2D_out,
                                std::vector<LineWithPlanes>* lines3D);
 
+  // Given a point in 3D and a projection matrix returns a point in 2D.
+  //
+  // Input: point_3D:  3D point.
+  //
+  //        camera_P:  Projection matrix.
+  //
+  // Output: point_2D: 2D point.
+  void project3DPointTo2D(const cv::Vec3f& point_3D, const cv::Mat& camera_P,
+                          cv::Vec2f* point_2D);
+
   // Given a line in 3D and a projection matrix returns a line in 2D.
   //
   // Input: line_3D:
@@ -725,8 +735,6 @@ class LineDetector {
                          cv::Vec4f* line_2D);
   void project3DLineTo2D(const cv::Vec3f& start_3D, const cv::Vec3f& end_3D,
                          const cv::Mat& camera_P, cv::Vec4f* line_2D);
-
-
 
   // Given a 2D line and the point cloud image returns the inlier points around
   // the line by fitting rectangles around it.

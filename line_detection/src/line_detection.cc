@@ -2052,7 +2052,6 @@ void LineDetector::project2Dto3DwithPlanes(
                 << reprojected_line[2] << ", " << reprojected_line[3] << ").";
 
       if (visualization_mode_on_) {
-
         // Display original line/rectangles overlapped with the reprojection
         // of the line adjusted with inliers and the prolonged line/
         // rectangles (if any).
@@ -2068,25 +2067,27 @@ void LineDetector::project2Dto3DwithPlanes(
   }
 }
 
+void LineDetector::project3DPointTo2D(const cv::Vec3f& point_3D,
+                                      const cv::Mat& camera_P,
+                                      cv::Vec2f* point_2D) {
+  CHECK_NOTNULL(point_2D);
+  cv::Vec4f point_3D_homo = {point_3D[0], point_3D[1], point_3D[2], 1.0};
+  cv::Mat point_2D_homo = camera_P * cv::Mat(point_3D_homo);
+  *point_2D = {point_2D_homo.at<float>(0, 0) / point_2D_homo.at<float>(2, 0),
+              point_2D_homo.at<float>(1, 0) / point_2D_homo.at<float>(2, 0)};
+}
+
 void LineDetector::project3DLineTo2D(const cv::Vec3f& start_3D,
                                      const cv::Vec3f& end_3D,
                                      const cv::Mat& camera_P,
                                      cv::Vec4f* line_2D) {
   CHECK_NOTNULL(line_2D);
   cv::Vec2f start_2D, end_2D;
-  cv::Vec4f start_3D_homo = {start_3D[0], start_3D[1], start_3D[2], 1.0};
-  cv::Vec4f end_3D_homo = {end_3D[0], end_3D[1], end_3D[2], 1.0};
 
-  cv::Mat start_2D_homo = camera_P * cv::Mat(start_3D_homo);
-  cv::Mat end_2D_homo = camera_P * cv::Mat(end_3D_homo);
-  start_2D = {start_2D_homo.at<float>(0, 0) /
-              start_2D_homo.at<float>(2, 0),
-              start_2D_homo.at<float>(1, 0) /
-              start_2D_homo.at<float>(2, 0)};
-  end_2D = {end_2D_homo.at<float>(0, 0) / end_2D_homo.at<float>(2, 0),
-            end_2D_homo.at<float>(1, 0) / end_2D_homo.at<float>(2, 0)};
+  project3DPointTo2D(start_3D, camera_P, &start_2D);
+  project3DPointTo2D(end_3D, camera_P, &end_2D);
+
   *line_2D = cv::Vec4f({start_2D[0], start_2D[1], end_2D[0], end_2D[1]});
-
 }
 
 void LineDetector::project3DLineTo2D(const LineWithPlanes& line_3D,
