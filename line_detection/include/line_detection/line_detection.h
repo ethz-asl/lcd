@@ -212,6 +212,10 @@ inline double computeSlopeOfLine(const cv::Vec4f line) {
   return (line[1] - line[3]) / (line[0] - line[2]);
 }
 
+inline void normalizeVector2D(cv::Vec2f* vector) {
+  *vector = (*vector) / cv::norm(*vector);
+}
+
 inline void normalizeVector3D(cv::Vec3f* vector) {
   *vector = (*vector) / cv::norm(*vector);
 }

@@ -2740,30 +2740,104 @@ void LineDetector::fitDiscontLineToInliers(const std::vector<cv::Vec3f>& points,
   CHECK_NOTNULL(end_out);
   CHECK(points.size() >= 2);
   cv::Vec2f start_ref_2D, end_ref_2D;
+  // As a first fit, we aim to take the reference line in 2D and find its fit in
+  // 3D to the inlier plane to which we want to assign it. To do so, we follow
+  // the procedure below.
+  // Let us denote 3D coordinates with capital letters X, Y and Z and
+  // coordinates in the 2D image plane with lowercase letters x, y and let
+  // the equation of the inlier plane be a * X + b * y + c * Z + d = 0.
+  // From the projection equation combined with the plane equation we have:
+  // (x, y, 1)' = P * (X, Y, Z, 1)'
+  //            = P * (X, Y, -(a * X + b * Y + d) / c, 1)' (*),
+  // where P is the projection matrix (camera_P).
+  // To find the 3D points corresponding to the endpoints of the 2D reference,
+  // with the constraint that they should lie on the inlier plane, we can
+  // rewrite the equation (*) as a function of X and Y:
+  // A * (X, Y, 1)' = (x, y, 1)', where from algebraic calculus one has
+  // A = (p_00 - a * p_02 / c, p_01 - b * p_02 / c, p_03 - d * p_02 / c;
+  //      p_10 - a * p_12 / c, p_11 - b * p_12 / c, p_13 - d * p_12 / c;
+  //      p_20 - a * p_22 / c, p_21 - b * p_22 / c, p_23 - d * p_22 / c) and
+  // p_ij denotes the element at i-th row and j-th column of P.
+  // One can therefore retrieve X and Y from (X, Y, 1)' = A^(-1) * (x, y, 1)'
+  // and by dividing the vector obtained by the last element, so as to ensure
+  // that the latter is 1.
+  // Z can later be obtained from the plane equation as:
+  // Z = -(a * X + b * Y + d) / c.
+  float a, b, c, d;
+  a = static_cast<float>(hessian[0]);
+  b = static_cast<float>(hessian[1]);
+  c = static_cast<float>(hessian[2]);
+  d = static_cast<float>(hessian[3]);
+
+  cv::Mat A(3, 3, CV_32F);
+  for (size_t i = 0; i < 3; ++i) {
+    A.at<float>(i, 0) = camera_P.at<float>(i, 0) -
+                        a * camera_P.at<float>(i, 2) / c;
+    A.at<float>(i, 1) = camera_P.at<float>(i, 1) -
+                        b * camera_P.at<float>(i, 2) / c;
+    A.at<float>(i, 2) = camera_P.at<float>(i, 3) -
+                        d * camera_P.at<float>(i, 2) / c;
+  }
+  // Find projection in 2D of the reference line.
   project3DPointTo2D(start_ref, camera_P, &start_ref_2D);
   project3DPointTo2D(end_ref, camera_P, &end_ref_2D);
 
-  double min_dist_from_start_ref = 1e9;
-  double min_dist_from_end_ref = 1e9;
-  // For temporary storage.
-  cv::Vec2f point_2D;
-  double temp_dist_from_start_ref, temp_dist_from_end_ref;
-  // Find the two inlier points the projection of which is closer to the
-  // endpoints of the projection of the reference line.
-  for (auto& point : points) {
-    project3DPointTo2D(point, camera_P, &point_2D);
-    temp_dist_from_start_ref = cv::norm(start_ref_2D - point_2D);
-    temp_dist_from_end_ref = cv::norm(end_ref_2D - point_2D);
-    if (temp_dist_from_start_ref < min_dist_from_start_ref) {
-      *start_out = point;
-      min_dist_from_start_ref = temp_dist_from_start_ref;
-    } else if (temp_dist_from_end_ref < min_dist_from_end_ref) {
-      *end_out = point;
-      min_dist_from_end_ref = temp_dist_from_end_ref;
+  // Find (X, Y, 1) on the inlier plane for both endpoints of the reference
+  // line, as described above.
+  cv::Mat start_out_temp_mat, end_out_temp_mat;
+  cv::Vec3f start_out_temp, end_out_temp;
+  cv::Vec3f start_ref_2D_homo, end_ref_2D_homo;
+  start_ref_2D_homo = {start_ref_2D[0], start_ref_2D[1], 1.0f};
+  end_ref_2D_homo = {end_ref_2D[0], end_ref_2D[1], 1.0f};
+  start_out_temp_mat = A.inv() * cv::Mat(start_ref_2D_homo);
+  end_out_temp_mat = A.inv() * cv::Mat(end_ref_2D_homo);
+  start_out_temp = cv::Vec3f(start_out_temp_mat.reshape(3).at<cv::Vec3f>());
+  end_out_temp = cv::Vec3f(end_out_temp_mat.reshape(3).at<cv::Vec3f>());
+  // Normalization by the last element, so as to ensure that one has (X, Y, 1).
+  start_out_temp /= start_out_temp[2];
+  end_out_temp /= end_out_temp[2];
+  // Return (X, Y, 1) for both endpoints.
+  *start_out = {start_out_temp[0], start_out_temp[1],
+                - (a * start_out_temp[0] + b * start_out_temp[1] + d) / c};
+  *end_out = {end_out_temp[0], end_out_temp[1],
+              - (a * end_out_temp[0] + b * end_out_temp[1] + d) / c};
+  // Now further adjust the line obtained by shifting it towards the inliers.
+  // More precisely, as a first step find the inlier point that is closer, in
+  // 2D, to the projection of the 3D line obtained so far. Then, take the 3D
+  // distance vector of this point from the 3D line and shift the line by this
+  // distance in the direction of the distance vector.
+  double min_dist_from_line_2D = 1e9;
+  double temp_dist_from_line_2D;
+  cv::Vec3f distance_vector_3D, projection_on_line_3D;
+  cv::Vec2f point_2D, projection_on_line_2D;
+  cv::Vec2f reference_line_direction_2D = (end_ref_2D - start_ref_2D);
+  normalizeVector2D(&reference_line_direction_2D);
+  cv::Vec3f reference_line_direction_3D = *end_out - *start_out;
+  normalizeVector3D(&reference_line_direction_3D);
+
+  int idx_point_closest_to_line;
+  // Find the inlier point that is closer to the reference line in 2D.
+  for (size_t i = 0; i < points.size(); ++i) {
+    project3DPointTo2D(points[i], camera_P, &point_2D);
+    projection_on_line_2D =
+        start_ref_2D + (point_2D - start_ref_2D).dot(
+          reference_line_direction_2D) * reference_line_direction_2D;
+    temp_dist_from_line_2D = cv::norm(projection_on_line_2D - point_2D);
+    if (temp_dist_from_line_2D < min_dist_from_line_2D) {
+      min_dist_from_line_2D = temp_dist_from_line_2D;
+      idx_point_closest_to_line = i;
     }
   }
-}
+  // Shift the 3D line towards the inlier point found above.
+  projection_on_line_3D =
+      *start_out + (points[idx_point_closest_to_line] - *start_out).dot(
+        reference_line_direction_3D) * reference_line_direction_3D;
+  distance_vector_3D =
+      projection_on_line_3D - points[idx_point_closest_to_line];
 
+  *start_out -= distance_vector_3D;
+  *end_out -= distance_vector_3D;
+}
 
 void LineDetector::adjustLineOrientationGiven2DReferenceLine(
     const cv::Vec4f& reference_line, const cv::Mat& camera_P, cv::Vec3f* start,
@@ -2787,7 +2861,6 @@ void LineDetector::adjustLineOrientationGiven2DReferenceLine(
     *end = temp_endpoint;
   }
 }
-
 
 void LineDetector::adjustLineOrientationGivenReferenceLine(
     const cv::Vec6f& reference_line, cv::Vec3f* start, cv::Vec3f* end) {
