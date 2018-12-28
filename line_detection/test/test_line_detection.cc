@@ -632,6 +632,29 @@ TEST_F(LineDetectionTest, testfitLineToBounds) {
   EXPECT_NEAR(line_out[1], 0.000001, 1e-4);
   EXPECT_EQ(line_out[2], 180);
   EXPECT_EQ(line_out[3], 200);
+  //
+  line_in = {0, 10, 180, 200};
+  line_out = line_detector_.fitLineToBounds(line_in, x_max, y_max);
+  LOG(INFO) << "Fitted line (" << line_in[0] << ", " << line_in[1] << ", "
+            << line_in[2] << ", " << line_in[3] << ") as (" << line_out[0]
+            << ", " << line_out[1] << ", " << line_out[2] << ", "
+            << line_out[3] << ").";
+  EXPECT_EQ(line_out[0], 0);
+  EXPECT_EQ(line_out[1], 10);
+  EXPECT_EQ(line_out[2], 180);
+  EXPECT_EQ(line_out[3], 200);
+  //
+  line_in = {0, 10, 180, -200};
+  line_out = line_detector_.fitLineToBounds(line_in, x_max, y_max);
+  LOG(INFO) << "Fitted line (" << line_in[0] << ", " << line_in[1] << ", "
+            << line_in[2] << ", " << line_in[3] << ") as (" << line_out[0]
+            << ", " << line_out[1] << ", " << line_out[2] << ", "
+            << line_out[3] << ").";
+  EXPECT_EQ(line_out[0], 0);
+  EXPECT_EQ(line_out[1], 10);
+  EXPECT_NEAR(line_out[2], 8.5714286, 1e-4);
+  EXPECT_EQ(line_out[3], 0);
+
   // From a previous failure case.
   line_in = {-1.55502, 23.2056, 174, -2.74736e-06};
   line_out = line_detector_.fitLineToBounds(line_in, x_max, y_max);
@@ -643,6 +666,18 @@ TEST_F(LineDetectionTest, testfitLineToBounds) {
   EXPECT_NEAR(line_out[1], 23, 1e-4);
   EXPECT_EQ(line_out[2], 174);
   EXPECT_EQ(line_out[3], 0);
+  // From a previous failure case
+  line_in = {-4.02431, 170.024, -7.4678e-07, 166};
+  line_out = line_detector_.fitLineToBounds(line_in, x_max, y_max);
+  LOG(INFO) << "Fitted line (" << line_in[0] << ", " << line_in[1] << ", "
+            << line_in[2] << ", " << line_in[3] << ") as (" << line_out[0]
+            << ", " << line_out[1] << ", " << line_out[2] << ", "
+            << line_out[3] << ").";
+  EXPECT_EQ(line_out[0], 0);
+  EXPECT_EQ(line_out[1], 0);
+  EXPECT_EQ(line_out[2], 0);
+  EXPECT_EQ(line_out[3], 0);
+
 }
 
 }  // namespace line_detection

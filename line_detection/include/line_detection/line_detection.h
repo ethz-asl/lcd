@@ -182,15 +182,22 @@ bool inline checkEqualPoints(const cv::Point2f& point_1,
           checkEqualFloats(point_1.y, point_2.y));
 }
 
+// Binary function that checks whether a point (x, y) is such that:
+// - 0 < x < x_max and 0 < y < y_max if tight = true,
+// - 0 <= x <= x_max and 0 <= y <= y_max if tight = false.
 bool inline checkPointInBounds(const cv::Point2f& point, size_t x_max,
-                              size_t y_max) {
+                              size_t y_max, bool tight=false) {
   CHECK(x_max > 0);
   CHECK(y_max > 0);
-  double x_bound = static_cast<double>(x_max + 1e-9);
-  double y_bound = static_cast<double>(y_max + 1e-9);
-
-  return (point.x >= 0.0f && point.x <= x_bound && point.y >= 0.0f &&
-          point.y <= y_bound);
+  double x_bound = static_cast<double>(x_max);
+  double y_bound = static_cast<double>(y_max);
+  if (tight) {
+    return (point.x > 0.0f && point.x < x_bound && point.y > 0.0f &&
+            point.y < y_bound);
+  } else {
+    return (point.x >= 0.0f && point.x <= x_bound && point.y >= 0.0f &&
+            point.y <= y_bound);
+  }
 }
 
 // Binary function to compare two intersection points found in the method
@@ -517,7 +524,7 @@ class LineDetector {
   std::vector<cv::Vec4f> fitLinesToBounds(
       const std::vector<cv::Vec4f>& lines2D, size_t x_max, size_t y_max,
       bool keep_direction=true);
-  // Called by the checkLine(s)InBounds functions above. Returns a line
+  // Called by the fitLine(s)ToBounds functions above. Returns a line
   // "cropped" so as to fit in the image bounds, while keeping the direction of
   // the original line.
   cv::Vec4f fitLineToBoundsWithDirection(const cv::Vec4f& line2D,

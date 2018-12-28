@@ -792,11 +792,13 @@ cv::Vec4f LineDetector::fitLineToBoundsWithDirection(
   cv::Point2f start = roundPoint({line2D[0], line2D[1]});
   cv::Point2f end = roundPoint({line2D[2], line2D[3]});
 
-  bool start_is_inside_the_image = checkPointInBounds(start, x_max, y_max);
-  bool end_is_inside_the_image = checkPointInBounds(end, x_max, y_max);
+  bool start_is_strictly_inside_the_image =
+      checkPointInBounds(start, x_max, y_max, true);
+  bool end_is_strictly_inside_the_image =
+      checkPointInBounds(end, x_max, y_max, true);
 
   // If the line is already inside the image return it as it is.
-  if (start_is_inside_the_image && end_is_inside_the_image) {
+  if (start_is_strictly_inside_the_image && end_is_strictly_inside_the_image) {
     return line2D;
   }
 
@@ -897,12 +899,15 @@ cv::Vec4f LineDetector::fitLineToBoundsWithDirection(
   }
   // Substitute endpoints out of bounds with the corresponding intersection
   // point.
-  if (!start_is_inside_the_image && !end_is_inside_the_image) {
-    CHECK(true_intersection_points.size() == 0 ||
-          true_intersection_points.size() == 2);
-    if (true_intersection_points.size() == 0) {
-      // Line segment does not go through the image at all => Return zero-length
-      // line.
+  if (!start_is_strictly_inside_the_image &&
+      !end_is_strictly_inside_the_image) {
+    CHECK(true_intersection_points.size() <= 2);
+    if (true_intersection_points.size() < 2) {
+      // Either both points are outside the image or one point is on an edge of
+      // the image (therefore, an intersection point is found that coincides
+      // with this point) and the other is outside. This case corresponds to a
+      // line segment that does not go through the image at all => Return
+      // zero-length line.
       return {0.0f, 0.0f, 0.0f, 0.0f};
     }
     // Line segment goes through the image.
@@ -910,12 +915,14 @@ cv::Vec4f LineDetector::fitLineToBoundsWithDirection(
             static_cast<float>(true_intersection_points[0].first.y),
             static_cast<float>(true_intersection_points[1].first.x),
             static_cast<float>(true_intersection_points[1].first.y)};
-  } else if (start_is_inside_the_image && !end_is_inside_the_image) {
+  } else if (start_is_strictly_inside_the_image &&
+             !end_is_strictly_inside_the_image) {
     CHECK(true_intersection_points.size() == 1);
     return {static_cast<float>(start.x), static_cast<float>(start.y),
             static_cast<float>(true_intersection_points[0].first.x),
             static_cast<float>(true_intersection_points[0].first.y)};
-  } else if (!start_is_inside_the_image && end_is_inside_the_image) {
+  } else if (!start_is_strictly_inside_the_image &&
+             end_is_strictly_inside_the_image) {
     CHECK(true_intersection_points.size() == 1);
     return {static_cast<float>(true_intersection_points[0].first.x),
             static_cast<float>(true_intersection_points[0].first.y),
