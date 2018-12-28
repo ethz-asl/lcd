@@ -1,6 +1,7 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <Eigen/Core>
+#include <pcl_ros/point_cloud.h>
 
 #include "line_detection/common.h"
 #include "line_detection/line_detection.h"
@@ -76,60 +77,6 @@ TEST_F(LineDetectionTest, testHoughLineDetection) {
       << "HOUGH detection: Expected 165 lines to be found. Found " << n_lines;
 }
 
-TEST_F(LineDetectionTest, testComputePointCloud) {
-  // Create calibration matrix and fill it (with non calibrated values!).
-  cv::Mat K(3, 3, CV_32FC1);
-  K.at<float>(0, 0) = 570.3f;
-  K.at<float>(0, 1) = 0.0f;
-  K.at<float>(0, 2) = 960.0f;
-  K.at<float>(1, 0) = 0.0f;
-  K.at<float>(1, 1) = 570.3f;
-  K.at<float>(1, 2) = 540.0f;
-  K.at<float>(2, 0) = 0.0f;
-  K.at<float>(2, 1) = 0.0f;
-  K.at<float>(2, 2) = 1.0f;
-  // Point_cloud to be filled.
-  pcl::PointCloud<pcl::PointXYZRGB> point_cloud;
-  // Fill the point cloud (this is the functioned that is tested here)
-  line_detector_.computePointCloud(test_image_, test_depth_, K, &point_cloud);
-  // Compue the mean of all entries of the point cloud
-  double x_mean = 0;
-  double y_mean = 0;
-  double z_mean = 0;
-  double r_mean = 0;
-  double g_mean = 0;
-  double b_mean = 0;
-  for (size_t i = 0u; i < point_cloud.size(); ++i) {
-    if (std::isnan(point_cloud.points[i].x)) continue;
-    x_mean += point_cloud.points[i].x;
-    y_mean += point_cloud.points[i].y;
-    z_mean += point_cloud.points[i].z;
-    r_mean += point_cloud.points[i].r;
-    g_mean += point_cloud.points[i].g;
-    b_mean += point_cloud.points[i].b;
-  }
-  x_mean = x_mean / point_cloud.size();
-  y_mean = y_mean / point_cloud.size();
-  z_mean = z_mean / point_cloud.size();
-  r_mean = r_mean / point_cloud.size();
-  g_mean = g_mean / point_cloud.size();
-  b_mean = b_mean / point_cloud.size();
-
-  // The function LineDetector::computePointCloud computes an ordered point
-  // cloud. It does fill in points for which the depth image no information,
-  // these are then just NaN values. But this means for every pixel there should
-  // be a point in the cloud.
-  EXPECT_EQ(point_cloud.size(), 1920 * 1080);
-  // These are all values that were precomputed with the above calibration
-  // matrix K. They are not the true values!
-  EXPECT_NEAR(x_mean, 0.324596, 1e-5);
-  EXPECT_NEAR(y_mean, -0.147148, 1e-5);
-  EXPECT_NEAR(z_mean, 1.69212, 1e-5);
-  EXPECT_NEAR(r_mean, 108.686, 1e-2);
-  EXPECT_NEAR(g_mean, 117.155, 1e-2);
-  EXPECT_NEAR(b_mean, 116.337, 1e-2);
-}
-
 TEST_F(LineDetectionTest, testAreLinesEqual2D) {
   EXPECT_TRUE(line_detection::areLinesEqual2D(cv::Vec4f(0, 0, 10, 10),
                                               cv::Vec4f(0, 0, 10, 10)));
@@ -139,10 +86,10 @@ TEST_F(LineDetectionTest, testAreLinesEqual2D) {
                                                cv::Vec4f(0, 0, 0, 10)));
 }
 
-TEST_F(LineDetectionTest, testCheckInBoundary) {
-  EXPECT_EQ(line_detection::checkInBoundary(1, 0, 3), 1);
-  EXPECT_EQ(line_detection::checkInBoundary(-1, 0, 3), 0);
-  EXPECT_EQ(line_detection::checkInBoundary(10, 0, 3), 3);
+TEST_F(LineDetectionTest, testfitToBoundary) {
+  EXPECT_EQ(line_detection::fitToBoundary(1, 0, 3), 1);
+  EXPECT_EQ(line_detection::fitToBoundary(-1, 0, 3), 0);
+  EXPECT_EQ(line_detection::fitToBoundary(10, 0, 3), 3);
 }
 
 TEST_F(LineDetectionTest, testdistPointToLine) {
@@ -170,7 +117,7 @@ TEST_F(LineDetectionTest, testErrorPointToPlane) {
   point = {0, 0, 0};
   hessian = {1, 1, 1, -3};
   hessian = hessian / cv::norm(normal);
-  normalizeVector3D(normal);
+  normalizeVector3D(&normal);
   EXPECT_FLOAT_EQ(errorPointToPlane(hessian, point), sqrt(3));
   EXPECT_FLOAT_EQ(errorPointToPlane(normal, point_on_plane, point), sqrt(3));
 }
@@ -444,7 +391,7 @@ TEST_F(LineDetectionTest, testFind3DlinesRated) {
   lines2D.push_back(vec1);
   std::vector<cv::Vec6f> lines3D;
   std::vector<double> rating;
-  line_detector_.find3DlinesRated(cloud, lines2D, lines3D, rating);
+  line_detector_.find3DlinesRated(cloud, lines2D, &lines3D, &rating);
   ASSERT_EQ(lines3D.size(), 1);
   ASSERT_EQ(rating.size(), 1);
   EXPECT_EQ(rating[0], 0);
@@ -456,7 +403,7 @@ TEST_F(LineDetectionTest, testFind3DlinesRated) {
   EXPECT_NEAR(lines3D[0][5], 160 * scale, 1e-6);
   vec1 = {50, 50, 250, 20};
   lines2D.push_back(vec1);
-  line_detector_.find3DlinesRated(cloud, lines2D, lines3D, rating);
+  line_detector_.find3DlinesRated(cloud, lines2D, &lines3D, &rating);
   ASSERT_EQ(lines3D.size(), 2);
   ASSERT_EQ(rating.size(), 2);
   EXPECT_EQ(rating[1], 1e9);
