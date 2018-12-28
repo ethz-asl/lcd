@@ -494,10 +494,28 @@ class LineDetector {
                           const cv::Mat& point_cloud,
                           std::vector<cv::Vec6f>* lines3D);
 
-  // This function clusters nearby lines in line_in and summarizes them as one
-  // line. All new lines are stored in lines_out.
+  // Overload for fuseLines2DAtTheEnd and fuseLines2DOnTheFly.
+  // If merge_at_the_end is true, then fuseLines2DAtTheEnd is called, otherwise
+  // fuseLines2DOnTheFly is used.
   void fuseLines2D(const std::vector<cv::Vec4f>& lines_in,
-                   std::vector<cv::Vec4f>* lines_out);
+                   std::vector<cv::Vec4f>* lines_out,
+                   bool merge_at_the_end=false);
+  // These functions cluster nearby lines in line_in and summarizes them as one
+  // line. All new lines are stored in lines_out. Two versions:
+  //
+  // * First forms clusters of lines that each have at least one other line in
+  //   the cluster to which to be merged into. Then, for all clusters, merge all
+  //   the lines in the cluster so as to form an output line.
+  //   (Old implementation).
+  void fuseLines2DAtTheEnd(const std::vector<cv::Vec4f>& lines_in,
+                           std::vector<cv::Vec4f>* lines_out);
+  // * Merge each input line into the matching previously-formed clusters, as
+  //   soon as the match is found.
+  void fuseLines2DOnTheFly(const std::vector<cv::Vec4f>& lines_in,
+                           std::vector<cv::Vec4f>* lines_out);
+
+  // Return the 2D line obtained by merging the two input 2D lines.
+  cv::Vec4f mergeLines2D(const cv::Vec4f& line_1, const cv::Vec4f& line_2);
 
   // Simply paints all lines to image.
   void paintLines(const std::vector<cv::Vec4f>& lines, cv::Mat* image,

@@ -95,7 +95,7 @@ bool areLinesEqual2D(const cv::Vec4f line1, const cv::Vec4f line2) {
   // return true. Note that since we want angle_difference ~= 0 it must hold
   // that cos(angle_difference) ~= 1 => cos^2(angle_difference) ~= 1.
   constexpr double kCosSqAngleDifference = 0.95;
-  constexpr double kMinDistance = 1.5;
+  constexpr double kMinDistance = 2;
   if (cos_sq_angle_difference > kCosSqAngleDifference &&
       min_dist < kMinDistance) {
     return true;
@@ -570,7 +570,18 @@ void LineDetector::projectLines2Dto3D(const std::vector<cv::Vec4f>& lines2D,
 }
 
 void LineDetector::fuseLines2D(const std::vector<cv::Vec4f>& lines_in,
-                               std::vector<cv::Vec4f>* lines_out) {
+                               std::vector<cv::Vec4f>* lines_out,
+                               bool merge_at_the_end) {
+  if (merge_at_the_end) {
+    fuseLines2DAtTheEnd(lines_in, lines_out);
+  } else {
+    fuseLines2DOnTheFly(lines_in, lines_out);
+  }
+}
+
+// Old implementation.
+void LineDetector::fuseLines2DAtTheEnd(const std::vector<cv::Vec4f>& lines_in,
+                                       std::vector<cv::Vec4f>* lines_out) {
   CHECK_NOTNULL(lines_out);
   lines_out->clear();
   // This list is used to remember which lines have already been assigned to a
@@ -629,6 +640,83 @@ void LineDetector::fuseLines2D(const std::vector<cv::Vec4f>& lines_in,
     else
       lines_out->push_back(cv::Vec4f(x_min, y_max, x_max, y_min));
   }
+}
+
+void LineDetector::fuseLines2DOnTheFly(const std::vector<cv::Vec4f>& lines_in,
+                                       std::vector<cv::Vec4f>* lines_out) {
+  CHECK_NOTNULL(lines_out);
+  lines_out->clear();
+
+  std::list<cv::Vec4f> line_cluster;
+  // Iterate over all lines.
+  std::list<cv::Vec4f>::iterator old_line_it, current_line_it;
+  cv::Vec4f old_line, current_line;
+  bool current_line_is_in_cluster;
+  // The principle is the following: at each iteration we keep so-called
+  // "clusters", that represent either a single input line or the line obtained
+  // by merging several lines that have close endpoints and similar directions.
+  // At the start of each iteration the clusters are such that none of them can
+  // be merged with any other cluster. At each iteration, a line "current_line"
+  // is compared with all the previously-formed clusters and either immediately
+  // merged into the matching clusters (therefore updating the 'receiving'
+  // cluster) or set to be a new cluster (if no matches with the previous
+  // clusters are found).
+  for (size_t line_idx = 0; line_idx < lines_in.size(); ++line_idx) {
+    // At first, current_line is initialized to the input line considered at
+    // this iteration.
+    current_line = lines_in[line_idx];
+    current_line_is_in_cluster = false;
+    for (old_line_it = line_cluster.begin(); old_line_it != line_cluster.end();
+         ++old_line_it) {
+      old_line = *old_line_it;
+      // Compare current_line with each previously-formed cluster.
+      if (areLinesEqual2D(current_line, old_line)) {
+        // Merge current line into the previously-formed cluster.
+        *old_line_it = mergeLines2D(current_line, old_line);
+        current_line = *old_line_it;
+        // If current_line is a cluster, i.e., the input line was already merged
+        // to another cluster old_line in the same iteration, remove the cluster
+        // to which the line was previously merged (old_line), since it has now
+        // itself been merged into the newly found cluster.
+        if (current_line_is_in_cluster) {
+          line_cluster.erase(current_line_it);
+        }
+        // Update current_line to be the cluster into which the input line/the
+        // older cluster was merged.
+        current_line_is_in_cluster = true;
+        current_line_it = old_line_it;
+      }
+    }
+    // The input line cannot be merged into any of the previoùsly-found
+    // clusters.
+    if (!current_line_is_in_cluster) {
+      // Add the input line as a new cluster.
+      line_cluster.push_back(current_line);
+    }
+  }
+  // Return the clusters left, that by construction are all disconnected
+  // components, in the sense that they cannot be merged into one another.
+  *lines_out = std::vector<cv::Vec4f> (
+      std::make_move_iterator(std::begin(line_cluster)),
+      std::make_move_iterator(std::end(line_cluster)));
+}
+
+cv::Vec4f LineDetector::mergeLines2D(const cv::Vec4f& line_1,
+                                     const cv::Vec4f& line_2) {
+  float x_min, x_max, y_min, y_max, slope;
+  x_min = std::min(std::min(line_1[0], line_1[2]),
+                   std::min(line_2[0], line_2[2]));
+  x_max = std::max(std::max(line_1[0], line_1[2]),
+                   std::max(line_2[0], line_2[2]));
+  y_min = std::min(std::min(line_1[1], line_1[3]),
+                  std::min(line_2[1], line_2[3]));
+  y_max = std::max(std::max(line_1[1], line_1[3]),
+                  std::max(line_2[1], line_2[3]));
+  slope = computeSlopeOfLine(line_1) + computeSlopeOfLine(line_2);
+  if (slope > 0)
+    return {x_min, y_min, x_max, y_max};
+  else
+    return {x_min, y_max, x_max, y_min};
 }
 
 void LineDetector::paintLines(const std::vector<cv::Vec4f>& lines,
