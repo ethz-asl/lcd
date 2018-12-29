@@ -1014,7 +1014,6 @@ class LineDetector {
                                const cv::Mat& camera_P, cv::Vec3f* start_out,
                                cv::Vec3f* end_out);
 
-
   // It might happen that when adjusting line using inliers the orientation of
   // the resulting line changes w.r.t. to the original lines. It might, i.e.,
   // happen that what was defined to be the start in the original line is closer
