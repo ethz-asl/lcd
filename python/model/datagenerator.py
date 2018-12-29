@@ -134,7 +134,6 @@ class ImageDataGenerator:
         and labels and loads the images into them into memory
         """
 
-
         # Allocate memory for batch of images
         if self.image_type == 'bgr':
             images = np.ndarray(

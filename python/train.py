@@ -77,12 +77,12 @@ def train():
     # Placeholder for graph input and output
     if image_type == 'bgr':
         input_img = tf.placeholder(
-            tf.float32, [batch_size, 227, 227, 3], name="input_img")
+            tf.float32, [None, 227, 227, 3], name="input_img")
     elif image_type == 'bgr-d':
         input_img = tf.placeholder(
-            tf.float32, [batch_size, 227, 227, 4], name="input_img")
+            tf.float32, [None, 227, 227, 4], name="input_img")
 
-    labels = tf.placeholder(tf.float32, [batch_size, 4], name="labels")
+    labels = tf.placeholder(tf.float32, [None, 4], name="labels")
     keep_prob = tf.placeholder(tf.float32, name="keep_prob")
 
     # Initialize model
