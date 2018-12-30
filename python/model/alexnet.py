@@ -9,11 +9,12 @@ import numpy as np
 
 class AlexNet(object):
 
-    def __init__(self, x, keep_prob, skip_layer,
+    def __init__(self, x, line_types, keep_prob, skip_layer,
                  input_images='bgr', weights_path='DEFAULT'):
 
         # Parse input arguments into class variables
         self.X = x
+        self.LINE_TYPES = line_types
         self.KEEP_PROB = keep_prob
         self.SKIP_LAYER = skip_layer
         self.INPUT__IMAGES = input_images
@@ -59,9 +60,16 @@ class AlexNet(object):
         # 7th Layer: FC (w ReLu) -> Dropout
         fc7 = fc(dropout6, 4096, 4096, name='fc7')
         dropout7 = dropout(fc7, self.KEEP_PROB)
+        flattened_dropout7 = tf.reshape(dropout7, [-1, 4096])
+
+        # Concatenate line type
+        dropout7_with_line_types = tf.concat(
+            [flattened_dropout7, self.LINE_TYPES],
+            axis=1,
+            name='dropout7_with_line_types')
 
         # 8th Layer: FC and return unscaled activations (for tf.nn.softmax_cross_entropy_with_logits)
-        self.fc8 = fc(dropout7, 4096, 64, relu=True, name='fc8')
+        self.fc8 = fc(dropout7_with_line_types, 4097, 64, relu=True, name='fc8')
 
     def load_initial_weights(self, session):
         """

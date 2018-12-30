@@ -3,6 +3,7 @@ import os
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
+from timeit import default_timer as timer
 
 from model.datagenerator import ImageDataGenerator
 from tools.visualization import vis_square
@@ -70,11 +71,10 @@ if os.path.isfile(embeddings_path):
 else:
     graph = tf.get_default_graph()
     input_img = graph.get_tensor_by_name('input_img:0')  # input images
-    labels = graph.get_tensor_by_name(
-        'labels:0')  # labels of input images
-    keep_prob = graph.get_tensor_by_name(
-        'keep_prob:0')  # dropout probability
+    labels = graph.get_tensor_by_name('labels:0')  # labels of input images
+    keep_prob = graph.get_tensor_by_name('keep_prob:0')  # dropout probability
     embeddings = graph.get_tensor_by_name('l2_normalize:0')
+    line_types = graph.get_tensor_by_name('line_types:0')
 
     batch_size = int(input_img.shape[0])
     test_embeddings_all = np.empty(
@@ -120,20 +120,24 @@ else:
     #test_count = 0
 
     for i in range(test_set_size / batch_size):
-        batch_input_img, batch_labels = test_generator.next_batch(batch_size)
+        batch_input_img, batch_labels, batch_line_types = test_generator.next_batch(
+            batch_size)
 
         # Pickled files have labels in the endpoints format -> convert them
         # to center format
         if read_as_pickle:
             batch_labels = get_line_center(batch_labels)
 
+        start_time = timer()
         output = sess.run(
             embeddings,
             feed_dict={
                 input_img: batch_input_img,
                 labels: batch_labels,
+                line_types: batch_line_types,
                 keep_prob: 1.
             })
+        end_time = timer()
         #current_test_loss = sess.run(
         #    triplet_loss, feed_dict={
         #        input_img: batch_input_img,
@@ -144,6 +148,8 @@ else:
         #test_count += 1
 
         test_embeddings_all = np.vstack([test_embeddings_all, output])
+        print('Time needed to retrieve desciptors for %d lines: %.3f seconds' %
+              (batch_size, (end_time - start_time)))
         # Display every 5 steps
         if i % 5 == 0:
             print("Embeddings got for {} lines ".format(
@@ -220,7 +226,6 @@ plot_lines_with_open3d(pcl_lines_open3d_cluster, "Clusterized instances")
 print("Displaying scene with ground-truth instances")
 plot_lines_with_open3d(pcl_lines_open3d_ground_truth, "Ground-truth instances")
 #plot_lines_with_matplotlib(pcl_lines_matplotlib_ground_truth)
-
 
 # # See embeddings in the feature space, colored with instance label
 from tensorflow.contrib.tensorboard.plugins import projector

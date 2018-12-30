@@ -44,12 +44,17 @@ def pickle_images(input_text_file, output_pickle_file, dataset_name):
                 print('Image {0} returns None'.format(line_path))
             else:
                 # Create entry for image in dictionary
-                data_dict[dataset_name][trajectory_number][
-                    frame_number][image_type][line_number]['img'] = img
+                data_dict[dataset_name][trajectory_number][frame_number][
+                    image_type][line_number]['img'] = img
                 # Create entry for labels in dictionary
                 data_dict[dataset_name][trajectory_number][
                     frame_number][image_type][line_number]['labels'] = \
-                    [float(i) for i in split_line[1:]]
+                    [float(i) for i in split_line[1:-2]] + \
+                    [float(split_line[-1])]
+                # Create entry for line type in dictionary
+                data_dict[dataset_name][trajectory_number][
+                    frame_number][image_type][line_number]['line_type'] = \
+                    float(split_line[-2])
 
         # Current version of lines files only include paths for rbg images. The
         # following is to also load depth images
@@ -66,12 +71,17 @@ def pickle_images(input_text_file, output_pickle_file, dataset_name):
                     print('Image {0} returns None'.format(line_path_depth))
                 else:
                     # Create entry for image in dictionary
-                    data_dict[dataset_name][trajectory_number][
-                        frame_number]['depth'][line_number]['img'] = img
+                    data_dict[dataset_name][trajectory_number][frame_number][
+                        'depth'][line_number]['img'] = img
                     # Create entry for labels in dictionary
                     data_dict[dataset_name][trajectory_number][
                         frame_number]['depth'][line_number]['labels'] = \
-                        [float(i) for i in split_line[1:]]
+                        [float(i) for i in split_line[1:-2]] + \
+                        [float(split_line[-1])]
+                    # Create entry for line type in dictionary
+                    data_dict[dataset_name][trajectory_number][
+                        frame_number]['depth'][line_number]['line_type'] = \
+                        float(split_line[-2])
     # Convert defaultdict to dicts
     def defaultdict_to_dict(dictionary):
         # Found image

@@ -65,6 +65,7 @@ else:
     labels = graph.get_tensor_by_name('labels:0')  # labels of input images
     keep_prob = graph.get_tensor_by_name('keep_prob:0')  # dropout probability
     embeddings = graph.get_tensor_by_name('l2_normalize:0')
+    line_types = graph.get_tensor_by_name('line_types:0')
 
     batch_size = 1
     test_embeddings_all = np.empty(
@@ -107,7 +108,8 @@ else:
     # therefore some lines might be visualized in one case but not in the other.
 
     for i in range(test_set_size):
-        batch_input_img, batch_labels = test_generator.next_batch(batch_size)
+        batch_input_img, batch_labels, batch_line_types = test_generator.next_batch(
+            batch_size)
 
         # Pickled files have labels in the endpoints format -> convert them
         # to center format
@@ -120,6 +122,7 @@ else:
             feed_dict={
                 input_img: batch_input_img,
                 labels: batch_labels,
+                line_types: batch_line_types,
                 keep_prob: 1.
             })
         end_time = timer()

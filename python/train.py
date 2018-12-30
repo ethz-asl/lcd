@@ -84,10 +84,11 @@ def train():
 
     labels = tf.placeholder(tf.float32, [None, 4], name="labels")
     keep_prob = tf.placeholder(tf.float32, name="keep_prob")
+    line_types = tf.placeholder(tf.float32, [None, 1], name="line_types")
 
     # Initialize model
     skip_layers = ['fc8']  # Don't use weights from AlexNet
-    model = AlexNet(input_img, keep_prob, skip_layers, image_type)
+    model = AlexNet(input_img, line_types, keep_prob, skip_layers, image_type)
 
     # Link variable to model output
     embeddings = tf.nn.l2_normalize(model.fc8, axis=1)
@@ -256,7 +257,7 @@ def train():
             while step < train_batches_per_epoch:
 
                 # Get a batch of images and labels
-                batch_input_img_train, batch_labels_train = train_generator.next_batch(
+                batch_input_img_train, batch_labels_train, batch_line_types_train = train_generator.next_batch(
                     batch_size)
 
                 # Pickled files have labels in the endpoints format -> convert
@@ -270,6 +271,7 @@ def train():
                     feed_dict={
                         input_img: batch_input_img_train,
                         labels: batch_labels_train,
+                        line_types: batch_line_types_train,
                         keep_prob: dropout_rate
                     })
 
@@ -281,6 +283,7 @@ def train():
                         feed_dict={
                             input_img: batch_input_img_train,
                             labels: batch_labels_train,
+                            line_types: batch_line_types_train,
                             keep_prob: 1.
                         })
                     writer.add_summary(s,
@@ -293,7 +296,7 @@ def train():
             loss_val = 0.
             val_count = 0
             for _ in range(val_batches_per_epoch):
-                batch_input_img_val, batch_labels_val = val_generator.next_batch(
+                batch_input_img_val, batch_labels_val, batch_line_types_val = val_generator.next_batch(
                     batch_size)
 
                 # Pickled files have labels in the endpoints format -> convert
@@ -306,6 +309,7 @@ def train():
                     feed_dict={
                         input_img: batch_input_img_val,
                         labels: batch_labels_val,
+                        line_types: batch_line_types_val,
                         keep_prob: 1.
                     })
                 loss_val += loss_current

@@ -84,13 +84,21 @@ def split_dataset():
                 center_of_line = (
                     line_start_point_world[:3] + line_end_point_world[:3]) / 2
 
+                # According to line_ros_utility::printToFile line_type is:
+                # * 0 for discontinuity lines,
+                # * 1 for planar lines,
+                # * 2 for edge lines,
+                # * 3 for intersection lines.
+                line_type = int(line[-2])
+
                 label = int(line[-1])
 
                 with open(os.path.join(output_path, key + '.txt'), 'a') as f:
                     f.write(
                         os.path.abspath(path_to_write) + ' ' +
                         str(center_of_line[0]) + ' ' + str(center_of_line[1]) +
-                        ' ' + str(center_of_line[2]) + ' ' + str(label) + '\n')
+                        ' ' + str(center_of_line[2]) + ' ' + str(line_type) +
+                        ' ' + str(label) + '\n')
 
                 with open(
                         os.path.join(output_path,
@@ -98,12 +106,13 @@ def split_dataset():
                         'a') as f:
                     f.write(
                         os.path.abspath(path_to_write) + ' ' +
-                        str(line_start_point_world[0]) + ' ' +
-                        str(line_start_point_world[1]) + ' ' + str(
-                            line_start_point_world[2]) + ' ' + str(
-                                line_end_point_world[0]) + ' ' +
+                        str(line_start_point_world[0]) + ' ' + str(
+                            line_start_point_world[1]) + ' ' + str(
+                                line_start_point_world[2]) + ' ' + str(
+                                    line_end_point_world[0]) + ' ' +
                         str(line_end_point_world[1]) + ' ' + str(
-                            line_end_point_world[2]) + ' ' + str(label) + '\n')
+                            line_end_point_world[2]) + ' ' + str(line_type) +
+                        ' ' + str(label) + '\n')
 
 
 if __name__ == '__main__':
