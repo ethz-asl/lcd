@@ -7,6 +7,7 @@ import numpy as np
 import cv2
 import pandas as pd
 import argparse
+from timeit import default_timer as timer
 
 from tools import scenenet_utils
 from tools import pathconfig
@@ -14,6 +15,7 @@ from tools import get_protobuf_paths
 
 
 def get_virtual_camera_images():
+    impainting = False
     trajectories = sn.Trajectories()
     try:
         with open(protobuf_path, 'rb') as f:
@@ -36,8 +38,9 @@ def get_virtual_camera_images():
     # Virtual camera model
     camera_model = scenenet_utils.get_camera_model()
     # Distance between virtual camera origin and line's center
-    distance = 1
+    distance = 3
     for frame_id in range(300):
+        start_time = timer()
         photo_id = frame_id * 25
 
         rgb_image = cv2.imread(
@@ -61,7 +64,9 @@ def get_virtual_camera_images():
         data_lines = data_lines.values
         lines_count = data_lines.shape[0]
 
+        average_time_per_line = 0
         for i in range(lines_count):
+            start_time_line = timer()
             T, _ = scenenet_utils.virtual_camera_pose(data_lines[i, :],
                                                       distance)
             # Draw the line in the virtual camera image.
@@ -81,32 +86,43 @@ def get_virtual_camera_images():
             rgb_image_from_line_view, depth_image_from_line_view = \
                 scenenet_utils.project_pcl_to_image(pcl_from_line_view,
                                                     camera_model)
-            # Inpaint the virtual camera image.
-            reds = rgb_image_from_line_view[:, :, 2]
-            greens = rgb_image_from_line_view[:, :, 1]
-            blues = rgb_image_from_line_view[:, :, 0]
+            if (impainting):
+                # Inpaint the virtual camera image.
+                reds = rgb_image_from_line_view[:, :, 2]
+                greens = rgb_image_from_line_view[:, :, 1]
+                blues = rgb_image_from_line_view[:, :, 0]
 
-            mask = ((greens != 0) | (reds != 0) | (blues != 0)) * 1
-            mask = np.array(mask, dtype=np.uint8)
-            kernel = np.ones((5, 5), np.uint8)
-            dilated_mask = cv2.dilate(mask, kernel, iterations=1) - mask
+                mask = ((greens != 0) | (reds != 0) | (blues != 0)) * 1
+                mask = np.array(mask, dtype=np.uint8)
+                kernel = np.ones((5, 5), np.uint8)
+                dilated_mask = cv2.dilate(mask, kernel, iterations=1) - mask
 
-            dst_rgb = cv2.inpaint(rgb_image_from_line_view, dilated_mask, 10,
-                                  cv2.INPAINT_TELEA)
-            dst_depth = cv2.inpaint(depth_image_from_line_view, dilated_mask,
-                                    10, cv2.INPAINT_TELEA)
+                rgb_image_from_line_view = cv2.inpaint(rgb_image_from_line_view,
+                                                       dilated_mask, 10,
+                                                       cv2.INPAINT_TELEA)
+                depth_image_from_line_view = cv2.inpaint(
+                    depth_image_from_line_view, dilated_mask, 10,
+                    cv2.INPAINT_TELEA)
+            end_time_line = timer()
+            average_time_per_line += ((
+                end_time_line - start_time_line) / lines_count)
+
             # Print images to file.
             cv2.imwrite(
-                os.path.join(output_path,
-                             'traj_{0}/frame_{1}/rgb/{2}.png'.format(
-                                 trajectory, frame_id, i)), dst_rgb)
+                os.path.join(
+                    output_path, 'traj_{0}/frame_{1}/rgb/{2}.png'.format(
+                        trajectory, frame_id, i)), rgb_image_from_line_view)
             cv2.imwrite(
                 os.path.join(output_path,
                              'traj_{0}/frame_{1}/depth/{2}.png'.format(
                                  trajectory, frame_id, i)),
-                dst_depth.astype(np.uint16))
+                depth_image_from_line_view.astype(np.uint16))
+
+        end_time = timer()
 
         print('Generated virtual camera images for frame {0}'.format(frame_id))
+        print('Time elapsed: %.3f seconds' % (end_time - start_time))
+        print('Average time per line: %.3f seconds' % average_time_per_line)
 
 
 if __name__ == '__main__':
