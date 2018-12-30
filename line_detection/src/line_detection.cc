@@ -1891,6 +1891,7 @@ void LineDetector::planeRANSAC(const std::vector<cv::Vec3f>& points,
         inlier_candidates.push_back(points[j]);
       }
     }
+
     // If we found more inliers than in any previous run, we store them
     // as global inliers.
     if (inlier_candidates.size() > inliers->size()) {
@@ -1943,6 +1944,8 @@ void LineDetector::project2Dto3DwithPlanes(
   double min_inliers = params_->min_inlier_ransac;
   double max_rating = params_->max_rating_valid_line;
   bool right_found, left_found;
+  // For a description please cf. findInliersGiven2DLine.
+  bool found_point_with_no_depth_info;
   constexpr size_t min_points_for_ransac = 3;
   // This is a first guess of the 3D lines. They are used in some cases, where
   // the lines cannot be found by intersecting planes.
@@ -1952,6 +1955,7 @@ void LineDetector::project2Dto3DwithPlanes(
   find3DlinesRated(cloud, lines2D, &lines3D_cand, &rating);
   // Loop over all 2D lines.
   for (size_t i = 0; i < lines2D.size(); ++i) {
+    found_point_with_no_depth_info = false;
     // If the rating is so high, no valid 3d line was found by the
     // find3DlinesRated function.
     if (rating[i] > max_rating) continue;
@@ -1959,7 +1963,7 @@ void LineDetector::project2Dto3DwithPlanes(
     // defining a patch, find all points within the patch and try to fit a
     // plane to these points.
     getRectanglesFromLine(lines2D[i], &rect_left, &rect_right);
-    // Find lines for the left side.
+    // Find points for the left side.
     findPointsInRectangle(rect_left, &points_in_rect);
     if (set_colors) {
       assignColorToLines(image, points_in_rect, &line3D_true);
@@ -1971,7 +1975,16 @@ void LineDetector::project2Dto3DwithPlanes(
         continue;
       }
       if (std::isnan(cloud.at<cv::Vec3f>(points_in_rect[j])[0])) continue;
+      if (checkEqualPoints(cloud.at<cv::Vec3f>(points_in_rect[j]),
+          {0.0f, 0.0f, 0.0f})) {
+          found_point_with_no_depth_info = true;
+          break;
+      }
       plane_point_cand.push_back(cloud.at<cv::Vec3f>(points_in_rect[j]));
+    }
+    // Point with no depth info => Discard line.
+    if (found_point_with_no_depth_info) {
+      continue;
     }
     left_found = false;
     if (plane_point_cand.size() > min_points_for_ransac) {
@@ -1980,7 +1993,7 @@ void LineDetector::project2Dto3DwithPlanes(
         left_found = true;
       }
     }
-    // Find lines for the right side.
+    // Find points for the right side.
     findPointsInRectangle(rect_right, &points_in_rect);
     if (set_colors) {
       assignColorToLines(image, points_in_rect, &line3D_true);
@@ -1992,7 +2005,16 @@ void LineDetector::project2Dto3DwithPlanes(
         continue;
       }
       if (std::isnan(cloud.at<cv::Vec3f>(points_in_rect[j])[0])) continue;
+      if (checkEqualPoints(cloud.at<cv::Vec3f>(points_in_rect[j]),
+          {0.0f, 0.0f, 0.0f})) {
+          found_point_with_no_depth_info = true;
+          break;
+      }
       plane_point_cand.push_back(cloud.at<cv::Vec3f>(points_in_rect[j]));
+    }
+    // Point with no depth info => Discard line.
+    if (found_point_with_no_depth_info) {
+      continue;
     }
     right_found = false;
     if (plane_point_cand.size() > min_points_for_ransac) {
@@ -2233,11 +2255,25 @@ void LineDetector::findInliersGiven2DLine(const cv::Vec4f& line_2D,
 
   std::vector<cv::Point2i> points_in_rect;
   std::vector<cv::Vec3f> plane_point_cand;
+  // Some points in the point cloud might have no depth information. In
+  // SceneNetRGBD these are encoded with corresponding {0, 0, 0} coordinates in
+  // the point cloud. If a line is on the edge of a region containing such
+  // points (e.g., frame 248 of trajectory 4 of train dataset 0), it should be
+  // discarded, because planeRANSAC, due to its casuality, might wrongly select
+  // one of these null-coordinate points to fit the plane, therefore fitting a
+  // (completely) wrong plane to a side of the line, causing several other
+  // failures later in the pipeline. One way to handle this could be simply
+  // not considering the null-coordinate points as inliers, rather than
+  // discarding the entire line, but this way the line could be assigned to a
+  // wrong line type or have remaining inliers that are not descriptive of the
+  // actual plane.
+  bool found_point_with_no_depth_info;
   constexpr size_t min_points_for_ransac = 3;
   // Parameter: Fraction of inlier that must be found for the plane model to
   // be valid.
   double min_inliers = params_->min_inlier_ransac;
 
+  found_point_with_no_depth_info = false;
   // Clear inliers.
   inliers_right->clear();
   inliers_left->clear();
@@ -2246,7 +2282,7 @@ void LineDetector::findInliersGiven2DLine(const cv::Vec4f& line_2D,
   // defining a patch, find all points within the patch and try to fit a plane
   // to these points.
   getRectanglesFromLine(line_2D, rect_left, rect_right);
-  // Find lines for the left side.
+  // Find points for the left side.
   findPointsInRectangle(*rect_left, &points_in_rect);
   if (set_colors) {
     assignColorToLines(image, points_in_rect, line_3D);
@@ -2258,7 +2294,18 @@ void LineDetector::findInliersGiven2DLine(const cv::Vec4f& line_2D,
       continue;
     }
     if (std::isnan(cloud.at<cv::Vec3f>(points_in_rect[j])[0])) continue;
+    if (checkEqualPoints(cloud.at<cv::Vec3f>(points_in_rect[j]),
+        {0.0f, 0.0f, 0.0f})) {
+        found_point_with_no_depth_info = true;
+        break;
+    }
     plane_point_cand.push_back(cloud.at<cv::Vec3f>(points_in_rect[j]));
+  }
+  // Point with no depth info => Discard line.
+  if (found_point_with_no_depth_info) {
+    *right_found = false;
+    *left_found = false;
+    return;
   }
   // If the size of plane_point_cand is too small, either the line is too short
   // or the line is near the edge of the image, reject it.
@@ -2275,7 +2322,7 @@ void LineDetector::findInliersGiven2DLine(const cv::Vec4f& line_2D,
       *left_found = true;
     }
   }
-  // Find lines for the right side.
+  // Find points for the right side.
   findPointsInRectangle(*rect_right, &points_in_rect);
   if (set_colors) {
     assignColorToLines(image, points_in_rect, line_3D);
@@ -2287,7 +2334,18 @@ void LineDetector::findInliersGiven2DLine(const cv::Vec4f& line_2D,
       continue;
     }
     if (std::isnan(cloud.at<cv::Vec3f>(points_in_rect[j])[0])) continue;
+    if (checkEqualPoints(cloud.at<cv::Vec3f>(points_in_rect[j]),
+        {0.0f, 0.0f, 0.0f})) {
+        found_point_with_no_depth_info = true;
+        break;
+    }
     plane_point_cand.push_back(cloud.at<cv::Vec3f>(points_in_rect[j]));
+  }
+  // Point with no depth info => Discard line.
+  if (found_point_with_no_depth_info) {
+    *right_found = false;
+    *left_found = false;
+    return;
   }
 
   if (plane_point_cand.size() < params_->min_points_in_rect) {
@@ -2896,11 +2954,9 @@ void LineDetector::fitDiscontLineToInliers(const std::vector<cv::Vec3f>& points,
   // Normalization by the last element, so as to ensure that one has (X, Y, 1).
   start_out_temp /= start_out_temp[2];
   end_out_temp /= end_out_temp[2];
-  // Return (X, Y, 1) for both endpoints.
-  *start_out = {start_out_temp[0], start_out_temp[1],
-                - (a * start_out_temp[0] + b * start_out_temp[1] + d) / c};
-  *end_out = {end_out_temp[0], end_out_temp[1],
-              - (a * end_out_temp[0] + b * end_out_temp[1] + d) / c};
+  // Set Z for both endpoints.
+  start_out_temp[2] = - (a * start_out_temp[0] + b * start_out_temp[1] + d) / c;
+  end_out_temp[2] = - (a * end_out_temp[0] + b * end_out_temp[1] + d) / c;
   // Now further adjust the line obtained by shifting it towards the inliers.
   // More precisely, as a first step find the inlier point that is closer, in
   // 2D, to the projection of the 3D line obtained so far. Then, take the 3D
@@ -2912,7 +2968,7 @@ void LineDetector::fitDiscontLineToInliers(const std::vector<cv::Vec3f>& points,
   cv::Vec2f point_2D, projection_on_line_2D;
   cv::Vec2f reference_line_direction_2D = (end_ref_2D - start_ref_2D);
   normalizeVector2D(&reference_line_direction_2D);
-  cv::Vec3f reference_line_direction_3D = *end_out - *start_out;
+  cv::Vec3f reference_line_direction_3D = end_out_temp - start_out_temp;
   normalizeVector3D(&reference_line_direction_3D);
 
   int idx_point_closest_to_line;
@@ -2930,13 +2986,25 @@ void LineDetector::fitDiscontLineToInliers(const std::vector<cv::Vec3f>& points,
   }
   // Shift the 3D line towards the inlier point found above.
   projection_on_line_3D =
-      *start_out + (points[idx_point_closest_to_line] - *start_out).dot(
+      start_out_temp + (points[idx_point_closest_to_line] - start_out_temp).dot(
         reference_line_direction_3D) * reference_line_direction_3D;
   distance_vector_3D =
       projection_on_line_3D - points[idx_point_closest_to_line];
 
-  *start_out -= distance_vector_3D;
-  *end_out -= distance_vector_3D;
+  start_out_temp -= distance_vector_3D;
+  end_out_temp -= distance_vector_3D;
+  if (std::isnan(start_out_temp[0]) || std::isnan(start_out_temp[1]) ||
+      std::isnan(start_out_temp[2]) || std::isnan(end_out_temp[0]) ||
+      std::isnan(end_out_temp[1]) || std::isnan(end_out_temp[2])) {
+    // This case should in principle never be entered, but if an error occurs
+    // during the adjustment, this ensures that the input line is returned, as
+    // it is.
+    *start_out = start_ref;
+    *end_out = end_ref;
+  } else {
+    *start_out = start_out_temp;
+    *end_out = end_out_temp;
+  }
 }
 
 void LineDetector::adjustLineOrientationGiven2DReferenceLine(

@@ -169,14 +169,14 @@ cv::Point2f roundPoint(const cv::Point2f& point, int decimal=5) {
   return {roundValue(point.x, decimal), roundValue(point.y, decimal)};
 }
 
-bool inline checkEqualFloats(const float& num_1, const float& num_2) {
+inline bool checkEqualFloats(const float& num_1, const float& num_2) {
   // Partially based on The art of computer programming by Donald Knuth.
   float epsilon = 1e-5;
   return (fabs(num_1 - num_2) <= ((fabs(num_1) < fabs(num_2) ?  fabs(num_2):
           fabs(num_1)) * epsilon));
 }
 
-bool inline checkEqualPoints(const cv::Point2f& point_1,
+inline bool checkEqualPoints(const cv::Point2f& point_1,
                              const cv::Point2f& point_2) {
   return (checkEqualFloats(point_1.x, point_2.x) &&
           checkEqualFloats(point_1.y, point_2.y));
@@ -192,7 +192,7 @@ inline bool checkEqualPoints(const cv::Vec3f& point_1,
 // Binary function that checks whether a point (x, y) is such that:
 // - 0 < x < x_max and 0 < y < y_max if tight = true,
 // - 0 <= x <= x_max and 0 <= y <= y_max if tight = false.
-bool inline checkPointInBounds(const cv::Point2f& point, size_t x_max,
+inline bool checkPointInBounds(const cv::Point2f& point, size_t x_max,
                               size_t y_max, bool tight=false) {
   CHECK(x_max > 0);
   CHECK(y_max > 0);
