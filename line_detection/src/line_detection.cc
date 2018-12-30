@@ -801,6 +801,15 @@ double LineDetector::findAndRate3DLine(const cv::Mat& point_cloud,
   if (!find3DLineStartAndEnd(point_cloud, line2D, line3D, &start, &end)) {
     return 1e9;
   }
+  // In some cases the line found had an endpoint that coincided with the
+  // origin, causing the reprojection to 2D to fail. This line should be
+  // discarded.
+  cv::Vec3f start_3D = {(*line3D)[0], (*line3D)[1], (*line3D)[2]};
+  cv::Vec3f end_3D = {(*line3D)[3], (*line3D)[4], (*line3D)[5]};
+  if (checkEqualPoints(start_3D, {0.0f, 0.0f, 0.0f}) ||
+      checkEqualPoints(end_3D, {0.0f, 0.0f, 0.0f})) {
+    return 1e9;
+  }
 
   // In addition to find3DLineStartAndEnd, this function also rates the
   // line. The rating is based on the average distance between 3D line and
@@ -2080,7 +2089,6 @@ void LineDetector::project2Dto3DwithPlanes(
     findInliersGiven2DLine(lines2D[i], cloud, image, set_colors, &line3D_true,
                           &inliers_right, &inliers_left, &rect_right,
                           &rect_left, &right_found, &left_found);
-
     bool planes_found = false;
     if ((!right_found) && (!left_found)) {
       continue;

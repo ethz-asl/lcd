@@ -182,6 +182,13 @@ bool inline checkEqualPoints(const cv::Point2f& point_1,
           checkEqualFloats(point_1.y, point_2.y));
 }
 
+inline bool checkEqualPoints(const cv::Vec3f& point_1,
+                             const cv::Vec3f& point_2) {
+  return (checkEqualFloats(point_1[0], point_2[0]) &&
+          checkEqualFloats(point_1[1], point_2[1]) &&
+          checkEqualFloats(point_1[2], point_2[2]));
+}
+
 // Binary function that checks whether a point (x, y) is such that:
 // - 0 < x < x_max and 0 < y < y_max if tight = true,
 // - 0 <= x <= x_max and 0 <= y <= y_max if tight = false.
