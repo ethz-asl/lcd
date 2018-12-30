@@ -164,7 +164,7 @@ if __name__ == '__main__':
         dataset_name = pathconfig.obtain_paths_and_variables("DATASET_NAME")
         # Compose script arguments if necessary
         dataset_path = os.path.join(scenenet_dataset_path, 'data/',
-                                    dataset_name)
+                                    dataset_name.split('_')[0])
 
     linesfiles_path = os.path.join(linesandimagesfolder_path,
                                    '{}_lines'.format(dataset_name))

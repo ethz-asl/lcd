@@ -48,4 +48,4 @@ PICKLEANDSPLIT_PATH=/media/francesco/line\ tools\ data/pickle\ files/
 # *** The following two variables are specific of the data generation task being
 #     carried out ***
 TRAJ_NUM=1
-DATASET_NAME=train
+DATASET_NAME=train_0

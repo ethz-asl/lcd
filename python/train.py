@@ -31,14 +31,14 @@ def train():
 
     # For pickle version
     train_files = [
-        os.path.join(pickleandsplit_path, 'train/traj_1/pickled_train.pkl')
+        os.path.join(pickleandsplit_path, 'train_0/traj_1/pickled_train.pkl')
     ]
     val_files = [
-        os.path.join(pickleandsplit_path, 'train/traj_1/pickled_val.pkl')
+        os.path.join(pickleandsplit_path, 'train_0/traj_1/pickled_val.pkl')
     ]
     # For textfile version
-    #train_files = [os.path.join(pickleandsplit_path, 'train/traj_1/train.txt')]
-    #val_files = [os.path.join(pickleandsplit_path, 'train/traj_1/val.txt')]
+    #train_files = [os.path.join(pickleandsplit_path, 'train_0/traj_1/train.txt')]
+    #val_files = [os.path.join(pickleandsplit_path, 'train_0/traj_1/val.txt')]
 
     image_type = 'bgr-d'
 

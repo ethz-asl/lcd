@@ -3,20 +3,24 @@
 # 1 by default
 TRAJ_NUM=${1:-1}
 DATA_PATH=${2:-"../data"}
-DATASET_NAME=${3:-"train"}
+DATASET_NAME=${3:-"train_0"}
 
 # Check that name of the dataset is valid
-# TODO Retrieve from the protobuf if the DATASET_NAME is valid
-
-case "$DATASET_NAME" in
+case ${DATASET_NAME%_*} in
     train)
-        echo "Using training set from pySceneNetRGBD."
+        if [ ${DATASET_NAME#*_} -ge 0 ] && [ ${DATASET_NAME#*_} -le 16 ]
+        then
+          echo "Using training set ${DATASET_NAME#*_} from pySceneNetRGBD."
+        else
+          echo "Invalid argument $DATASET_NAME. Valid options are 'val' and 'train_NUM', where NUM is between 0 and 16."
+          exit 1
+        fi
         ;;
     val)
         echo "Using validation set from pySceneNetRGBD."
         ;;
     *)
-        echo "Invalid argument $DATASET_NAME. Valid options are 'train' and 'val'."
+        echo "Invalid argument $DATASET_NAME. Valid options are 'val' and 'train_NUM', where NUM is between 0 and 16."
         exit 1
         ;;
 esac

@@ -1,4 +1,20 @@
 # Please enter dataset names followed by a colon, (a whitespace) and the path
 # of the protobuf file corresponding to the dataset name.
-train: /media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/data/train_protobufs/scenenet_rgbd_train_0.pb
+train_0: /media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/data/scenenet_rgbd_train_0.pb
+train_1: /media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/data/scenenet_rgbd_train_1.pb
+train_2: /media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/data/scenenet_rgbd_train_2.pb
+train_3: /media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/data/scenenet_rgbd_train_3.pb
+train_4: /media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/data/scenenet_rgbd_train_4.pb
+train_5: /media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/data/scenenet_rgbd_train_5.pb
+train_6: /media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/data/scenenet_rgbd_train_6.pb
+train_7: /media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/data/scenenet_rgbd_train_7.pb
+train_8: /media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/data/scenenet_rgbd_train_8.pb
+train_9: /media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/data/scenenet_rgbd_train_9.pb
+train_10: /media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/data/scenenet_rgbd_train_10.pb
+train_11: /media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/data/scenenet_rgbd_train_11.pb
+train_12: /media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/data/scenenet_rgbd_train_12.pb
+train_13: /media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/data/scenenet_rgbd_train_13.pb
+train_14: /media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/data/scenenet_rgbd_train_14.pb
+train_15: /media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/data/scenenet_rgbd_train_15.pb
+train_16: /media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/data/scenenet_rgbd_train_16.pb
 val: /media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/data/scenenet_rgbd_val.pb

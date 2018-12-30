@@ -16,18 +16,16 @@ from tools.get_line_center import get_line_center
 python_root = '../'
 sys.path.insert(0, python_root)
 
-log_files_folder = '/media/francesco/line_tools_data/logs/29122018_1819/'
+log_files_folder = '/media/francesco/line_tools_data/logs/30122018_0852/'
 
 sess = tf.InteractiveSession()
 saver = tf.train.import_meta_graph(
     os.path.join(log_files_folder,
-                 'triplet_loss_batch_all_ckpt/bgr-d_model_epoch1.ckpt.meta')
-)
+                 'triplet_loss_batch_all_ckpt/bgr-d_model_epoch1.ckpt.meta'))
 saver.restore(
     sess,
     os.path.join(log_files_folder,
-                 'triplet_loss_batch_all_ckpt/bgr-d_model_epoch1.ckpt')
-)
+                 'triplet_loss_batch_all_ckpt/bgr-d_model_epoch1.ckpt'))
 
 # Visualize kernels
 conv1_kernels = sess.run('conv1/weights:0')
@@ -41,7 +39,7 @@ vis_square(conv1_kernels_depth.transpose(2, 0, 1))
 
 read_as_pickle = True
 
-test_files = '/media/francesco/line_tools_data/pickle files/train/traj_1/pickled_test.pkl'
+test_files = '/media/francesco/line_tools_data/pickle files/train_0/traj_1/pickled_test.pkl'
 
 # For the last models trained, that also store train_set_mean in the model
 train_set_mean = sess.run('train_set_mean:0')

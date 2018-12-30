@@ -41,9 +41,9 @@ vis_square(conv1_kernels_depth.transpose(2, 0, 1))
 
 read_as_pickle = True
 
-test_files = '/media/francesco/line tools data/pickle files/train/traj_1/pickled_test.pkl'
-#test_files = '/media/francesco/line tools data/pickle files/train/traj_1/test.txt'
-#test_files = '/media/francesco/line tools data/pickle files/train/traj_2/test_edited.txt'
+test_files = '/media/francesco/line_tools_data/pickle files/train_0/traj_1/pickled_test.pkl'
+#test_files = '/media/francesco/line_tools_data/pickle files/train_0/traj_1/test.txt'
+#test_files = '/media/francesco/line_tools_data/pickle files/train_0/traj_2/test_edited.txt'
 
 # For the last models trained, that also store train_set_mean in the model
 train_set_mean = sess.run('train_set_mean:0')

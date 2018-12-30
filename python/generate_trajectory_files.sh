@@ -62,7 +62,7 @@ then
 else
    # Generate virtual camera images
    echo -e "\n**** Generating virtual camera images for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
-   python "$PYTHONSCRIPTS_PATH"/get_virtual_camera_images.py -trajectory ${TRAJ_NUM} -scenenetscripts_path "$SCENENET_SCRIPTS_PATH" -dataset_name ${DATASET_NAME} -dataset_path "$SCENENET_DATASET_PATH"/data/${DATASET_NAME}/ -linesandimagesfolder_path "$LINESANDIMAGESFOLDER_PATH"/;
+   python "$PYTHONSCRIPTS_PATH"/get_virtual_camera_images.py -trajectory ${TRAJ_NUM} -scenenetscripts_path "$SCENENET_SCRIPTS_PATH" -dataset_name ${DATASET_NAME} -dataset_path "$SCENENET_DATASET_PATH"/data/${DATASET_NAME%_*}/ -linesandimagesfolder_path "$LINESANDIMAGESFOLDER_PATH"/;
    # Creates a file to say that virtual camera images have been generated, to
    # avoid creating them again if reexecuting the script before moving files.
    touch "$LINESANDIMAGESFOLDER_PATH"/VALID_VIRTUAL_CAMERA_IMAGES_${TRAJ_NUM}_${DATASET_NAME};
@@ -71,9 +71,9 @@ fi
 # Create archive.
 echo -e "\n**** Zipping files for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
 cd "$LINESANDIMAGESFOLDER_PATH";
-# (the --no-name option is to prevent gzip to insert time info in the header,
-# so that two archives containing the exact same files can in fact have same md5
-# hash)
+# (the --no-name option is to prevent gzip from inserting time info in the
+# header, so that two archives containing the exact same files can in fact have
+# same md5 hash)
 tar -cf - ${DATASET_NAME}/traj_${TRAJ_NUM} ${DATASET_NAME}_lines/traj_${TRAJ_NUM} | gzip --no-name > "$TARFILES_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM}.tar.gz
 
 # Split dataset.
