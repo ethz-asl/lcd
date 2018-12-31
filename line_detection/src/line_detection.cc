@@ -2103,6 +2103,11 @@ void LineDetector::project2Dto3DwithPlanes(
 
   // Initialize the number of lines successfully projected to 3D to 0.
   num_lines_successfully_projected_to_3D = 0;
+
+  bool planes_found;
+  cv::Mat image_of_line_with_rectangles;
+  cv::Vec4f reprojected_line;
+  cv::Vec3f start_3D, end_3D;
   // Loop over all 2D lines.
   for (size_t i = 0; i < lines2D.size(); ++i) {
     // If cannot find valid 3D start and end points for the 2D line.
@@ -2111,7 +2116,7 @@ void LineDetector::project2Dto3DwithPlanes(
     findInliersGiven2DLine(lines2D[i], cloud, image, set_colors, &line3D_true,
                           &inliers_right, &inliers_left, &rect_right,
                           &rect_left, &right_found, &left_found);
-    bool planes_found = false;
+    planes_found = false;
     if ((!right_found) && (!left_found)) {
       continue;
     } else if (!right_found) {
@@ -2122,8 +2127,6 @@ void LineDetector::project2Dto3DwithPlanes(
       // Both left and right planes are found.
       planes_found = true;
     }
-
-    cv::Mat image_of_line_with_rectangles;
 
     if (visualization_mode_on_) {
       //background_image_ = getImageOfLineWithRectangles(lines2D[i],
@@ -2142,14 +2145,21 @@ void LineDetector::project2Dto3DwithPlanes(
     if (find3DlineOnPlanes(inliers_right, inliers_left, lines3D_cand[i],
                            lines2D[i], cloud, camera_P, planes_found,
                            &line3D_true)) {
+      // Further test: check that the line found and the candidate reference
+      // line are similar in length. It might indeed happen that because of
+      // planes around the line being not perfect fits, the lines readjusted
+      // with inliers are much shorter/longer than the originally detected 3D
+      // line. These lines should be discarded.
+      if (!linesHaveSimilarLength(lines3D_cand[i], line3D_true.line)) {
+        continue;
+      }
+
       // Only push back the reliably found lines.
       lines3D->push_back(line3D_true);
       lines2D_out->push_back(lines2D[i]);
-      cv::Vec4f reprojected_line;
-      cv::Vec3f start_3D({line3D_true.line[0], line3D_true.line[1],
-                          line3D_true.line[2]});
-      cv::Vec3f end_3D({line3D_true.line[3], line3D_true.line[4],
-                        line3D_true.line[5]});
+      start_3D = {line3D_true.line[0], line3D_true.line[1],
+                  line3D_true.line[2]};
+      end_3D = {line3D_true.line[3], line3D_true.line[4], line3D_true.line[5]};
 
       project3DLineTo2D(start_3D, end_3D, camera_P, &reprojected_line);
 
@@ -2624,9 +2634,7 @@ bool LineDetector::checkIfValidLineWith2DInfo(const cv::Mat& cloud,
   cv::Vec2f line_dir{end_2D[0] - start_2D[0], end_2D[1] - start_2D[1]};
 
   // Check difference of length.
-  constexpr double kLengthDifference = 1.5;
-  if (cv::norm(line_dir) / cv::norm(line_dir_true) > kLengthDifference ||
-      cv::norm(line_dir_true) / cv::norm(line_dir) > kLengthDifference) {
+  if (!linesHaveSimilarLength(line_3D_reprojected, line_2D)) {
     return false;
   }
 

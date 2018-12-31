@@ -318,6 +318,34 @@ inline void directHessianTowardsPoint(const cv::Vec3f& point,
     *hessian = -(*hessian);
 }
 
+inline bool linesHaveSimilarLength(const cv::Vec4f& line_1,
+                                   const cv::Vec4f& line_2) {
+  constexpr double kLengthDifference = 1.5;
+  double length_1 = cv::norm(cv::Vec2f({line_1[2], line_1[3]}) -
+                             cv::Vec2f({line_1[0], line_1[1]}));
+  double length_2 = cv::norm(cv::Vec2f({line_2[2], line_2[3]}) -
+                             cv::Vec2f({line_2[0], line_2[1]}));
+  if (length_1 / length_2 > kLengthDifference ||
+      length_2 / length_1 > kLengthDifference) {
+      return false;
+  }
+  return true;
+}
+
+inline bool linesHaveSimilarLength(const cv::Vec6f& line_1,
+                                   const cv::Vec6f& line_2) {
+  constexpr double kLengthDifference = 1.5;
+  double length_1 = cv::norm(cv::Vec3f({line_1[3], line_1[4], line_1[5]}) -
+                             cv::Vec3f({line_1[0], line_1[1], line_1[2]}));
+  double length_2 = cv::norm(cv::Vec3f({line_2[3], line_2[4], line_2[5]}) -
+                             cv::Vec3f({line_2[0], line_2[1], line_2[2]}));
+  if (length_1 / length_2 > kLengthDifference ||
+      length_2 / length_1 > kLengthDifference) {
+      return false;
+  }
+  return true;
+}
+
 // Returns the projection of a point on the plane given defined by the hessian.
 cv::Vec3f projectPointOnPlane(const cv::Vec4f& hessian, const cv::Vec3f& point);
 
