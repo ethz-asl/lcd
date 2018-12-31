@@ -8,7 +8,7 @@ source $CURRENT_DIR/config_paths_and_variables.sh
 # Check dataset name.
 if [ -z $DATASET_NAME ]
 then
-    echo "Please provide the name of dataset to use. Possible options are 'train' and 'val'. Exiting."
+    echo "Please provide the name of dataset to use. Possible options are and 'val' and 'train_NUM', where NUM is a number between 0 and 16. Exiting."
     exit 1
 fi
 
@@ -22,14 +22,14 @@ mkdir -p "$PICKLEANDSPLIT_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM}/;
 trap "exit" INT
 
 # Generate bag.
-echo -e "\n****  Generating bag for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
-echo -e "PLEASE NOTE! If an error occurs during the formation of the bag (e.g."
-echo -e "early termination by interrupt) the script will not check if the bag "
-echo -e "is valid. Therefore invalid bags should be manually removed.\n"
 if [ -e "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenet_traj_${TRAJ_NUM}.bag ]
 then
-    echo 'Bag file already existent. Using bag found.';
+    echo "Bag file for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set already exists. Using bag found.";
 else
+    echo -e "\n****  Generating bag for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
+    echo -e "PLEASE NOTE! If an error occurs during the formation of the bag (e.g."
+    echo -e "early termination by interrupt) the script will not check if the bag "
+    echo -e "is valid. Therefore invalid bags should be manually removed.\n"
     rosrun scenenet_ros_tools scenenet_to_rosbag.py -scenenet_path "$SCENENET_DATASET_PATH" -trajectory $TRAJ_NUM -dataset_type ${DATASET_NAME} -output_bag "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenet_traj_${TRAJ_NUM}.bag;
 fi
 
@@ -41,18 +41,23 @@ if [ -e "$LINESANDIMAGESFOLDER_PATH"/VALID_LINES_FILES_${TRAJ_NUM}_${DATASET_NAM
 then
    echo 'Found valid lines files. Using them.'
 else
-   # Delete any previous line textfile associated to that trajectory.
-   rm "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/traj_${TRAJ_NUM}/*
-   # Play bag and record data.
-   echo -e "\n**** Playing bag and recording data for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
-   roslaunch line_ros_utility detect_cluster_show.launch trajectory:=${TRAJ_NUM} write_path:="$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/ &
-   LAUNCH_PID=$!;
-   rosbag play -d 3.5 "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenet_traj_${TRAJ_NUM}.bag;
-   sudo kill ${LAUNCH_PID};
-
-   # Creates a file to say that lines files have been generated, to avoid
-   # creating them again if reexecuting the script before moving files.
-   touch "$LINESANDIMAGESFOLDER_PATH"/VALID_LINES_FILES_${TRAJ_NUM}_${DATASET_NAME};
+  while
+    # Delete any previous line textfile associated to that trajectory.
+    rm "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/traj_${TRAJ_NUM}/*
+    # Play bag and record data.
+    echo -e "\n**** Playing bag and recording data for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
+    roslaunch line_ros_utility detect_cluster_show.launch trajectory:=${TRAJ_NUM} write_path:="$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/ &
+    LAUNCH_PID=$!;
+    rosbag play -d 3.5 -r 2 "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenet_traj_${TRAJ_NUM}.bag;
+    sudo kill ${LAUNCH_PID};
+    # Repeat process from scratch if not all lines have been generated.
+    [ ! -e "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/traj_${TRAJ_NUM}/lines_2D_299.txt ]
+  do
+    :
+  done
+  # Creates a file to say that (all) lines files have been generated, to avoid
+  # creating them again if reexecuting the script before moving files.
+  touch "$LINESANDIMAGESFOLDER_PATH"/VALID_LINES_FILES_${TRAJ_NUM}_${DATASET_NAME};
 fi
 
 # Only generate virtual camera images files if not there already (and valid).
@@ -98,3 +103,4 @@ rm -r "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/traj_${TRAJ_NUM};
 echo -e "\n**** Delete virtual camera images for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
 rm "$LINESANDIMAGESFOLDER_PATH"/VALID_VIRTUAL_CAMERA_IMAGES_${TRAJ_NUM}_${DATASET_NAME};
 rm -r "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM};
+rm -r "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM}_inpaint;
