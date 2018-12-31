@@ -106,20 +106,14 @@ else:
     # therefore some lines might be visualized in one case but not in the other.
 
     for i in range(test_set_size):
-        batch_input_img, batch_labels, batch_line_types = test_generator.next_batch(
+        batch_input_img, _, batch_line_types = test_generator.next_batch(
             batch_size)
-
-        # Pickled files have labels in the endpoints format -> convert them
-        # to center format
-        if read_as_pickle:
-            batch_labels = get_line_center(batch_labels)
 
         start_time = timer()
         output = sess.run(
             embeddings,
             feed_dict={
                 input_img: batch_input_img,
-                labels: batch_labels,
                 line_types: batch_line_types,
                 keep_prob: 1.
             })
@@ -141,7 +135,7 @@ if read_as_pickle:
 else:
     from tools.visualization import get_lines_world_coordinates_with_instances
     data_lines_world = get_lines_world_coordinates_with_instances(
-        trajectory=traj, frames=test, dataset_name='train')
+        trajectory=traj, frames=test, dataset_name='train_0')
 
 # Only keep the lines for which an embedding was seeked (since data is processed
 # in batches only for a number of lines multiple of the batch size the embedding
