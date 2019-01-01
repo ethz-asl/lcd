@@ -1728,6 +1728,42 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
       &right_plane_enough_valid_points_after_end,
       &left_plane_enough_valid_points_after_end);
 
+  bool can_prolonge_before_start, can_prolonge_after_end, can_prolonge;
+  constexpr size_t max_iterations = 4;
+  size_t num_iterations;
+  can_prolonge_before_start = right_plane_enough_valid_points_before_start &&
+                              left_plane_enough_valid_points_before_start;
+  can_prolonge_after_end = right_plane_enough_valid_points_after_end &&
+                           left_plane_enough_valid_points_after_end;
+  can_prolonge = can_prolonge_before_start || can_prolonge_after_end;
+  num_iterations = 0;
+  while (can_prolonge && num_iterations < max_iterations) {
+    // Prolonge.
+    if (can_prolonge_before_start) {
+      start_line_before_start -=
+          params_->extension_length_for_edge_or_intersection * direction;
+    }
+    if (can_prolonge_after_end) {
+      end_line_after_end +=
+          params_->extension_length_for_edge_or_intersection * direction;
+    }
+    checkIfValidPointsOnPlanesGivenProlongedLine(
+        cloud, camera_P, start_line_before_start, end_line_before_start,
+        line->hessians, &right_plane_enough_valid_points_before_start,
+        &left_plane_enough_valid_points_before_start);
+    checkIfValidPointsOnPlanesGivenProlongedLine(
+        cloud, camera_P, start_line_after_end, end_line_after_end,
+        line->hessians, &right_plane_enough_valid_points_after_end,
+        &left_plane_enough_valid_points_after_end);
+    can_prolonge_before_start = right_plane_enough_valid_points_before_start &&
+                                left_plane_enough_valid_points_before_start;
+    can_prolonge_after_end = right_plane_enough_valid_points_after_end &&
+                             left_plane_enough_valid_points_after_end;
+    can_prolonge = can_prolonge_before_start || can_prolonge_after_end;
+
+    num_iterations++;
+  }
+
   // Convert booleans to string.
   std::string point_planes_config;
   point_planes_config.push_back(
@@ -1739,12 +1775,16 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
   point_planes_config.push_back(
       int(right_plane_enough_valid_points_after_end) + '0');
   // Possible cases:
-  // - [0][0]/[0][0] -> Edge line.
+  // - [0][0]/[0][0] or [1][1]/[1][1] -> Edge line.
   // - All other cases -> Intersection line.
   if (point_planes_config == "0000") {
     line->type = LineType::EDGE;
     num_edge_lines++;
     occurrences_config_prolonged_plane[0][0][0][0]++;
+  } else if (point_planes_config == "1111") {
+    line->type = LineType::EDGE;
+    num_edge_lines++;
+    occurrences_config_prolonged_plane[1][1][1][1]++;
   } else {
     LOG(INFO) << "The current line (of intersection type) has the following "
               << "configuration for inliers in the prolonged planes (LRLR): "
@@ -1762,8 +1802,6 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
     } else if (point_planes_config == "1110" || point_planes_config == "1101" ||
                point_planes_config == "1011" || point_planes_config == "0111") {
       occurrences_config_prolonged_plane[1][1][1][0]++;
-    } else if (point_planes_config == "1111") {
-      occurrences_config_prolonged_plane[1][1][1][1]++;
     } else {
       LOG(ERROR) << "Found a case for the configuration valid points/prolonged "
                  << "planes that should be impossible.";
