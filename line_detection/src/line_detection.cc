@@ -885,6 +885,185 @@ cv::Vec4f LineDetector::fitLineToBoundsWithDirection(
   double x_bound = static_cast<double>(x_max);
   double y_bound = static_cast<double>(y_max);
 
+  cv::Point2f start = {line2D[0], line2D[1]};
+  cv::Point2f end = {line2D[2], line2D[3]};
+  cv::Point2f start_trimmed, end_trimmed;
+  bool start_trimmed_found, end_trimmed_found;
+
+  // Lines that are too short are not very sensible to look at, since they might
+  // be due to noisy detection. Furthermore, they might cause numerical errors.
+  // Therefore they are discarded (they are assigned 0 length).
+  if (cv::norm(end - start) < 1e-4) {
+    return {0.0f, 0.0f, 0.0f, 0.0f};
+  }
+  // Retrieve the trimmed endpoints.
+  start_trimmed_found = trimEndpoint(start, end, x_max, y_max, &start_trimmed);
+  if (!start_trimmed_found) {
+    return {0.0f, 0.0f, 0.0f, 0.0f};
+  }
+  end_trimmed_found = trimEndpoint(end, start, x_max, y_max, &end_trimmed);
+  if (!end_trimmed_found) {
+    return {0.0f, 0.0f, 0.0f, 0.0f};
+  }
+  start_trimmed = roundPoint(start_trimmed);
+  end_trimmed = roundPoint(end_trimmed);
+  return {start_trimmed.x, start_trimmed.y, end_trimmed.x, end_trimmed.y};
+}
+
+bool LineDetector::trimEndpoint(const cv::Point2f& point,
+                                const cv::Point2f& other_endpoint,
+                                double x_max, double y_max,
+                                cv::Point2f* trimmed_point) {
+  CHECK_NOTNULL(trimmed_point);
+  // We refer to line segments x = 0, x = x_max, y = 0, y = y_max respectively
+  // as left (L), right (R), down (D), up (U), and to the endpoint of the line
+  // to be trimmed and the other endpoint respectively as P and O. We then
+  // compute the distances of P from each of L, R, U and D.
+  // Expected values for the endpoint to be inside the image:
+  // * 0 <= d_PL, d_RP, d_OL, d_RO <= x_max;
+  // * 0 <= d_UP, d_PD, d_UO, d_OD <= y_max.
+  std::vector<cv::Point2f> candidate_point_trimmed;
+  double d_PL, d_RP, d_PD, d_UP;
+  double d_OL, d_RO, d_OD, d_UO;
+  bool horizontally_in_the_image;
+  bool vertically_in_the_image;
+  cv::Point2f point_trimmed;
+  d_PL = point.x;
+  d_RP = x_max - point.x;
+  d_PD = point.y;
+  d_UP = y_max - point.y;
+  d_OL = other_endpoint.x;
+  d_RO = x_max - other_endpoint.x;
+  d_OD = other_endpoint.y;
+  d_UO = y_max - other_endpoint.y;
+
+  horizontally_in_the_image = false;
+  if (d_PL < 0) {   // Endpoint is on the left of the image.
+    CHECK(d_PL <= x_max);
+    CHECK(d_RP >= 0);
+    CHECK(d_RP > x_max);
+    if (d_OL < 0) {
+      // If both endpoints are on the same side of the bound the line does not
+      // intersect the image and therefore it cannot be trimmed.
+      return false;
+    }
+    point_trimmed.x = 0.0f;
+  } else if (d_RP < 0) {   // Endpoint is on the right of the image.
+    CHECK(d_RP <= x_max);
+    CHECK(d_PL >= 0);
+    CHECK(d_PL > x_max);
+    if (d_RO < 0) {
+      // If both endpoints are on the same side of the bound the line does not
+      // intersect the image and therefore it cannot be trimmed.
+      return false;
+    }
+    point_trimmed.x = x_max;
+  } else { // Endpoint is within the horizontal bounds of the image.
+    point_trimmed.x = point.x;
+    horizontally_in_the_image = true;
+  }
+  if (!horizontally_in_the_image) {
+    // (other_endpoint.y - point_trimmed.y) /
+    // (other_endpoint.x - point_trimmed.x) = (other_endpoint.y - point.y) /
+    // (other_endpoint.x - point.x)
+    if (checkEqualFloats(other_endpoint.x, point.x)) { // Vertical line.
+      // A vertical line that is not horizontally in the image will never
+      // intersect the image => Return false.
+      return false;
+    }
+    // NOTE: division can be performed, as vertical line has already been
+    // excluded.
+    point_trimmed.y = other_endpoint.y - (other_endpoint.y - point.y) *
+                      (other_endpoint.x - point_trimmed.x) /
+                      (other_endpoint.x - point.x);
+    // Take the intersection of the line with the axis x = point_trimmed.x as
+    // candidate trimmed point.
+    candidate_point_trimmed.push_back(point_trimmed);
+  }
+
+  vertically_in_the_image = false;
+  if (d_PD < 0) {   // Endpoint is under the image.
+    CHECK(d_PD <= y_max);
+    CHECK(d_UP >= 0);
+    CHECK(d_UP > y_max);
+    if (d_OD < 0) {
+      // If both endpoints are on the same side of the bound the line does not
+      // intersect the image and therefore it cannot be trimmed.
+      return false;
+    }
+    point_trimmed.y = 0;
+  } else if (d_UP < 0) {   // Endpoint is on top of the image.
+    CHECK(d_UP <= y_max);
+    CHECK(d_PD >= 0);
+    CHECK(d_PD > y_max);
+    if (d_UO < 0) {
+      // If both endpoints are on the same side of the bound the line does not
+      // intersect the image and therefore it cannot be trimmed.
+      return false;
+    }
+    point_trimmed.y = y_max;
+  } else { // Endpoint is within the vertical bounds of the image.
+    point_trimmed.y = point.y;
+    vertically_in_the_image = true;
+  }
+  if (!vertically_in_the_image) {
+    // (other_endpoint.y - point_trimmed.y) /
+    // (other_endpoint.x - point_trimmed.x) = (other_endpoint.y - point.y) /
+    // (other_endpoint.x - point.x)
+    if (checkEqualFloats(other_endpoint.y, point.y)) { // Horizontal line.
+      // A horizontal line that is not vertically in the image will never
+      // intersect the image => Return false.
+      return false;
+    }
+    // NOTE: division can be performed, as horinzontal line has already been
+    // excluded.
+    point_trimmed.x = other_endpoint.x - (other_endpoint.x - point.x) *
+                      (other_endpoint.y - point_trimmed.y) /
+                      (other_endpoint.y - point.y);
+    // Take the intersection of the line with the axis y = point_trimmed.y as
+    // candidate trimmed point.
+    candidate_point_trimmed.push_back(point_trimmed);
+  }
+
+  if (horizontally_in_the_image && vertically_in_the_image) {
+    // Point is already in the image, return it as it is.
+    *trimmed_point = point;
+    return true;
+  }
+  // Return the trimmed point. If the point is outside the image both vertically
+  // and horizontally there are two candidate points => The one within the
+  // the bounds of the image should be selected. Note: in case of line that go
+  // through a corner of the image, both points found should be within the
+  // the bounds of the image, as they coincide => Take the first valid point.
+  if (candidate_point_trimmed.size() == 2) {
+    if (checkPointInBounds(candidate_point_trimmed[0], x_max, y_max) &&
+        checkPointInBounds(candidate_point_trimmed[1], x_max, y_max)) {
+          LOG(INFO) << "Both " << candidate_point_trimmed[0] << " and "
+                << candidate_point_trimmed[1] << " are valid candidates for "
+                << "the trimmed point. They are "
+                << (checkEqualPoints(candidate_point_trimmed[0],
+                                    candidate_point_trimmed[1]) ? "" : "not ")
+                << "equal.";
+    }
+  }
+  for (auto& candidate_point : candidate_point_trimmed) {
+    if (checkPointInBounds(candidate_point, x_max, y_max)) {
+      *trimmed_point = candidate_point;
+      return true;
+    }
+  }
+  // This case corresponds for instance to start = (10, -60), end = (-20, 60).
+  return false;
+}
+
+// Deprecated. Old version of fitLineToBoundsWithDirection.
+cv::Vec4f LineDetector::fitLineToBoundsWithDirectionByParametrization(
+     const cv::Vec4f& line2D, size_t x_max, size_t y_max) {
+  CHECK(x_max > 0);
+  CHECK(y_max > 0);
+  double x_bound = static_cast<double>(x_max);
+  double y_bound = static_cast<double>(y_max);
+
   // Round start and end to the same decimal.
   cv::Point2f start = roundPoint({line2D[0], line2D[1]});
   cv::Point2f end = roundPoint({line2D[2], line2D[3]});

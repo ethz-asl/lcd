@@ -664,7 +664,7 @@ TEST_F(LineDetectionTest, testfitLineToBounds) {
             << line_out[3] << ").";
   EXPECT_NEAR(line_out[0], 0, 1e-4);
   EXPECT_NEAR(line_out[1], 23, 1e-4);
-  EXPECT_EQ(line_out[2], 174);
+  EXPECT_NEAR(line_out[2], 174, 1e-4);
   EXPECT_EQ(line_out[3], 0);
   // From a previous failure case
   line_in = {-4.02431, 170.024, -7.4678e-07, 166};
@@ -677,7 +677,17 @@ TEST_F(LineDetectionTest, testfitLineToBounds) {
   EXPECT_EQ(line_out[1], 0);
   EXPECT_EQ(line_out[2], 0);
   EXPECT_EQ(line_out[3], 0);
-
+  //
+  line_in = {-20, 10, -10, 10};
+  line_out = line_detector_.fitLineToBounds(line_in, x_max, y_max);
+  LOG(INFO) << "Fitted line (" << line_in[0] << ", " << line_in[1] << ", "
+            << line_in[2] << ", " << line_in[3] << ") as (" << line_out[0]
+            << ", " << line_out[1] << ", " << line_out[2] << ", "
+            << line_out[3] << ").";
+  EXPECT_EQ(line_out[0], 0);
+  EXPECT_EQ(line_out[1], 0);
+  EXPECT_EQ(line_out[2], 0);
+  EXPECT_EQ(line_out[3], 0);
 }
 
 }  // namespace line_detection

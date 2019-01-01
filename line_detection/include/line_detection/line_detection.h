@@ -159,21 +159,37 @@ inline int fitToBoundaryInt(const int value, const int lower,
   }
 }
 
-float roundValue(const float& value, int decimal=5) {
+// Truncates a number to the decimal-th decimal number, with an error less test
+// 10^(-decimal).
+float roundValue(const float& value, int decimal=6) {
   CHECK(decimal <= 6 && decimal >= 0);
-  return floor(value * pow(10, decimal) + 0.5) / pow(10, decimal);
+  // Truncate.
+  if (value >= 0.0) {
+    return floor(value * pow(10, decimal)) / pow(10, decimal);
+  } else {
+    return ceil(value * pow(10, decimal)) / pow(10, decimal);
+  }
 }
 
-cv::Point2f roundPoint(const cv::Point2f& point, int decimal=5) {
+cv::Point2f roundPoint(const cv::Point2f& point, int decimal=6) {
   CHECK(decimal <= 6 && decimal >= 0);
   return {roundValue(point.x, decimal), roundValue(point.y, decimal)};
 }
 
 inline bool checkEqualFloats(const float& num_1, const float& num_2) {
-  // Partially based on The art of computer programming by Donald Knuth.
-  float epsilon = 1e-5;
-  return (fabs(num_1 - num_2) <= ((fabs(num_1) < fabs(num_2) ?  fabs(num_2):
-          fabs(num_1)) * epsilon));
+  if (std::isnan(num_1) || std::isnan(num_2)) {
+    return false;
+  }
+  // For large numbers use a method based on the relative difference, to avoid
+  // accessing digits that are not encoded with the precision used (partially
+  // based on The art of computer programming by Donald Knuth.)
+  if (fabs(num_1) > 1e4 || fabs(num_2) > 1e4) {
+    return (fabs(num_1 - num_2) <= ((fabs(num_1) < fabs(num_2) ?  fabs(num_2):
+            fabs(num_1)) * 1e-6));
+  }
+  // For smaller numbers, round them to a certain decimal and check that the
+  // preceding decimals are equal.
+  return fabs(roundValue(num_1, 6) - roundValue(num_2, 6)) < 1e-5;
 }
 
 inline bool checkEqualPoints(const cv::Point2f& point_1,
@@ -194,16 +210,19 @@ inline bool checkEqualPoints(const cv::Vec3f& point_1,
 // - 0 <= x <= x_max and 0 <= y <= y_max if tight = false.
 inline bool checkPointInBounds(const cv::Point2f& point, size_t x_max,
                               size_t y_max, bool tight=false) {
+  return checkPointInBounds(point, static_cast<double>(x_max),
+                            static_cast<double>(y_max), tight);
+}
+inline bool checkPointInBounds(const cv::Point2f& point, double x_max,
+                              double y_max, bool tight=false) {
   CHECK(x_max > 0);
   CHECK(y_max > 0);
-  double x_bound = static_cast<double>(x_max);
-  double y_bound = static_cast<double>(y_max);
   if (tight) {
-    return (point.x > 0.0f && point.x < x_bound && point.y > 0.0f &&
-            point.y < y_bound);
+    return (point.x > 0.0f && point.x < x_max && point.y > 0.0f &&
+            point.y < y_max);
   } else {
-    return (point.x >= 0.0f && point.x <= x_bound && point.y >= 0.0f &&
-            point.y <= y_bound);
+    return (point.x >= 0.0f && point.x <= x_max && point.y >= 0.0f &&
+            point.y <= y_max);
   }
 }
 
@@ -581,7 +600,26 @@ class LineDetector {
   // "cropped" so as to fit in the image bounds, while keeping the direction of
   // the original line.
   cv::Vec4f fitLineToBoundsWithDirection(const cv::Vec4f& line2D,
-                                           size_t x_max, size_t y_max);
+                                         size_t x_max, size_t y_max);
+  // Deprecated. Old version of fitLineToBoundsWithDirection.
+  cv::Vec4f fitLineToBoundsWithDirectionByParametrization(
+      const cv::Vec4f& line2D, size_t x_max, size_t y_max);
+
+  // Trims an endpoint of a line segment to the bounds [0, x_max] x [0, y_max],
+  // given the other endpoint.
+  // Input: point:          Endpoint to trim.
+  //
+  //        other_endpoint: Other endpoint of the line segment.
+  //
+  //        x_max, y_max:   Bounds of the area to which to trim the line.
+  //
+  // Output: return:        True the line segment can be trimmed to the area,
+  //                        false otherwise.
+  //
+  //         trimmed_point: If return value is true, the input endpoint trimmed
+  //                        to the input area.
+  bool trimEndpoint(const cv::Point2f& point, const cv::Point2f& other_endpoint,
+                    double x_max, double y_max, cv::Point2f* trimmed_point);
 
   // Finds two rectangles left and right of a line defined by 4 corner points.
   // Input:   line:   The 2D line defined as (start, end).

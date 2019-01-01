@@ -801,7 +801,7 @@ void ListenAndPublish::findInliersWithLabelsGivenPlanes(
     start_2D = {line_2D[0], line_2D[1]};
     end_2D = {line_2D[2], line_2D[3]};
     double line_length = cv::norm(end_2D - start_2D);
-    if (line_length < 1e-5) {
+    if (line_length < 1e-4) {
       LOG(INFO) << "Discarding line because too short in 2D.";
       // Line collapsed to a point => Return empty vectors as inliers.
       inliers_right->setInliersWithLabels(
