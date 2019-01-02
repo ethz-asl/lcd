@@ -1,18 +1,14 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>line_ros_utility</name>
+  <name>line_matching</name>
   <version>0.0.1</version>
-  <description>Package for utility functions for 3d_line_tools.</description>
+  <description>Package to match 3D lines in line_tools.</description>
 
   <maintainer email="fmilano@student.ethz.ch">Francesco Milano</maintainer>
-  <maintainer email="lichengk@student.ethz.ch">Chengkun Li</maintainer>
-  <maintainer email="dwalder@student.ethz.ch">Dominik Walder</maintainer>
   <maintainer email="fadri.furrer@mavt.ethz.ch">Fadri Furrer</maintainer>
   <maintainer email="tonci.novkovic@mavt.ethz.ch">Tonci Novkovic</maintainer>
 
   <author>Francesco Milano</author>
-  <author>Chengkun Li</author>
-  <author>Dominik Walder</author>
   <author>Fadri Furrer</author>
   <author>Tonci Novkovic</author>
 
@@ -22,7 +18,6 @@
   <buildtool_depend>catkin_simple</buildtool_depend>
 
   <depend>cv_bridge</depend>
-  <depend>dynamic_reconfigure</depend>
   <depend>eigen_catkin</depend>
   <depend>eigen_checks</depend>
   <depend>gflags_catkin</depend>
@@ -37,8 +32,6 @@
   <depend>rospy</depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
-  <depend>tf</depend>
 
   <depend>line_detection</depend>
-  <depend>line_clustering</depend>
 </package>

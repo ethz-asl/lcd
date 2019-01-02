@@ -1,3 +1,4 @@
+// DEPRECATED
 // This node advertises a service that extracts lines from input images.
 // "detect_lines":
 //

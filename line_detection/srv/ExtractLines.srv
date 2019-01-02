@@ -1,0 +1,9 @@
+sensor_msgs/Image image
+sensor_msgs/Image cloud
+sensor_msgs/CameraInfo camera_info
+uint8 detector
+---
+line_detection/Line3DWithHessians[] lines
+geometry_msgs/Point[] start2D
+geometry_msgs/Point[] end2D
+uint8 frame_index

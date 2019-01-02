@@ -1,0 +1,4 @@
+sensor_msgs/Image virtual_image
+uint8 line_type
+---
+float32[] embeddings

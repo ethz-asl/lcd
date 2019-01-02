@@ -332,9 +332,9 @@ void ListenAndPublish::masterCallback(
   cv_bridge::CvImageConstPtr cv_img_ptr =
       cv_bridge::toCvShare(rosmsg_image, "rgb8");
   cv_image_ = cv_img_ptr->image;
-  // Extract depth from message.
-  cv_bridge::CvImageConstPtr cv_depth_ptr = cv_bridge::toCvShare(rosmsg_depth);
-  cv_depth_ = cv_depth_ptr->image;
+  // Extract depth from message. (Commented because it is not used).
+  //cv_bridge::CvImageConstPtr cv_depth_ptr = cv_bridge::toCvShare(rosmsg_depth);
+  //cv_depth_ = cv_depth_ptr->image;
   // Extract instances from message.
   cv_bridge::CvImageConstPtr cv_instances_ptr =
       cv_bridge::toCvShare(rosmsg_instances);

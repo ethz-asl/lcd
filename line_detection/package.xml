@@ -4,11 +4,13 @@
   <version>0.0.1</version>
   <description>Package for detecting lines in 3D.</description>
 
+  <maintainer email="fmilano@student.ethz.ch">Francesco Milano</maintainer>
   <maintainer email="lichengk@student.ethz.ch">Chengkun Li</maintainer>
   <maintainer email="dwalder@student.ethz.ch">Dominik Walder</maintainer>
   <maintainer email="fadri.furrer@mavt.ethz.ch">Fadri Furrer</maintainer>
   <maintainer email="tonci.novkovic@mavt.ethz.ch">Tonci Novkovic</maintainer>
 
+  <author>Francesco Milano</author>
   <author>Chengkun Li</author>
   <author>Dominik Walder</author>
   <author>Fadri Furrer</author>
@@ -22,10 +24,13 @@
   <depend>cv_bridge</depend>
   <depend>eigen_catkin</depend>
   <depend>eigen_checks</depend>
+  <depend>image_geometry</depend>
   <depend>image_transport</depend>
+  <depend>geometry_msgs</depend>
   <depend>gflags_catkin</depend>
   <depend>glog_catkin</depend>
   <depend>message_generation</depend>
+  <depend>message_runtime</depend>
   <depend>opencv3_catkin</depend>
   <depend>pcl_catkin</depend>
   <depend>roscpp</depend>

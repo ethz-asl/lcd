@@ -6,9 +6,9 @@ add_definitions(-std=c++11)
 find_package(catkin_simple REQUIRED)
 catkin_simple(ALL_DEPS_REQUIRED)
 
-cs_add_library(${PROJECT_NAME}
-  src/line_description.cc
-)
+#cs_add_library(${PROJECT_NAME}
+#  src/image_to_embeddings_server.py
+#)
 
 add_custom_target(test_data)
 add_custom_command(TARGET test_data

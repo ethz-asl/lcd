@@ -10,7 +10,7 @@ cs_add_library(${PROJECT_NAME}
   src/line_detection.cc
 )
 
-add_executable(detector src/detector_node.cc)
+add_executable(detector src/line_extractor_node.cc)
 target_link_libraries(detector ${PROJECT_NAME})
 
 add_executable(general_test general_tests.cc)
