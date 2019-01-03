@@ -97,6 +97,23 @@ bool detectLinesCallback(line_detection::ExtractLines::Request& req,
                                  lines_3D[i].hessians[1][1],
                                  lines_3D[i].hessians[1][2],
                                  lines_3D[i].hessians[1][3]};
+    switch (lines_3D[i].type) {
+      case line_detection::LineType::DISCONT:
+        res.lines[i].line_type = 0;
+        break;
+      case line_detection::LineType::PLANE:
+        res.lines[i].line_type = 1;
+        break;
+      case line_detection::LineType::EDGE:
+        res.lines[i].line_type = 2;
+        break;
+      case line_detection::LineType::INTERSECT:
+        res.lines[i].line_type = 3;
+        break;
+      default:
+        ROS_ERROR("Illegal line type. Possible types are DISCONT, PLANE, EDGE "
+                   "and INTERSECT");
+    }
   }
   return true;
 }
