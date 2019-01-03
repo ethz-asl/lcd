@@ -33,7 +33,7 @@ class ImageToEmbeddingsConverter:
     def handle_image_to_embeddings(self, req):
         return ImageToEmbeddingsResponse(
             self.embeddings_retriever.get_embeddings_from_image(
-                req.virtual_image, req.line_type))
+                req.virtual_camera_image, req.line_type))
 
     def start_server(self):
         rospy.init_node('image_to_embeddings')

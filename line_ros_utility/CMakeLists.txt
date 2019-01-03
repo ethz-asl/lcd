@@ -10,6 +10,10 @@ cs_add_library(${PROJECT_NAME}
   src/line_ros_utility.cc
 )
 
+cs_add_library(line_detect_describe_and_match
+  src/line_detect_describe_and_match.cc
+)
+
 add_executable(detect_cluster_show src/detect_cluster_show_node.cc)
 target_link_libraries(detect_cluster_show ${PROJECT_NAME})
 
@@ -18,6 +22,10 @@ target_link_libraries(scenenet_to_line_tools ${PROJECT_NAME})
 
 add_executable(freiburg_to_line_tools src/freiburg_to_line_tools_node.cc)
 target_link_libraries(freiburg_to_line_tools ${PROJECT_NAME})
+
+add_executable(matching_visualizer_node src/matching_visualizer_node.cc)
+target_link_libraries(matching_visualizer_node line_detect_describe_and_match)
+
 
 cs_install()
 cs_export()

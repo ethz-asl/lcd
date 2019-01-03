@@ -29,15 +29,13 @@ class LineToVirtualCameraImageConverter:
         hessian_left = req.line.hessian_left
         hessian_right = req.line.hessian_right
         line_type = req.line.line_type
-        coloured_cloud_img = req.coloured_cloud
-        # Convert the coloured cloud image to the format required by the virtual
-        # image retriever.
-        coloured_cloud = np.reshape(coloured_cloud_img, (-1, 6))
+        image_rgb = req.image_rgb
+        cloud = req.cloud
         return LineToVirtualCameraImageResponse(
             self.virtual_camera_image_retriever.get_virtual_camera_image(
                 start3D=start3D, end3D=end3D, hessian_left=hessian_left,
                 hessian_right=hessian_right, line_type=line_type,
-                coloured_cloud=coloured_cloud))
+                image_rgb=req.image_rgb, cloud=req.cloud))
 
     def start_server(self):
         rospy.init_node('line_to_virtual_camera_image')

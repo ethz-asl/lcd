@@ -25,11 +25,9 @@ struct Frame {
   std::vector<LineWithEmbeddings> lines;
   // RGB image.
   cv::Mat image;
-  // Point cloud image.
-  cv::Mat cloud;
 };
 
-typedef pair<Frame, int> FrameWithIndex;
+typedef std::pair<Frame, int> FrameWithIndex;
 
 enum class MatchingMethod : unsigned int {
   HAMMING = 0,

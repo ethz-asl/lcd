@@ -3,6 +3,8 @@
 
 #include "line_description/common.h"
 
+#include <vector>
+
 namespace line_description {
 
   typedef std::vector<float> Embedding;

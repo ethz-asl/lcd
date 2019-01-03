@@ -29,7 +29,8 @@ typedef message_filters::sync_policies::ExactTime<
 
 class LineDetectorDescriptorAndMatcher {
  public:
-   LineDetectorDescriptorAndMatcher(line_detection::Detector detector_type=LSD);
+   LineDetectorDescriptorAndMatcher(
+       line_detection::Detector detector_type=line_detection::Detector::LSD);
    ~LineDetectorDescriptorAndMatcher();
    // Starts listening to the input messages.
    void start();
@@ -40,14 +41,12 @@ class LineDetectorDescriptorAndMatcher {
  private:
    // Type of detector to use.
    line_detection::Detector detector_type_;
-   // Current frame.
-   line_matching::FrameWithIndex current_frame_;
-   // Instance of LineMatcher used to do the matching.
+    // Instance of LineMatcher used to do the matching.
    line_matching::LineMatcher line_matcher_;
-   // Data from the ROS messages.
+   /*// Data from the ROS messages.
    cv::Mat cv_image_;
    cv::Mat cv_cloud_;
-   sensor_msgs::CameraInfoConstPtr camera_info_;
+   sensor_msgs::CameraInfoConstPtr camera_info_;*/
    // Subscribers.
    message_filters::Synchronizer<MySyncPolicy>* sync_;
    message_filters::Subscriber<sensor_msgs::Image> image_sub_;
@@ -55,61 +54,75 @@ class LineDetectorDescriptorAndMatcher {
    message_filters::Subscriber<sensor_msgs::CameraInfo> info_sub_;
    // Node handle.
    ros::NodeHandle node_handle_;
+   // Services.
+   line_detection::ExtractLines service_extract_lines_;
+   line_description::LineToVirtualCameraImage
+       service_line_to_virtual_camera_image_;
+
+   line_description::ImageToEmbeddings service_image_to_embeddings_;
    // Service clients.
    ros::ServiceClient client_extract_lines_;
-   ros::ServiceClient client_image_to_embeddings_;
    ros::ServiceClient client_line_to_virtual_camera_image_;
+   ros::ServiceClient client_image_to_embeddings_;
 
    // Given an input image and point cloud, detect lines in the image, retrieves
    // the embeddings and saves the result in the current frame.
-   // Input: image_rgb:   RGB image from which to detect lines (it gets
-   //                     converted to grayscale by the line_extractor node).
+   // Input: image_rgb_msg:   ROS message containing the RGB image from which to
+   //                         detect lines (it gets converted to grayscale by
+   //                         the line_extractor node).
    //
-   //        cloud:       Point cloud image, in the format CV32FC3, in which
-   //                     each pixel has 3 channels that corresponds to the x, y
-   //                     and z coordinate of the 3D point shown at that pixel.
+   //        cloud_msg:       ROS message containing the point cloud image, in
+   //                         the format CV32FC3, in which each pixel has 3
+   //                         channels that correspond to the x, y and z
+   //                         coordinate of the 3D point shown at that pixel.
    //
-   //        camera_info: ROS message containing the camera info. It is left as
-   //                     a message so as not to force a specific type of camera
-   //                     in the interface.
+   //        camera_info_msg: ROS message containing the camera info.
    void saveLinesWithEmbeddings(
-       const cv::Mat& image_rgb, const cv::Mat& cloud,
-       const sensor_msgs::CameraInfoConstPtr& camera_info);
+       const sensor_msgs::ImageConstPtr& image_rgb_msg,
+       const sensor_msgs::ImageConstPtr& cloud_msg,
+       const sensor_msgs::CameraInfoConstPtr& camera_info_msg);
 
    // Given an input image and point cloud, detect lines in the image and
    // returns them, together with an index to be assigned to the current frame.
-   // Input: image_rgb:    RGB image from which to detect lines (it gets
-   //                      converted to grayscale by the line_extractor node).
+   // Input: image_rgb_msg:   ROS message containing the RGB image from which to
+   //                         detect lines (it gets converted to grayscale by
+   //                         the line_extractor node).
    //
-   //        cloud:        Point cloud image, in the format CV_32FC3, in which
-   //                      each pixel has 3 channels that correspond to the x, y
-   //                      and z coordinate of the 3D point shown at that pixel.
+   //        cloud_msg:       ROS message containing the point cloud image, in
+   //                         the format CV32FC3, in which each pixel has 3
+   //                         channels that correspond to the x, y and z
+   //                         coordinate of the 3D point shown at that pixel.
    //
-   //        camera_info:  ROS message containing the camera info.
+   //        camera_info_msg: ROS message containing the camera info.
    //
    // Output: lines:       Lines detected in the input image, both in 2D and 3D,
    //                      and with their inlier planes and types.
    //
    //         frame_index: Index to be assigned to the current frame.
-   void detectLines(const cv::Mat& image_rgb, const cv::Mat& cloud,
-                    const sensor_msgs::CameraInfoConstPtr& camera_info,
+   void detectLines(const sensor_msgs::ImageConstPtr& image_rgb_msg,
+                    const sensor_msgs::ImageConstPtr& cloud_msg,
+                    const sensor_msgs::CameraInfoConstPtr& camera_info_msg,
                     std::vector<line_detection::Line2D3DWithPlanes>* lines,
                     int* frame_index);
 
-   // Given a line (both in 2D and 3D, with the inlier planes and type) and a
-   // coloured point cloud, returns the descriptor (embedding) associated to
+   // Given a line (both in 2D and 3D, with the inlier planes and type) and RGB
+   // image and a cloud image, returns the descriptor (embedding) associated to
    // that line.
-   // Input: line:           Line the descriptor of which should be retrieved.
+   // Input: line:          Line the descriptor of which should be retrieved.
    //
-   //        coloured_cloud: Coloured point cloud, in the format CV_32FC(6), in
-   //                        which each pixel has 6 channels that correspond to
-   //                        the x, y, z coordinate and the R, G, B color of the
-   //                        3D point shown at that pixel.
+   //        image_rgb_msg: ROS message containing the RGB image from which to
+   //                       detect lines (it gets converted to grayscale by the
+   //                       line_extractor node).
    //
-   // Output: embeddings:    Descriptor (embedding) for the input line.
+   //        cloud_msg:     ROS message containing the point cloud image, in the
+   //                       format CV32FC3, in which each pixel has 3 channels
+   //                       that correspond to the x, y and z coordinate of the
+   //                       3D point shown at that pixel.
+   // Output: embeddings:   Descriptor (embedding) for the input line.
    void getEmbeddings(const line_detection::Line2D3DWithPlanes& line,
-                      const cv::Mat& coloured_cloud,
-                      std::vector<float>* embedding);
+                      const sensor_msgs::ImageConstPtr& image_rgb_msg,
+                      const sensor_msgs::ImageConstPtr& cloud_msg,
+                      line_description::Embedding* embedding);
 
    // Given a set of lines and their descriptors, as well as the RGB image from
    // which lines were extracted, saves them as a new frame with frame index

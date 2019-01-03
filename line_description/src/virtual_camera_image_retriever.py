@@ -29,7 +29,7 @@ class VirtualCameraImageRetriever:
         self.impainting_mode_on = impainting
 
     def get_virtual_camera_image(self, start3D, end3D, hessian_left,
-                                 hessian_right, line_type, coloured_cloud):
+                                 hessian_right, line_type, image_rgb, cloud):
         """Returns a virtual camera image for the given line.
 
         Args:
@@ -39,10 +39,10 @@ class VirtualCameraImageRetriever:
                 the line in hessian normal form.
             line_type (int): Type of the line: 0 -> Discontinuity, 1 -> Planar,
                 2 -> Edge, 3 -> Intersection.
-            coloured_cloud ([6, width*height] float vector): Coloured point
-                cloud, in which each row contains (X, Y, Z, R, G, B) information
-                for all the pixels in the image. Pixel (i, j) corresponds to row
-                i * width + j, where 0 <= i <= height and 0 <= j <= width.
+            image_rgb (numpy array of shape(height, width, 3)): RGB image.
+            cloud (numpy array of shape(height, width, 3)): Cloud image.
+                cloud[i, j, :] contains the (x, y, z) coordinates of the point
+                shown at pixel (i, j).
 
         Returns:
             Virtual camera image.
@@ -69,7 +69,11 @@ class VirtualCameraImageRetriever:
                 np.hstack([(start3D + idx / float(num_points_in_line) *
                             (end3D - start3D)), [0, 0, 255]])
             ])
-
+        # Construct the coloured point cloud.
+        image_rgb.reshape((-1, 3))
+        cloud.reshape((-1, 3))
+        coloured_cloud = np.hstack([image_rgb, cloud])
+        
         pcl_from_line_view = scenenet_utils.pcl_transform(
             np.vstack([coloured_cloud, line_3D]), T)
         rgb_image_from_line_view, _ = scenenet_utils.project_pcl_to_image(

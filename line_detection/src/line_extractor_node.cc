@@ -11,10 +11,11 @@
 // geometry_msgs/Point[] start2D
 // geometry_msgs/Point[] end2D
 // uint8 frame_index
-
 #include <ros/ros.h>
 
 #include <cv_bridge/cv_bridge.h>
+#include <glog/logging.h>
+#include <gtest/gtest.h>
 #include <image_transport/image_transport.h>
 #include <image_geometry/pinhole_camera_model.h>
 #include <line_detection/ExtractLines.h>
@@ -113,6 +114,7 @@ bool detectLinesCallback(line_detection::ExtractLines::Request& req,
       default:
         ROS_ERROR("Illegal line type. Possible types are DISCONT, PLANE, EDGE "
                    "and INTERSECT");
+        return false;
     }
   }
   return true;
