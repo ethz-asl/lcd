@@ -39,6 +39,8 @@
   <depend>std_msgs</depend>
   <depend>tf</depend>
 
-  <depend>line_detection</depend>
   <depend>line_clustering</depend>
+  <depend>line_description</depend>
+  <depend>line_detection</depend>
+  <depend>line_matching</depend>
 </package>

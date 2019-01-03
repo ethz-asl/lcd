@@ -5,7 +5,7 @@
 
 namespace line_description {
 
-// TODO: Implement
+  typedef std::vector<float> Embedding;
 
 }  // namespace line_description
 

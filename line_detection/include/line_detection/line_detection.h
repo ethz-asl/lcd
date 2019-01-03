@@ -66,6 +66,13 @@ enum class LineType : unsigned int {
   INTERSECT = 3
 };
 
+struct Line2D3DWithPlanes {
+  cv::Vec4f line2D;
+  cv::Vec6f line3D;
+  std::vector<cv::Vec4f> hessians;
+  LineType type;
+};
+
 struct LineWithPlanes {
   cv::Vec6f line;
   std::vector<cv::Vec4f> hessians;
