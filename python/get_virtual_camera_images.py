@@ -67,8 +67,8 @@ def get_virtual_camera_images():
         average_time_per_line = 0
         for i in range(lines_count):
             start_time_line = timer()
-            T, _ = scenenet_utils.virtual_camera_pose(data_lines[i, :],
-                                                      distance)
+            T, _ = scenenet_utils.virtual_camera_pose_from_file_line(
+                data_lines[i, :], distance)
             # Draw the line in the virtual camera image.
             start_point = data_lines[i, :3]
             end_point = data_lines[i, 3:6]

@@ -2,32 +2,41 @@
    it feeds the trained network with the corresponding virtual camera image to
    obtain the embeddings for the line, one line at a time).
 """
-import sys
-import os
 import numpy as np
 import tensorflow as tf
 from timeit import default_timer as timer
 
+
 class EmbeddingsRetriever:
     """ Retrieves embeddings for lines, given a virtual camera image and the
         line type.
+
+    Args:
+        meta_file (str): Location of the .ckpt.meta file to restore the meta
+            graph for the neural network.
+        checkpoint_file (str): Location of the .ckpt file to restore the
+            parameters of the trained neural network.
+
+    Attributes:
+        sess (TensorFlow session): TensorFlow session.
+        graph (TensorFlow metagraph): TensorFlow metagraph restored from the
+            .meta file.
+        input_img (TensorFlow tensor): Tensor for the input image.
+        keep_prob (TensorFlow tensor): Tensor for the the keeping probability in
+            the dropout layer.
+        embeddings (TensorFlow tensor): Tensor for the descriptor embeddings of
+            the lines.
+        line_types (TensorFlow tensor): Tensor for the types of the lines.
     """
 
-    def __init__(self, log_files_folder):
+    def __init__(self, meta_file, checkpoint_file):
         self.sess = tf.InteractiveSession()
-        # Restore checkpoint and model.
-        saver = tf.train.import_meta_graph(
-            os.path.join(log_files_folder, 'triplet_loss_batch_all_ckpt/'
-                         'bgr-d_model_epoch1.ckpt.meta'))
-        saver.restore(
-            self.sess,
-            os.path.join(log_files_folder,
-                         'triplet_loss_batch_all_ckpt/bgr-d_model_epoch1.ckpt'))
+        # Restore model and checkpoint.
+        saver = tf.train.import_meta_graph(meta_file)
+        saver.restore(self.sess, checkpoint_file)
         self.graph = tf.get_default_graph()
         # Input image tensor.
         self.input_img = self.graph.get_tensor_by_name('input_img:0')
-        # Label of input image tensor.
-        self.labels = self.graph.get_tensor_by_name('labels:0')
         # Dropout probability tensor.
         self.keep_prob = self.graph.get_tensor_by_name('keep_prob:0')
         # Embeddings tensor.

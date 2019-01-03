@@ -1,0 +1,4 @@
+line_detection/Line3DWithHessians line
+sensor_msgs/Image coloured_cloud
+---
+sensor_msgs/Image virtual_camera_image

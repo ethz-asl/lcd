@@ -1,20 +1,6 @@
 import numpy as np
 import sys
 
-import pathconfig
-from get_protobuf_paths import get_protobuf_path
-
-# Retrieve scenenetscripts_path from config file.
-print('scenenet_utils.py: Using value in config_paths_and_variables.sh '
-      'for SCENENET_SCRIPTS_PATH.')
-scenenetscripts_path = pathconfig.obtain_paths_and_variables(
-    "SCENENET_SCRIPTS_PATH")
-
-sys.path.append(scenenetscripts_path)
-import scenenet_pb2 as sn
-
-from camera_pose_and_intrinsics_example import camera_to_world_with_pose, interpolate_poses
-
 
 class SceneNetCameraModel:
     """A simplified camera model class mainly for storing camera intrinsics.
@@ -73,8 +59,11 @@ def project_pcl_to_image(pointcloud, camera_model):
         camera_model: camera model class.
 
     Returns:
-        rbg_image: numpy array of shape (240, 320, 3), dtype=np.uint8
-        depth_image: numpy array of shape (240, 320), dtype=np.float32. The depth unit is mm.
+        rbg_image (numpy array of shape (240, 320, 3), dtype=np.uint8): RGB
+            image of the point cloud projected to the image plane.
+        depth_image (numpy array of shape (240, 320), dtype=np.float32): Depth
+            image of the point cloud projected to the image plane. The depth
+            unit is mm.
     """
     rgb_image = np.zeros((240, 320, 3), dtype=np.uint8)
     depth_image = np.zeros((240, 320), dtype=np.float32)
@@ -182,25 +171,6 @@ def get_origin_virtual_camera(start3D, end3D, hessian_left, hessian_right,
     return origin_virtual_camera
 
 
-def get_origin_virtual_camera_from_line(line, distance):
-    """Get the origin of virtual camera for a line read from a file_line.
-
-    Args:
-        line: numpy array of shape (22, ). [start point(3, ), end point(3, ), left plane hessian form(4, ), right plane hessian form(4, ), left color(3, ), right color(3, ), line's type(1, ), instance label(1, )].
-        distance: distance in meter between the origin of the virtual camera and the middle point of the line.
-
-    Returns:
-        origin_virtual_camera: numpy array of shape (3, ). Origin of the virtual camera.
-    """
-    return get_origin_virtual_camera_from_line(
-        start3D=line[:3],
-        end3D=line[3:6],
-        hessian_left=line[6:10],
-        hessian_right=line[10:14],
-        line_type=line[-2],
-        distance=distance)
-
-
 def virtual_camera_pose(start3D, end3D, hessian_left, hessian_right, line_type,
                         distance):
     """Get the virtual camera's pose according to the line.
@@ -238,125 +208,18 @@ def virtual_camera_pose(start3D, end3D, hessian_left, hessian_right, line_type,
     return T, z
 
 
-def virtual_camera_pose_from_file_line(line, distance):
-    """Get the pose of the virtual camera according to the line read from a file
-       line.
-
-    Args:
-        line: numpy array of shape (22, ). [start point(3, ), end point(3, ), left plane hessian form(4, ), right plane hessian form(4, ), left color(3, ), right color(3, ), line's type(1, ), instance label(1, )].
-        distance: distance in meter between the origin of the virtual camera and the middle point of the line.
-
-    Returns:
-        T: numpy array of shape (4, 4). Transformation matrix.
-        z: numpy array of shape (3, ). Optical axis of the virtual camera.
-    """
-    return virtual_camera_pose(
-        start3D=line[:3],
-        end3D=line[3:6],
-        hessian_left=line[6:10],
-        hessian_right=line[10:14],
-        line_type=line[-2],
-        distance=distance)
-
-
 def pcl_transform(pointcloud, T):
     """Transform pointcloud according to the transformation matrix.
+
     Args:
         pointcloud: numpy array of shape (points_number, 6). [x, y, z, r, g, b].
         T: numpy array of shape (4, 4). Transformation matrix.
 
     Returns:
-        pcl_new: numpy array of shape (points_number, 6). The pointcloud expressed in the new coordinate frame. [x, y, z, r, g, b].
+        pcl_new: numpy array of shape (points_number, 6). The pointcloud
+            expressed in the new coordinate frame. [x, y, z, r, g, b].
     """
     pcl_xyz = np.hstack((pointcloud[:, :3], np.ones((pointcloud.shape[0], 1))))
     pcl_new_xyz = T.dot(pcl_xyz.T).T
     pcl_new = np.hstack((pcl_new_xyz[:, :3], pointcloud[:, 3:]))
     return pcl_new
-
-
-def rgbd_to_pcl(rgb_image, depth_image, camera_model):
-    """Convert rgb-d image to pointcloud. Adapted from https://github.com/ethz-asl/scenenet_ros_tools/blob/master/nodes/scenenet_to_rosbag.py"""
-    center_x = camera_model.cx
-    center_y = camera_model.cy
-
-    constant_x = 1 / camera_model.fx
-    constant_y = 1 / camera_model.fy
-
-    vs = np.array(
-        [(v - center_x) * constant_x for v in range(0, depth_image.shape[1])])
-    us = np.array(
-        [(u - center_y) * constant_y for u in range(0, depth_image.shape[0])])
-
-    # euclidean_ray_length_to_z_coordinate
-    depth_image = euclidean_ray_length_to_z_coordinate(depth_image,
-                                                       camera_model)
-    # Convert depth from cm to m.
-    depth_image = depth_image / 1000.0
-
-    x = np.multiply(depth_image, vs)
-    y = depth_image * us[:, np.newaxis]
-
-    stacked = np.ma.dstack((x, y, depth_image, rgb_image))
-    compressed = stacked.compressed()
-    pointcloud = compressed.reshape((int(compressed.shape[0] / 6), 6))
-
-    return pointcloud
-
-
-def convert_camera_coordinates_to_world(coor_camera, dataset_name, trajectory,
-                                        frame):
-    """Convert coordinates in camera frame to coordinates in world frame.
-    Args:
-        coor_camera: numpy array of shape (3, ). Coordinates in camera frame. [x, y, z].
-        dataset_name: string. Name associated to the dataset (cf. python/config_protobuf_paths)
-        trajectory: int. A trajectory in SceneNetRGBD dataset.
-        frame: int. A certain frame of in the trajectory.
-
-    Returns:
-        coor_world: coordinates in world frame.
-    """
-
-    trajectories = sn.Trajectories()
-    # Find protobuf file associated to dataset_name
-    protobuf_path = get_protobuf_path(dataset_name)
-    if protobuf_path is None:
-        sys.exit('scenenet_utils.py/convert_camera_coordinates_to_world: Error '
-                 'in retrieving protobuf_path.')
-    try:
-        with open(protobuf_path, 'rb') as f:
-            trajectories.ParseFromString(f.read())
-    except IOError:
-        print('scenenet_utils.py: Scenenet protobuf data not found at location:'
-              '{0}'.format(data_root_path))
-        print('Please ensure you have copied the pb file to the data directory')
-
-    view = trajectories.trajectories[trajectory].views[frame]
-    ground_truth_pose = interpolate_poses(view.shutter_open, view.shutter_close,
-                                          0.5)
-    camera_to_world_matrix = camera_to_world_with_pose(ground_truth_pose)
-
-    # Homogeneous coordinates
-    coor_homo_camera = np.append(coor_camera, [1])
-    coor_homo_world = camera_to_world_matrix.dot(coor_homo_camera)
-    coor_world = coor_homo_world[:3]
-
-    return coor_world
-
-
-def euclidean_ray_length_to_z_coordinate(depth_image, camera_model):
-    """From https://github.com/ethz-asl/scenenet_ros_tools/blob/master/nodes/scenenet_to_rosbag.py"""
-    center_x = camera_model.cx
-    center_y = camera_model.cy
-
-    constant_x = 1 / camera_model.fx
-    constant_y = 1 / camera_model.fy
-
-    vs = np.array(
-        [(v - center_x) * constant_x for v in range(0, depth_image.shape[1])])
-    us = np.array(
-        [(u - center_y) * constant_y for u in range(0, depth_image.shape[0])])
-
-    return (np.sqrt(
-        np.square(depth_image / 1000.0) /
-        (1 + np.square(vs[np.newaxis, :]) + np.square(us[:, np.newaxis]))) *
-            1000.0).astype(np.uint16)
