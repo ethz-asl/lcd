@@ -3,11 +3,13 @@
 
 #include "line_matching/common.h"
 
+#include <map>
 #include <utility>
 #include <vector>
 
 #include <opencv2/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 
 #include <glog/logging.h>
 #include <gtest/gtest.h>
@@ -34,9 +36,20 @@ enum class MatchingMethod : unsigned int {
   EUCLIDEAN = 1
 };
 
+struct LineMatchingParams {
+  // Thresholds to define matches between lines.
+  float max_difference_between_matches_hamming_ = 2.5;
+  float max_difference_between_matches_euclidean_ = 2.5;
+
+};
+
 class LineMatcher {
  public:
    LineMatcher();
+   LineMatcher(LineMatchingParams* params);
+
+   ~LineMatcher();
+
    // Add the input frame with the given frame index to the set of frames
    // received if no other frame with that frame index was received.
    // Input: frame_to_add: Frame to add to the set of frames received.
@@ -45,14 +58,19 @@ class LineMatcher {
    //
    // Output: False if a frame the given frame_index is already in the set of
    //         frames received, true otherwise.
-   bool addFrame(const Frame& frame_to_add, int frame_index);
+   bool addFrame(const Frame& frame_to_add, unsigned int frame_index);
+
    // Display the matches between two frames with the given indices, if frames
    // with those indices were received.
    // Input: frame_index_1/2: Indices of the frame between which to display
    //                         matches.
    //
    //        matching_method: Method (distance) to be use to match lines.
-   void displayMatches(int frame_index_1, int frame_index_2,
+   //
+   // Output: return:         True if matching was possible, i.e., if frames
+   //                         with both input frame indices were received; false
+   //                         otherwise.
+   bool displayMatches(unsigned int frame_index_1, unsigned int frame_index_2,
                        MatchingMethod matching_method);
  private:
    // Matches the two frames with the given indices, if frame with those indices
@@ -67,12 +85,30 @@ class LineMatcher {
    //                           line_indices_1[i] in the first frame matches the
    //                           line with index line_indices_2[i] in the second
    //                           frame.
-   void matchFrames(int frame_index_1, int frame_index_2,
+   //
+   //         return:           True if matching was possible, i.e., if frames
+   //                           with both input frame indices were received;
+   //                           false otherwise.
+   bool matchFrames(unsigned int frame_index_1, unsigned int frame_index_2,
                     MatchingMethod matching_method,
                     std::vector<int>* line_indices_1,
                     std::vector<int>* line_indices_2);
-   // Frames received.
-   std::vector<Frame> frames_;
+   // Same interface as above. Matching based on brute-force comparison of all
+   // pairs of lines and selection of the best.
+   bool matchFramesBruteForce(unsigned int frame_index_1,
+                              unsigned int frame_index_2,
+                              MatchingMethod matching_method,
+                              std::vector<int>* line_indices_1,
+                              std::vector<int>* line_indices_2);
+
+   // Frames received: key = frame_index, value = frame.
+   std::map<unsigned int, Frame> frames_;
+   // Parameters for matching lines.
+   LineMatchingParams* params_;
+   // Whether the instance of the parameter struct was created by this instance
+   // or not.
+   bool params_is_mine_;
+
 };
 }  // namespace line_matching
 
