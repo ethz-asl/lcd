@@ -30,25 +30,56 @@ struct Frame {
 };
 
 typedef std::pair<Frame, int> FrameWithIndex;
+typedef std::pair<float, std::pair<int, int>> MatchWithRating;
 
 enum class MatchingMethod : unsigned int {
-  HAMMING = 0,
-  EUCLIDEAN = 1
+  MANHATTAN = 0,  // Manhattan distance
+  EUCLIDEAN = 1   // Euclidean distance
 };
 
-struct LineMatchingParams {
-  // Thresholds to define matches between lines.
-  float max_difference_between_matches_hamming_ = 2.5;
-  float max_difference_between_matches_euclidean_ = 2.5;
+// Abstract and derived classes to compute a rating for a candidate match pair
+// of descriptors.
+class MatchRatingComputer {
+ public:
+   MatchRatingComputer(float max_difference_between_matches = 100.0f);
 
+   // Computes the rating between two candidate matches (given their embedding
+   // descriptors).
+   // Input: embedding_1/2: Descriptors of the candidate matches.
+   //
+   // Output: rating_out:   Rating of the candidate match.
+   //
+   //         return:       True if the rating of the match is above the
+   //                       threshold defined by
+   //                       max_difference_between_matches_, false otherwise.
+   virtual bool computeMatchRating(const std::vector<float>& embedding_1,
+                                   const std::vector<float>& embedding_2,
+                                   float* rating_out) = 0;
+ protected:
+   // Threshold to define valid matches between lines.
+   float max_difference_between_matches_;
 };
 
+class ManhattanRatingComputer : public MatchRatingComputer {
+ public:
+   ManhattanRatingComputer(float max_difference_between_matches = 64.0f);
+   bool computeMatchRating(const std::vector<float>& embedding_1,
+                           const std::vector<float>& embedding_2,
+                           float* rating_out);
+};
+
+class EuclideanRatingComputer : public MatchRatingComputer {
+ public:
+   EuclideanRatingComputer(float max_difference_between_matches = 100.0f);
+   bool computeMatchRating(const std::vector<float>& embedding_1,
+                           const std::vector<float>& embedding_2,
+                           float* rating_out);
+};
+
+// Main class: holds the frame and can be called to display matches.
 class LineMatcher {
  public:
    LineMatcher();
-   LineMatcher(LineMatchingParams* params);
-
-   ~LineMatcher();
 
    // Add the input frame with the given frame index to the set of frames
    // received if no other frame with that frame index was received.
@@ -101,14 +132,15 @@ class LineMatcher {
                               std::vector<int>* line_indices_1,
                               std::vector<int>* line_indices_2);
 
+  // Comparator function used to sort candidate matching by increasing rating
+  // (lower rating <=> better match).
+  static inline bool match_comparator(const MatchWithRating& match_1,
+                                      const MatchWithRating& match_2) {
+    return match_1.first < match_2.first;
+  }
+
    // Frames received: key = frame_index, value = frame.
    std::map<unsigned int, Frame> frames_;
-   // Parameters for matching lines.
-   LineMatchingParams* params_;
-   // Whether the instance of the parameter struct was created by this instance
-   // or not.
-   bool params_is_mine_;
-
 };
 }  // namespace line_matching
 
