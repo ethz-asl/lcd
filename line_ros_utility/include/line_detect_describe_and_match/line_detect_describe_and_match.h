@@ -65,6 +65,10 @@ class LineDetectorDescriptorAndMatcher {
    ros::ServiceClient client_line_to_virtual_camera_image_;
    ros::ServiceClient client_image_to_embeddings_;
 
+   // Displays the matches between the current frame and the previous one.
+   // Input: current_frame_index: Frame index of the current frame.
+   void displayMatchesWithPreviousFrame(int current_frame_index);
+
    // Given an input image and point cloud, detect lines in the image, retrieves
    // the embeddings and saves the result in the current frame.
    // Input: image_rgb_msg:   ROS message containing the RGB image from which to
@@ -77,10 +81,13 @@ class LineDetectorDescriptorAndMatcher {
    //                         coordinate of the 3D point shown at that pixel.
    //
    //        camera_info_msg: ROS message containing the camera info.
+   //
+   // Output: frame_index_out: Frame index with which the new frame is saved.
    void saveLinesWithEmbeddings(
        const sensor_msgs::ImageConstPtr& image_rgb_msg,
        const sensor_msgs::ImageConstPtr& cloud_msg,
-       const sensor_msgs::CameraInfoConstPtr& camera_info_msg);
+       const sensor_msgs::CameraInfoConstPtr& camera_info_msg,
+       int* frame_index_out);
 
    // Given an input image and point cloud, detect lines in the image and
    // returns them, together with an index to be assigned to the current frame.

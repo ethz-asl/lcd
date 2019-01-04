@@ -36,10 +36,24 @@ namespace line_ros_utility {
              "to receive messages.");
   }
 
+  void LineDetectorDescriptorAndMatcher::displayMatchesWithPreviousFrame(
+      int current_frame_index) {
+    if (current_frame_index < 1) {
+      ROS_INFO("Unable to display matches of frame %d with previous frame: not "
+               "enough previous frames.", current_frame_index);
+      return;
+    }
+    // Make line matcher display matches of current frame with previous frame.
+    line_matcher_.displayMatches(current_frame_index - 1, current_frame_index,
+                                 line_matching::MatchingMethod::MANHATTAN);
+  }
+
   void LineDetectorDescriptorAndMatcher::saveLinesWithEmbeddings(
-    const sensor_msgs::ImageConstPtr& image_rgb_msg,
-    const sensor_msgs::ImageConstPtr& cloud_msg,
-    const sensor_msgs::CameraInfoConstPtr& camera_info_msg) {
+      const sensor_msgs::ImageConstPtr& image_rgb_msg,
+      const sensor_msgs::ImageConstPtr& cloud_msg,
+      const sensor_msgs::CameraInfoConstPtr& camera_info_msg,
+      int* frame_index_out) {
+    CHECK_NOTNULL(frame_index_out);
     int frame_index;
     std::vector<line_detection::Line2D3DWithPlanes> lines;
     std::vector<line_description::Embedding> embeddings;
@@ -56,6 +70,7 @@ namespace line_ros_utility {
     // Detect lines.
     detectLines(image_rgb_msg, cloud_msg, camera_info_msg, &lines,
                 &frame_index);
+    ROS_INFO("Number of lines detected: %d.", lines.size());
     // Retrieve descriptor for all lines.
     embeddings.resize(lines.size());
     for (size_t idx = 0; idx < lines.size(); ++idx) {
@@ -63,6 +78,8 @@ namespace line_ros_utility {
     }
     // Save frame.
     saveFrame(lines, embeddings, image_rgb, frame_index);
+    // Output the frame index of the new frame.
+    *frame_index_out = frame_index;
   }
 
   void LineDetectorDescriptorAndMatcher::detectLines(
@@ -100,8 +117,8 @@ namespace line_ros_utility {
     size_t num_lines;
     if (client_extract_lines_.call(service_extract_lines_)) {
       *frame_index = service_extract_lines_.response.frame_index;
-      lines->resize(num_lines);
       num_lines = service_extract_lines_.response.lines.size();
+      lines->resize(num_lines);
       for (size_t i = 0; i < num_lines; ++i) {
         (*lines)[i].line2D = {service_extract_lines_.response.start2D[i].x,
                               service_extract_lines_.response.start2D[i].y,
@@ -207,31 +224,39 @@ namespace line_ros_utility {
       const std::vector<line_detection::Line2D3DWithPlanes>& lines,
       const std::vector<line_description::Embedding>& embeddings,
       const cv::Mat& rgb_image, int frame_index) {
-      line_matching::Frame current_frame;
-      // Create frame.
-      current_frame.lines.resize(lines.size());
-      for (size_t i = 0; i < lines.size(); ++i) {
-        current_frame.lines[i].line2D = lines[i].line2D;
-        current_frame.lines[i].line3D = lines[i].line3D;
-        current_frame.lines[i].embeddings = embeddings[i];
-      }
-      current_frame.image = rgb_image;
-      // Try to save frame.
-      if (!line_matcher_.addFrame(current_frame, frame_index)) {
-        ROS_INFO("Could not add frame with index %d, as one with the same "
-                 "was previously received.", frame_index);
-        return false;
-      }
-      return true;
+    line_matching::Frame current_frame;
+    // Create frame.
+    current_frame.lines.resize(lines.size());
+    for (size_t i = 0; i < lines.size(); ++i) {
+      current_frame.lines[i].line2D = lines[i].line2D;
+      current_frame.lines[i].line3D = lines[i].line3D;
+      current_frame.lines[i].embeddings = embeddings[i];
+    }
+    current_frame.image = rgb_image;
+    // Try to save frame.
+    if (!line_matcher_.addFrame(current_frame, frame_index)) {
+      ROS_INFO("Could not add frame with index %d, as one with the same "
+               "was previously received.", frame_index);
+      return false;
+    }
+    return true;
   }
-
-
 
   void LineDetectorDescriptorAndMatcher::callback(
       const sensor_msgs::ImageConstPtr& rosmsg_image,
       const sensor_msgs::ImageConstPtr& rosmsg_cloud,
       const sensor_msgs::CameraInfoConstPtr& camera_info) {
-
+    int current_frame_index;
+    // Save lines to the line matcher.
+    ROS_INFO("Detecting, describing and saving line for new frame...");
+    saveLinesWithEmbeddings(rosmsg_image, rosmsg_cloud, camera_info,
+                            &current_frame_index);
+    ROS_INFO("...done with detecting, describing and saving line for new "
+             "frame.");
+    ROS_INFO("Current frame index is %d", current_frame_index);
+    if (current_frame_index == 1) {
+      displayMatchesWithPreviousFrame(current_frame_index);
+    }
   }
 
 }  // namespace line_matching

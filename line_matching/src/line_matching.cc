@@ -12,10 +12,11 @@ LineMatcher::LineMatcher() {
 bool LineMatcher::addFrame(const Frame& frame_to_add,
                            unsigned int frame_index) {
   // Check if a frame with the same frame index already exists.
-  if (frames_.count(frame_index) == 0) {
+  if (frames_.count(frame_index) != 0) {
     return false;
   }
   frames_[frame_index] = frame_to_add;
+  return true;
 }
 
 bool LineMatcher::displayMatches(unsigned int frame_index_1,
@@ -25,6 +26,8 @@ bool LineMatcher::displayMatches(unsigned int frame_index_1,
   // Obtain matches for the given frame indices, if possible.
   if (!matchFrames(frame_index_1, frame_index_2, matching_method,
                    &line_indices_1, &line_indices_2)) {
+    LOG(ERROR) << "Unable to match frames with indices " << frame_index_1
+               << " and " << frame_index_2 << ".";
     return false;
   }
   CHECK(line_indices_1.size() == line_indices_2.size());
@@ -32,11 +35,12 @@ bool LineMatcher::displayMatches(unsigned int frame_index_1,
   // each other.
   size_t cols = frames_[frame_index_1].image.cols;
   size_t rows = frames_[frame_index_1].image.rows;
-  cv::Mat large_image(cv::Size(2 * cols, rows), CV_32FC3);
+  cv::Mat large_image(cv::Size(2 * cols, rows),
+                      frames_[frame_index_1].image.type());
   // Add first image.
   frames_[frame_index_1].image.copyTo(large_image(cv::Rect(0, 0, cols, rows)));
   // Add second image.
-  frames_[frame_index_2].image.copyTo(large_image(cv::Rect(cols, 0, 2 * cols,
+  frames_[frame_index_2].image.copyTo(large_image(cv::Rect(cols, 0, cols,
                                                            rows)));
   // Draw lines in the first image (in red).
   cv::Vec4f line2D;
@@ -63,12 +67,14 @@ bool LineMatcher::displayMatches(unsigned int frame_index_1,
                      (frames_[frame_index_2].lines[i].line2D[1] +
                       frames_[frame_index_2].lines[i].line2D[3]) / 2};
     cv::line(large_image, cv::Point(center_line_1.x, center_line_1.y),
-             cv::Point(center_line_2.x, center_line_2.y), CV_RGB(255, 255, 0));
+             cv::Point(center_line_2.x + cols, center_line_2.y),
+             CV_RGB(255, 255, 0));
   }
   // Display image.
   cv::imshow("Matches between frame " + std::to_string(frame_index_1) +
-             "and frame " + std::to_string(frame_index_2), large_image);
+             " and frame " + std::to_string(frame_index_2), large_image);
   cv::waitKey();
+  return true;
 }
 
 bool LineMatcher::matchFrames(unsigned int frame_index_1,
@@ -78,8 +84,8 @@ bool LineMatcher::matchFrames(unsigned int frame_index_1,
                               std::vector<int>* line_indices_2) {
   CHECK_NOTNULL(line_indices_1);
   CHECK_NOTNULL(line_indices_2);
-  matchFramesBruteForce(frame_index_1, frame_index_2, matching_method,
-                        line_indices_1, line_indices_2);
+  return matchFramesBruteForce(frame_index_1, frame_index_2, matching_method,
+                               line_indices_1, line_indices_2);
 }
 
 bool LineMatcher::matchFramesBruteForce(unsigned int frame_index_1,
@@ -95,7 +101,7 @@ bool LineMatcher::matchFramesBruteForce(unsigned int frame_index_1,
   CHECK_NOTNULL(line_indices_1);
   CHECK_NOTNULL(line_indices_2);
   // Check that frames with the given frame indices exist.
-  if (frames_.count(frame_index_1) || frames_.count(frame_index_2)) {
+  if (frames_.count(frame_index_1) == 0 || frames_.count(frame_index_2) == 0) {
     return false;
   }
   // Set the match rating computer depending on the matching method.
@@ -161,6 +167,8 @@ bool LineMatcher::matchFramesBruteForce(unsigned int frame_index_1,
   }
   // Delete matching computer.
   delete match_rating_computer;
+
+  return true;
 }
 
 MatchRatingComputer::MatchRatingComputer(float max_difference_between_matches) {

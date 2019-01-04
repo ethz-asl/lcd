@@ -44,12 +44,12 @@ int frame_index;
 
 bool detectLinesCallback(line_detection::ExtractLines::Request& req,
                          line_detection::ExtractLines::Response& res) {
-  // Convert to cv_ptr (which has a member ->image (cv::Mat))
+  // Convert to cv_ptr (which has a member ->image (cv::Mat)).
   image_cv_ptr = cv_bridge::toCvCopy(req.image, "rgb8");
   cv_image_rgb = image_cv_ptr->image;
   cv::cvtColor(cv_image_rgb, cv_image_gray, CV_RGB2GRAY);
 
-  // Obtain projection matrix
+  // Obtain projection matrix.
   image_geometry::PinholeCameraModel camera_model;
   camera_model.fromCameraInfo(req.camera_info);
   camera_P = cv::Mat(camera_model.projectionMatrix());
@@ -74,9 +74,9 @@ bool detectLinesCallback(line_detection::ExtractLines::Request& req,
                                   lines_3D_tmp, &lines_2D, &lines_3D);
 
   // Store lines to the response.
-  res.lines.reserve(lines_2D.size());
-  res.start2D.reserve(lines_2D.size());
-  res.end2D.reserve(lines_2D.size());
+  res.lines.resize(lines_2D.size());
+  res.start2D.resize(lines_2D.size());
+  res.end2D.resize(lines_2D.size());
   res.frame_index = frame_index++;
 
   for (size_t i = 0u; i < lines_2D.size(); ++i) {
