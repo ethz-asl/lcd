@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """ROS node that provides the response to the ImageToEmbeddings service.
 """
 

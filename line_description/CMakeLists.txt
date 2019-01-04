@@ -6,9 +6,10 @@ add_definitions(-std=c++11)
 find_package(catkin_simple REQUIRED)
 catkin_simple(ALL_DEPS_REQUIRED)
 
-#cs_add_library(${PROJECT_NAME}
-#  src/image_to_embeddings_server.py
-#)
+catkin_install_python(PROGRAMS
+  nodes/image_to_embeddings_node.py
+  nodes/line_to_virtual_camera_image_node.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 add_custom_target(test_data)
 add_custom_command(TARGET test_data

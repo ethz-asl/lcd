@@ -32,4 +32,6 @@
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
   <depend>opencv3_catkin</depend>
+  <depend>rospy</depend>
+
 </package>
