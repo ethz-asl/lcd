@@ -91,6 +91,7 @@ namespace line_ros_utility {
     CHECK_NOTNULL(lines);
     CHECK_NOTNULL(frame_index);
     lines->clear();
+    
     // Create request.
     service_extract_lines_.request.image = *image_rgb_msg;
     service_extract_lines_.request.cloud = *cloud_msg;
@@ -120,17 +121,24 @@ namespace line_ros_utility {
       num_lines = service_extract_lines_.response.lines.size();
       lines->resize(num_lines);
       for (size_t i = 0; i < num_lines; ++i) {
-        (*lines)[i].line2D = {service_extract_lines_.response.start2D[i].x,
-                              service_extract_lines_.response.start2D[i].y,
-                              service_extract_lines_.response.end2D[i].x,
-                              service_extract_lines_.response.end2D[i].y};
+        (*lines)[i].line2D = {
+            static_cast<float>(service_extract_lines_.response.start2D[i].x),
+            static_cast<float>(service_extract_lines_.response.start2D[i].y),
+            static_cast<float>(service_extract_lines_.response.end2D[i].x),
+            static_cast<float>(service_extract_lines_.response.end2D[i].y)};
         (*lines)[i].line3D = {
-            service_extract_lines_.response.lines[i].start3D.x,
-            service_extract_lines_.response.lines[i].start3D.y,
-            service_extract_lines_.response.lines[i].start3D.z,
-            service_extract_lines_.response.lines[i].end3D.x,
-            service_extract_lines_.response.lines[i].end3D.y,
-            service_extract_lines_.response.lines[i].end3D.z};
+            static_cast<float>(
+                service_extract_lines_.response.lines[i].start3D.x),
+            static_cast<float>(
+                service_extract_lines_.response.lines[i].start3D.y),
+            static_cast<float>(
+                service_extract_lines_.response.lines[i].start3D.z),
+            static_cast<float>(
+                service_extract_lines_.response.lines[i].end3D.x),
+            static_cast<float>(
+                service_extract_lines_.response.lines[i].end3D.y),
+            static_cast<float>(
+                service_extract_lines_.response.lines[i].end3D.z)};
         (*lines)[i].hessians.resize(2);
         (*lines)[i].hessians[0] =
             {service_extract_lines_.response.lines[i].hessian_right[0],
@@ -172,6 +180,28 @@ namespace line_ros_utility {
       line_description::Embedding* embedding) {
     CHECK_NOTNULL(embedding);
     cv_bridge::CvImageConstPtr virtual_camera_image_ptr;
+    unsigned int line_type;
+
+    // Get line type.
+    switch (line.type) {
+      case line_detection::LineType::DISCONT:
+        line_type = 0;
+        break;
+      case line_detection::LineType::PLANE:
+        line_type = 1;
+        break;
+      case line_detection::LineType::EDGE:
+        line_type = 2;
+        break;
+      case line_detection::LineType::INTERSECT:
+        line_type = 3;
+        break;
+      default:
+        ROS_ERROR("Illegal line type. Possible types are DISCONT, PLANE, EDGE "
+                  "and INTERSECT");
+        return;
+    }
+
     // Create request for service line_to_virtual_camera_image.
     service_line_to_virtual_camera_image_.request.line.start3D.x =
         line.line3D[0];
@@ -182,6 +212,13 @@ namespace line_ros_utility {
     service_line_to_virtual_camera_image_.request.line.end3D.x = line.line3D[3];
     service_line_to_virtual_camera_image_.request.line.end3D.y = line.line3D[4];
     service_line_to_virtual_camera_image_.request.line.end3D.z = line.line3D[5];
+    for (size_t i = 0; i < 4; ++i) {
+      service_line_to_virtual_camera_image_.request.line.hessian_right[i] =
+          line.hessians[0][i];
+      service_line_to_virtual_camera_image_.request.line.hessian_left[i] =
+          line.hessians[1][i];
+    }
+    service_line_to_virtual_camera_image_.request.line.line_type = line_type;
     service_line_to_virtual_camera_image_.request.image_rgb = *image_rgb_msg;
     service_line_to_virtual_camera_image_.request.cloud = *cloud_msg;
     // Call line_to_virtual_camera_image service.
@@ -190,27 +227,11 @@ namespace line_ros_utility {
      ROS_ERROR("Failed to call service line_to_virtual_camera_image.");
      return;
     }
+
     // Create request for service image_to_embeddings.
     service_image_to_embeddings_.request.virtual_camera_image =
         service_line_to_virtual_camera_image_.response.virtual_camera_image;
-    switch (line.type) {
-      case line_detection::LineType::DISCONT:
-        service_image_to_embeddings_.request.line_type = 0;
-        break;
-      case line_detection::LineType::PLANE:
-        service_image_to_embeddings_.request.line_type = 1;
-        break;
-      case line_detection::LineType::EDGE:
-        service_image_to_embeddings_.request.line_type = 2;
-        break;
-      case line_detection::LineType::INTERSECT:
-        service_image_to_embeddings_.request.line_type = 3;
-        break;
-      default:
-        ROS_ERROR("Illegal line type. Possible types are DISCONT, PLANE, EDGE "
-                  "and INTERSECT");
-        return;
-    }
+    service_image_to_embeddings_.request.line_type = line_type;
     // Call image_to_embeddings service.
     if (client_image_to_embeddings_.call(service_image_to_embeddings_)) {
       *embedding = service_image_to_embeddings_.response.embeddings;

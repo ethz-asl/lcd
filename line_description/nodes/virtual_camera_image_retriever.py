@@ -70,8 +70,8 @@ class VirtualCameraImageRetriever:
                             (end3D - start3D)), [0, 0, 255]])
             ])
         # Construct the coloured point cloud.
-        image_rgb.reshape((-1, 3))
-        cloud.reshape((-1, 3))
+        image_rgb = image_rgb.reshape(-1, 3)
+        cloud = cloud.reshape(-1, 3)
         coloured_cloud = np.hstack([image_rgb, cloud])
         
         pcl_from_line_view = scenenet_utils.pcl_transform(
@@ -93,10 +93,6 @@ class VirtualCameraImageRetriever:
                 rgb_image_from_line_view, dilated_mask, 10, cv2.INPAINT_TELEA)
 
         end_time = timer()
-
-        print('Generated virtual camera images for frame {0}'.format(frame_id))
-        print('Time elapsed: %.3f seconds' % (end_time - start_time))
-        print('Average time per line: %.3f seconds' % average_time_per_line)
 
         # Return virtual image.
         return rgb_image_from_line_view
