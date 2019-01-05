@@ -2,6 +2,7 @@
    it feeds the trained network with the corresponding virtual camera image to
    obtain the embeddings for the line, one line at a time).
 """
+import cv2
 import numpy as np
 import tensorflow as tf
 from timeit import default_timer as timer
@@ -16,6 +17,8 @@ class EmbeddingsRetriever:
             graph for the neural network.
         checkpoint_file (str): Location of the .ckpt file to restore the
             parameters of the trained neural network.
+        scale_size (Tuple): Size of the input layer of the neural network.
+        image_type (String): Either 'bgr' or 'brg-d', type of the image.
 
     Attributes:
         sess (TensorFlow session): TensorFlow session.
@@ -27,9 +30,15 @@ class EmbeddingsRetriever:
         embeddings (TensorFlow tensor): Tensor for the descriptor embeddings of
             the lines.
         line_types (TensorFlow tensor): Tensor for the types of the lines.
+        scale_size (Tuple): Size of the input layer of the neural network.
+        image_type (String): Either 'bgr' or 'brg-d', type of the image.
     """
 
-    def __init__(self, meta_file, checkpoint_file):
+    def __init__(self,
+                 meta_file,
+                 checkpoint_file,
+                 scale_size=(227, 227),
+                 image_type='bgr-d'):
         self.sess = tf.InteractiveSession()
         # Restore model and checkpoint.
         saver = tf.train.import_meta_graph(meta_file)
@@ -44,14 +53,34 @@ class EmbeddingsRetriever:
         # Line type tensor.
         self.line_types = self.graph.get_tensor_by_name('line_types:0')
         # Retrieve mean of training set.
-        train_set_mean = self.sess.run('train_set_mean:0')
-        print("Train set mean is {}".format(train_set_mean))
+        self.train_set_mean = self.sess.run('train_set_mean:0')
+        print("Train set mean is {}".format(self.train_set_mean))
+        self.scale_size = scale_size
+        self.image_type = image_type
 
-    def get_embeddings_from_image(self, image, line_type):
+    def get_embeddings_from_image(self, image_bgr, image_depth, line_type):
         """ Given a virtual camera image and a line type, returns the
             corresponding embeddings.
         """
         start_time = timer()
+        # Rescale image.
+        image_bgr_preprocessed = cv2.resize(
+            image_bgr, (self.scale_size[0], self.scale_size[1]))
+        image_bgr_preprocessed = image_bgr_preprocessed.astype(np.float32)
+        image_depth_preprocessed = cv2.resize(
+            image_depth, (self.scale_size[0], self.scale_size[1]))
+        image_depth_preprocessed = image_depth_preprocessed.astype(np.float32)
+        if self.image_type == 'bgr':
+            image = image_bgr_preprocessed
+        elif self.image_type == 'bgr-d':
+            image = np.dstack(
+                [image_bgr_preprocessed, image_depth_preprocessed])
+        # Subtract mean of training set.
+        image -= self.train_set_mean
+        # Reshape arrays to feed them into the network.
+        image = image.reshape(1, image.shape[0], image.shape[1], image.shape[2])
+        line_type = np.array(line_type).reshape(-1, 1)
+
         output_embeddings = self.sess.run(
             self.embeddings,
             feed_dict={
@@ -61,6 +90,6 @@ class EmbeddingsRetriever:
             })
         end_time = timer()
 
-        print('Time needed to retrieve desciptors for line %d: %.3f seconds' %
-              (i, (end_time - start_time)))
+        print('Time needed to retrieve desciptors for line: %.3f seconds' %
+              (end_time - start_time))
         return output_embeddings

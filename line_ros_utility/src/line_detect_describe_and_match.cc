@@ -91,7 +91,7 @@ namespace line_ros_utility {
     CHECK_NOTNULL(lines);
     CHECK_NOTNULL(frame_index);
     lines->clear();
-    
+
     // Create request.
     service_extract_lines_.request.image = *image_rgb_msg;
     service_extract_lines_.request.cloud = *cloud_msg;
@@ -229,8 +229,10 @@ namespace line_ros_utility {
     }
 
     // Create request for service image_to_embeddings.
-    service_image_to_embeddings_.request.virtual_camera_image =
-        service_line_to_virtual_camera_image_.response.virtual_camera_image;
+    service_image_to_embeddings_.request.virtual_camera_image_bgr =
+        service_line_to_virtual_camera_image_.response.virtual_camera_image_bgr;
+    service_image_to_embeddings_.request.virtual_camera_image_depth =
+        service_line_to_virtual_camera_image_.response.virtual_camera_image_depth;
     service_image_to_embeddings_.request.line_type = line_type;
     // Call image_to_embeddings service.
     if (client_image_to_embeddings_.call(service_image_to_embeddings_)) {

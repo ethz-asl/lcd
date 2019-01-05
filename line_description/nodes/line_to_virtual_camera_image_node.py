@@ -49,7 +49,7 @@ class LineToVirtualCameraImageConverter:
             print(e)
         cloud = np.asarray(cv_cloud)
 
-        return LineToVirtualCameraImageResponse(
+        virtual_camera_image_rgb, virtual_camera_image_depth = \
             self.virtual_camera_image_retriever.get_virtual_camera_image(
                 start3D=start3D,
                 end3D=end3D,
@@ -57,7 +57,14 @@ class LineToVirtualCameraImageConverter:
                 hessian_right=hessian_right,
                 line_type=line_type,
                 image_rgb=image_rgb,
-                cloud=cloud))
+                cloud=cloud)
+        virtual_camera_image_rgb_msg = self.bridge.cv2_to_imgmsg(
+            virtual_camera_image_rgb, "8UC3")
+        virtual_camera_image_depth_msg = self.bridge.cv2_to_imgmsg(
+            virtual_camera_image_depth, "32FC1")
+
+        return LineToVirtualCameraImageResponse(virtual_camera_image_rgb_msg,
+                                                virtual_camera_image_depth_msg)
 
     def start_server(self):
         rospy.init_node('line_to_virtual_camera_image')

@@ -3,7 +3,6 @@ Get virtual camera image for each line in the given frame.
 """
 import numpy as np
 import cv2
-from timeit import default_timer as timer
 
 from tools import scenenet_utils
 
@@ -45,11 +44,10 @@ class VirtualCameraImageRetriever:
                 shown at pixel (i, j).
 
         Returns:
-            Virtual camera image.
+            RGB and depth virtual camera images (Tuple).
         """
         # Virtual camera model
         camera_model = scenenet_utils.get_camera_model()
-        start_time = timer()
 
         T, _ = scenenet_utils.virtual_camera_pose(
             start3D=start3D,
@@ -76,8 +74,8 @@ class VirtualCameraImageRetriever:
         
         pcl_from_line_view = scenenet_utils.pcl_transform(
             np.vstack([coloured_cloud, line_3D]), T)
-        rgb_image_from_line_view, _ = scenenet_utils.project_pcl_to_image(
-            pcl_from_line_view, camera_model)
+        rgb_image_from_line_view, depth_image_from_line_view = \
+           scenenet_utils.project_pcl_to_image(pcl_from_line_view, camera_model)
         if (self.impainting_mode_on):
             # Inpaint the virtual camera image.
             reds = rgb_image_from_line_view[:, :, 2]
@@ -91,8 +89,9 @@ class VirtualCameraImageRetriever:
 
             rgb_image_from_line_view = cv2.inpaint(
                 rgb_image_from_line_view, dilated_mask, 10, cv2.INPAINT_TELEA)
-
-        end_time = timer()
+            depth_image_from_line_view = cv2.inpaint(
+                depth_image_from_line_view, dilated_mask, 10,
+                cv2.INPAINT_TELEA)
 
         # Return virtual image.
-        return rgb_image_from_line_view
+        return rgb_image_from_line_view, depth_image_from_line_view

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """ROS node that provides the response to the ImageToEmbeddings service.
 """
+import numpy as np
 import os
 import rospy
 from embeddings_retriever import EmbeddingsRetriever
@@ -34,15 +35,20 @@ class ImageToEmbeddingsConverter:
 
     def handle_image_to_embeddings(self, req):
         try:
-            virtual_camera_image = self.bridge.imgmsg_to_cv2(
-                req.virtual_camera_image, "32FC3")
+            virtual_camera_image_bgr = self.bridge.imgmsg_to_cv2(
+                req.virtual_camera_image_bgr, "32FC3")
+            virtual_camera_image_depth = self.bridge.imgmsg_to_cv2(
+                req.virtual_camera_image_depth, "32FC1")
         except CvBridgeError as e:
             print(e)
-        virtual_camera_image = np.asarray(virtual_camera_image)
+        virtual_camera_image_bgr = np.asarray(virtual_camera_image_bgr)
+        virtual_camera_image_depth = np.asarray(virtual_camera_image_depth)
 
-        return ImageToEmbeddingsResponse(
-            self.embeddings_retriever.get_embeddings_from_image(
-                virtual_camera_image, req.line_type))
+        embeddings = self.embeddings_retriever.get_embeddings_from_image(
+            virtual_camera_image_bgr, virtual_camera_image_depth, req.line_type)
+        embeddings = embeddings.reshape((-1,))
+
+        return ImageToEmbeddingsResponse(embeddings)
 
     def start_server(self):
         rospy.init_node('image_to_embeddings')

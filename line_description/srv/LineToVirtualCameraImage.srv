@@ -2,4 +2,5 @@ line_detection/Line3DWithHessians line
 sensor_msgs/Image image_rgb
 sensor_msgs/Image cloud
 ---
-sensor_msgs/Image virtual_camera_image
+sensor_msgs/Image virtual_camera_image_bgr
+sensor_msgs/Image virtual_camera_image_depth
