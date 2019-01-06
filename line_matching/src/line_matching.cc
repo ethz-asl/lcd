@@ -21,43 +21,53 @@ bool LineMatcher::addFrame(const Frame& frame_to_add,
 
 bool LineMatcher::displayMatches(unsigned int frame_index_1,
                                  unsigned int frame_index_2,
-                                 MatchingMethod matching_method) {
+                                 MatchingMethod matching_method,
+                                 unsigned int magnification_factor) {
   std::vector<int> line_indices_1, line_indices_2;
+  std::vector<float> matching_ratings;
   // Obtain matches for the given frame indices, if possible.
   if (!matchFrames(frame_index_1, frame_index_2, matching_method,
-                   &line_indices_1, &line_indices_2)) {
+                   &line_indices_1, &line_indices_2, &matching_ratings)) {
     LOG(ERROR) << "Unable to match frames with indices " << frame_index_1
                << " and " << frame_index_2 << ".";
     return false;
   }
   CHECK(line_indices_1.size() == line_indices_2.size());
+  unsigned int num_matches = line_indices_1.size();
+  LOG(INFO) << "Found a total of " << num_matches << " matches between frame "
+            << frame_index_1 << " and " << frame_index_2 << ".";
+  LOG(INFO) << "Frame " << frame_index_1 << " originally contained "
+            << frames_[frame_index_1].lines.size() << " lines, while frame "
+            << frame_index_2 << " originally contained "
+            << frames_[frame_index_2].lines.size() << " lines.";
   // Display the two images side by side with the matched lines connected to
   // each other.
   size_t cols = frames_[frame_index_1].image.cols;
   size_t rows = frames_[frame_index_1].image.rows;
   cv::Mat large_image(cv::Size(2 * cols, rows),
                       frames_[frame_index_1].image.type());
+  cv::Mat temp_image(cv::Size(2 * cols, rows),
+                      frames_[frame_index_1].image.type());
   // Add first image.
   frames_[frame_index_1].image.copyTo(large_image(cv::Rect(0, 0, cols, rows)));
   // Add second image.
   frames_[frame_index_2].image.copyTo(large_image(cv::Rect(cols, 0, cols,
                                                            rows)));
-  // Draw lines in the first image (in red).
-  cv::Vec4f line2D;
+  cv::Vec4f line2D_1, line2D_2;
   cv::Point2f center_line_1, center_line_2;
-  for (auto& line_with_embedding : frames_[frame_index_1].lines) {
-    line2D = line_with_embedding.line2D;
-    cv::line(large_image, cv::Point(line2D[0], line2D[1]),
-             cv::Point(line2D[2], line2D[3]), CV_RGB(255, 0, 0));
-  }
-  // Draw lines in the second image (in red).
-  for (auto& line_with_embedding : frames_[frame_index_2].lines) {
-    line2D = line_with_embedding.line2D;
-    cv::line(large_image, cv::Point(line2D[0] + cols, line2D[1]),
-             cv::Point(line2D[2] + cols, line2D[3]), CV_RGB(255, 0, 0));
-  }
-  // Draw yellow lines between the center of the matched lines.
-  for (size_t i = 0; i < line_indices_1.size(); ++i) {
+  std::string window_title;
+
+  // Display matches one at a time.
+  for (size_t i = 0; i < num_matches; ++i) {
+    large_image.copyTo(temp_image);
+    // Draw lines in the first image (in red).
+    line2D_1 = frames_[frame_index_1].lines[i].line2D;
+    cv::line(temp_image, cv::Point(line2D_1[0], line2D_1[1]),
+             cv::Point(line2D_1[2], line2D_1[3]), CV_RGB(255, 0, 0));
+    // Draw lines in the second image (in red).
+    line2D_2 = frames_[frame_index_2].lines[i].line2D;
+    cv::line(temp_image, cv::Point(line2D_2[0] + cols, line2D_2[1]),
+             cv::Point(line2D_2[2] + cols, line2D_2[3]), CV_RGB(255, 0, 0));
     center_line_1 = {(frames_[frame_index_1].lines[i].line2D[0] +
                       frames_[frame_index_1].lines[i].line2D[2]) / 2,
                      (frames_[frame_index_1].lines[i].line2D[1] +
@@ -66,14 +76,24 @@ bool LineMatcher::displayMatches(unsigned int frame_index_1,
                       frames_[frame_index_2].lines[i].line2D[2]) / 2,
                      (frames_[frame_index_2].lines[i].line2D[1] +
                       frames_[frame_index_2].lines[i].line2D[3]) / 2};
-    cv::line(large_image, cv::Point(center_line_1.x, center_line_1.y),
+    // Draw yellow lines between the center of the matched lines.
+    cv::line(temp_image, cv::Point(center_line_1.x, center_line_1.y),
              cv::Point(center_line_2.x + cols, center_line_2.y),
              CV_RGB(255, 255, 0));
+    // Resize image.
+    cv::resize(temp_image, temp_image,
+               cv::Size(temp_image.size().width * magnification_factor,
+                        temp_image.size().height * magnification_factor));
+    // Display image.
+    window_title = "Match " + std::to_string(i) + "/" +
+                   std::to_string(num_matches) + " between frame " +
+                   std::to_string(frame_index_1) + " and frame " +
+                   std::to_string(frame_index_2) + ". Rating of current match "
+                   "is " + std::to_string(matching_ratings[i]);
+    cv::imshow(window_title, temp_image);
+    cv::waitKey();
+    cv::destroyWindow(window_title);
   }
-  // Display image.
-  cv::imshow("Matches between frame " + std::to_string(frame_index_1) +
-             " and frame " + std::to_string(frame_index_2), large_image);
-  cv::waitKey();
   return true;
 }
 
@@ -81,18 +101,21 @@ bool LineMatcher::matchFrames(unsigned int frame_index_1,
                               unsigned int frame_index_2,
                               MatchingMethod matching_method,
                               std::vector<int>* line_indices_1,
-                              std::vector<int>* line_indices_2) {
+                              std::vector<int>* line_indices_2,
+                              std::vector<float>* matching_ratings) {
   CHECK_NOTNULL(line_indices_1);
   CHECK_NOTNULL(line_indices_2);
   return matchFramesBruteForce(frame_index_1, frame_index_2, matching_method,
-                               line_indices_1, line_indices_2);
+                               line_indices_1, line_indices_2,
+                               matching_ratings);
 }
 
 bool LineMatcher::matchFramesBruteForce(unsigned int frame_index_1,
                                         unsigned int frame_index_2,
                                         MatchingMethod matching_method,
                                         std::vector<int>* line_indices_1,
-                                        std::vector<int>* line_indices_2) {
+                                        std::vector<int>* line_indices_2,
+                                        std::vector<float>* matching_ratings) {
   std::vector<MatchWithRating> candidate_matches;
   MatchRatingComputer* match_rating_computer;
   size_t num_lines_frame_1, num_lines_frame_2;
@@ -100,6 +123,7 @@ bool LineMatcher::matchFramesBruteForce(unsigned int frame_index_1,
   float rating;
   CHECK_NOTNULL(line_indices_1);
   CHECK_NOTNULL(line_indices_2);
+  CHECK_NOTNULL(matching_ratings);
   // Check that frames with the given frame indices exist.
   if (frames_.count(frame_index_1) == 0 || frames_.count(frame_index_2) == 0) {
     return false;
@@ -149,6 +173,7 @@ bool LineMatcher::matchFramesBruteForce(unsigned int frame_index_1,
   size_t idx_frame_1, idx_frame_2;
   line_indices_1->clear();
   line_indices_2->clear();
+  matching_ratings->clear();
   while (num_unmatched_lines_frame_1 > 0 && num_unmatched_lines_frame_2 > 0 &&
          current_match_idx < candidate_matches.size()) {
     idx_frame_1 = candidate_matches[current_match_idx].second.first;
@@ -162,6 +187,7 @@ bool LineMatcher::matchFramesBruteForce(unsigned int frame_index_1,
       // Output match.
       line_indices_1->push_back(idx_frame_1);
       line_indices_2->push_back(idx_frame_2);
+      matching_ratings->push_back(candidate_matches[current_match_idx].first);
     }
     current_match_idx++;
   }

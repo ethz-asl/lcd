@@ -93,16 +93,21 @@ class LineMatcher {
 
    // Display the matches between two frames with the given indices, if frames
    // with those indices were received.
-   // Input: frame_index_1/2: Indices of the frame between which to display
-   //                         matches.
+   // Input: frame_index_1/2:      Indices of the frame between which to display
+   //                              matches.
    //
-   //        matching_method: Method (distance) to be use to match lines.
+   //        matching_method:      Method (distance) to be use to match lines.
+   //
+   //        magnification_factor: Factor (default to 2) that expresses by how
+   //                              many times the images should be enlarged for
+   //                              visualization.
    //
    // Output: return:         True if matching was possible, i.e., if frames
    //                         with both input frame indices were received; false
    //                         otherwise.
    bool displayMatches(unsigned int frame_index_1, unsigned int frame_index_2,
-                       MatchingMethod matching_method);
+                       MatchingMethod matching_method,
+                       unsigned int magnification_factor=2);
  private:
    // Matches the two frames with the given indices, if frame with those indices
    // were received. Returns two vectors of indices with the same length,
@@ -117,20 +122,24 @@ class LineMatcher {
    //                           line with index line_indices_2[i] in the second
    //                           frame.
    //
+   //         matching_ratings: Ratings of the matches found.
+   //
    //         return:           True if matching was possible, i.e., if frames
    //                           with both input frame indices were received;
    //                           false otherwise.
    bool matchFrames(unsigned int frame_index_1, unsigned int frame_index_2,
                     MatchingMethod matching_method,
                     std::vector<int>* line_indices_1,
-                    std::vector<int>* line_indices_2);
+                    std::vector<int>* line_indices_2,
+                    std::vector<float>* matching_ratings);
    // Same interface as above. Matching based on brute-force comparison of all
    // pairs of lines and selection of the best.
    bool matchFramesBruteForce(unsigned int frame_index_1,
                               unsigned int frame_index_2,
                               MatchingMethod matching_method,
                               std::vector<int>* line_indices_1,
-                              std::vector<int>* line_indices_2);
+                              std::vector<int>* line_indices_2,
+                              std::vector<float>* matching_ratings);
 
   // Comparator function used to sort candidate matching by increasing rating
   // (lower rating <=> better match).
