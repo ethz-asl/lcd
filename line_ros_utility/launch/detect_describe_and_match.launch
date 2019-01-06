@@ -1,0 +1,32 @@
+<launch>
+  <node
+    pkg="line_ros_utility"
+    type="matching_visualizer_node"
+    name="matching_visualizer_node"
+    output="screen"
+ ></node>
+  <node
+    pkg="line_ros_utility"
+    type="scenenet_to_line_tools"
+    name="scenenet_to_line_tools"
+    output="screen"
+ ></node>
+  <node
+    pkg="line_detection"
+    type="line_extractor_node"
+    name="line_extractor_node"
+    output="screen"
+ ></node>
+  <node
+    pkg="line_description"
+    type="line_to_virtual_camera_image_node.py"
+    name="line_to_virtual_camera_image_node"
+    output="screen"
+ ></node>
+  <node
+    pkg="line_description"
+    type="image_to_embeddings_node.py"
+    name="image_to_embeddings_node"
+    output="screen"
+ ></node>
+</launch>
