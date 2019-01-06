@@ -56,26 +56,28 @@ bool LineMatcher::displayMatches(unsigned int frame_index_1,
   cv::Vec4f line2D_1, line2D_2;
   cv::Point2f center_line_1, center_line_2;
   std::string window_title;
-
+  unsigned int idx_1, idx_2;
   // Display matches one at a time.
   for (size_t i = 0; i < num_matches; ++i) {
+    idx_1 = line_indices_1[i];
+    idx_2 = line_indices_2[i];
     large_image.copyTo(temp_image);
     // Draw lines in the first image (in red).
-    line2D_1 = frames_[frame_index_1].lines[i].line2D;
+    line2D_1 = frames_[frame_index_1].lines[idx_1].line2D;
     cv::line(temp_image, cv::Point(line2D_1[0], line2D_1[1]),
              cv::Point(line2D_1[2], line2D_1[3]), CV_RGB(255, 0, 0));
     // Draw lines in the second image (in red).
-    line2D_2 = frames_[frame_index_2].lines[i].line2D;
+    line2D_2 = frames_[frame_index_2].lines[idx_2].line2D;
     cv::line(temp_image, cv::Point(line2D_2[0] + cols, line2D_2[1]),
              cv::Point(line2D_2[2] + cols, line2D_2[3]), CV_RGB(255, 0, 0));
-    center_line_1 = {(frames_[frame_index_1].lines[i].line2D[0] +
-                      frames_[frame_index_1].lines[i].line2D[2]) / 2,
-                     (frames_[frame_index_1].lines[i].line2D[1] +
-                      frames_[frame_index_1].lines[i].line2D[3]) / 2};
-    center_line_2 = {(frames_[frame_index_2].lines[i].line2D[0] +
-                      frames_[frame_index_2].lines[i].line2D[2]) / 2,
-                     (frames_[frame_index_2].lines[i].line2D[1] +
-                      frames_[frame_index_2].lines[i].line2D[3]) / 2};
+    center_line_1 = {(frames_[frame_index_1].lines[idx_1].line2D[0] +
+                      frames_[frame_index_1].lines[idx_1].line2D[2]) / 2,
+                     (frames_[frame_index_1].lines[idx_1].line2D[1] +
+                      frames_[frame_index_1].lines[idx_1].line2D[3]) / 2};
+    center_line_2 = {(frames_[frame_index_2].lines[idx_2].line2D[0] +
+                      frames_[frame_index_2].lines[idx_2].line2D[2]) / 2,
+                     (frames_[frame_index_2].lines[idx_2].line2D[1] +
+                      frames_[frame_index_2].lines[idx_2].line2D[3]) / 2};
     // Draw yellow lines between the center of the matched lines.
     cv::line(temp_image, cv::Point(center_line_1.x, center_line_1.y),
              cv::Point(center_line_2.x + cols, center_line_2.y),

@@ -43,10 +43,6 @@ class LineDetectorDescriptorAndMatcher {
    line_detection::Detector detector_type_;
     // Instance of LineMatcher used to do the matching.
    line_matching::LineMatcher line_matcher_;
-   /*// Data from the ROS messages.
-   cv::Mat cv_image_;
-   cv::Mat cv_cloud_;
-   sensor_msgs::CameraInfoConstPtr camera_info_;*/
    // Subscribers.
    message_filters::Synchronizer<MySyncPolicy>* sync_;
    message_filters::Subscriber<sensor_msgs::Image> image_sub_;
@@ -58,7 +54,6 @@ class LineDetectorDescriptorAndMatcher {
    line_detection::ExtractLines service_extract_lines_;
    line_description::LineToVirtualCameraImage
        service_line_to_virtual_camera_image_;
-
    line_description::ImageToEmbeddings service_image_to_embeddings_;
    // Service clients.
    ros::ServiceClient client_extract_lines_;

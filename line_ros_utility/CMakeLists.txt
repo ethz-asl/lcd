@@ -26,6 +26,5 @@ target_link_libraries(freiburg_to_line_tools ${PROJECT_NAME})
 add_executable(matching_visualizer_node src/matching_visualizer_node.cc)
 target_link_libraries(matching_visualizer_node line_detect_describe_and_match)
 
-
 cs_install()
 cs_export()

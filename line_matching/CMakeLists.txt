@@ -10,8 +10,5 @@ cs_add_library(${PROJECT_NAME}
   src/line_matching.cc
 )
 
-#add_executable(detect_cluster_show src/detect_cluster_show_node.cc)
-#target_link_libraries(detect_cluster_show ${PROJECT_NAME})
-
 cs_install()
 cs_export()
