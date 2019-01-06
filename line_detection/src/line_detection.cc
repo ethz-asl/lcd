@@ -754,30 +754,17 @@ bool LineDetector::find3DLineStartAndEnd(const cv::Mat& point_cloud,
   // from end to start (second loop) until a non NaN point is found.
   cv::LineIterator it_start_end(point_cloud, *(start), *(end), 8);
   // Search for a non NaN value on the line.
-  // From starting point
-  //LOG(INFO) << "it_start_end at (" << start->x << ", " << start-> y << ") and "
-  //          << "is " << (std::isnan(point_cloud.at<cv::Vec3f>(*(start))[0]) ?
-  //             "" : "not ") << "NaN";
   while (std::isnan(point_cloud.at<cv::Vec3f>(*(start))[0])) {
     ++it_start_end;
     *(start) = it_start_end.pos();
-    //LOG(INFO) << "it_start_end at (" << start->x << ", " << start-> y << ") "
-    //          << "and is " << (std::isnan(point_cloud.at<cv::Vec3f>(*(start))[0]) ?
-    //             "" : "not ") << "NaN";
     if (start->x == end->x && start->y == end->y) break;
   }
   if (start->x == end->x && start->y == end->y) return false;
   // From ending point
   cv::LineIterator it_end_start(point_cloud, *(end), *(start), 8);
-  //LOG(INFO) << "it_end_start at (" << start->x << ", " << start-> y << ") and "
-  //          << "is " << (std::isnan(point_cloud.at<cv::Vec3f>(*(start))[0]) ?
-  //             "" : "not ") << "NaN";
   while (std::isnan(point_cloud.at<cv::Vec3f>(*(end))[0])) {
     ++it_end_start;
     *(end) = it_end_start.pos();
-    //LOG(INFO) << "it_end_start at (" <<end->x << ", " << end-> y << ") "
-    //          << "and is " << (std::isnan(point_cloud.at<cv::Vec3f>(*(end))[0]) ?
-    //             "" : "not ") << "NaN";
     if (start->x == end->x && start->y == end->y) break;
   }
   if (start->x == end->x && start->y == end->y) return false;
@@ -837,7 +824,6 @@ double LineDetector::findAndRate3DLine(const cv::Mat& point_cloud,
     ++(*num_points);
   }
 
-  //LOG(INFO) << "Found " << num_nan_points << " NaN points for this line.";
   return rating / (*num_points);
 }
 double LineDetector::findAndRate3DLine(const cv::Mat& point_cloud,
@@ -1035,17 +1021,6 @@ bool LineDetector::trimEndpoint(const cv::Point2f& point,
   // the bounds of the image should be selected. Note: in case of line that go
   // through a corner of the image, both points found should be within the
   // the bounds of the image, as they coincide => Take the first valid point.
-  if (candidate_point_trimmed.size() == 2) {
-    if (checkPointInBounds(candidate_point_trimmed[0], x_max, y_max) &&
-        checkPointInBounds(candidate_point_trimmed[1], x_max, y_max)) {
-          LOG(INFO) << "Both " << candidate_point_trimmed[0] << " and "
-                << candidate_point_trimmed[1] << " are valid candidates for "
-                << "the trimmed point. They are "
-                << (checkEqualPoints(candidate_point_trimmed[0],
-                                    candidate_point_trimmed[1]) ? "" : "not ")
-                << "equal.";
-    }
-  }
   for (auto& candidate_point : candidate_point_trimmed) {
     if (checkPointInBounds(candidate_point, x_max, y_max)) {
       *trimmed_point = candidate_point;
@@ -1499,7 +1474,9 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                                        end_readjusted_line);
 
       if (enough_num_inliers && enough_inliers_around_center) {
-        LOG(INFO) << "* Line is assigned PLANE type.";
+        if (verbose_mode_on_) {
+          LOG(INFO) << "* Line is assigned PLANE type.";
+        }
         num_planar_lines++;
         return true;
       } else {
@@ -1557,18 +1534,22 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       // Line can now be either an edge or on an intersection line.
       if (!assignEdgeOrIntersectionLineType(cloud, camera_P, points1, points2,
                                             line)) {
-        LOG(ERROR) << "Could not assign neither edge- nor intersection- line "
-                   << "type to line (" << line->line[0] << ", " << line->line[1]
-                   << ", " << line->line[2] << ") -- (" << line->line[3] << ", "
-                   << line->line[4] << ", " << line->line[5] << ")";
-
+        if (verbose_mode_on_) {
+          LOG(ERROR) << "Could not assign neither edge- nor intersection- line "
+                     << "type to line (" << line->line[0] << ", "
+                     << line->line[1] << ", " << line->line[2] << ") -- ("
+                     << line->line[3] << ", " << line->line[4] << ", "
+                     << line->line[5] << ")";
+        }
         return false;
       } else {
-        LOG(INFO) << "Successfully determined type "
-                  << (line->type==LineType::EDGE ? "EDGE " : "INTERSECT ")
-                  << "for line (" << line->line[0] << ", " << line->line[1]
-                  << ", " << line->line[2] << ") -- (" << line->line[3] << ", "
-                  << line->line[4] << ", " << line->line[5] << ")";
+        if (verbose_mode_on_) {
+          LOG(INFO) << "Successfully determined type "
+                    << (line->type==LineType::EDGE ? "EDGE " : "INTERSECT ")
+                    << "for line (" << line->line[0] << ", " << line->line[1]
+                    << ", " << line->line[2] << ") -- (" << line->line[3]
+                    << ", " << line->line[4] << ", " << line->line[5] << ")";
+        }
         return true;
       }
     }
@@ -1644,7 +1625,9 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
         checkIfValidLineUsingInliers(*points, start_readjusted_line,
                                      end_readjusted_line);
     if (enough_inliers_around_center) {
-      LOG(INFO) << "* Line is assigned DISCONT type.";
+      if (verbose_mode_on_) {
+        LOG(INFO) << "* Line is assigned DISCONT type.";
+      }
       num_discontinuity_lines++;
       return true;
     } else {
@@ -1695,8 +1678,10 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
   // indeed an edge line. This example also works for a chair with no armrests:
   // prolonging the same planes no nearby points at all are found.) In all other
   // cases the line is assigned the INTERSECTION type.
-  LOG(INFO) << "Line with concave planes. Using method of prolonged lines to "
-            << "determine edge/intersection line type.";
+  if (verbose_mode_on_) {
+    LOG(INFO) << "Line with concave planes. Using method of prolonged lines to "
+              << "determine edge/intersection line type.";
+  }
 
   // As a first step extend the 3D line from both endpoints and extract the two
   // extensions as line segments.
@@ -1786,9 +1771,11 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
     num_edge_lines++;
     occurrences_config_prolonged_plane[1][1][1][1]++;
   } else {
-    LOG(INFO) << "The current line (of intersection type) has the following "
-              << "configuration for inliers in the prolonged planes (LRLR): "
-              << point_planes_config;
+    if (verbose_mode_on_) {
+      LOG(INFO) << "The current line (of intersection type) has the following "
+                << "configuration for inliers in the prolonged planes (LRLR): "
+                << point_planes_config;
+    }
     if (point_planes_config == "0001" || point_planes_config == "0010" ||
         point_planes_config == "0100" || point_planes_config == "1000") {
       occurrences_config_prolonged_plane[1][0][0][0]++;
@@ -1798,7 +1785,9 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
       occurrences_config_prolonged_plane[1][0][1][0]++;
     } else if (point_planes_config == "1001" || point_planes_config == "0110") {
       occurrences_config_prolonged_plane[1][0][0][1]++;
-      LOG(WARNING) << "Note: The configuration is one of the strange ones.";
+      if (verbose_mode_on_) {
+        LOG(WARNING) << "Note: The configuration is one of the strange ones.";
+      }
     } else if (point_planes_config == "1110" || point_planes_config == "1101" ||
                point_planes_config == "1011" || point_planes_config == "0111") {
       occurrences_config_prolonged_plane[1][1][1][0]++;
@@ -1873,15 +1862,17 @@ bool LineDetector::determineConvexityFromViewpointGivenLineAndInlierPoints(
       return true;
   } else {
     // This case should never be entered.
-    LOG(ERROR) << "Error in determining the concavity/convexity of the angle "
-               << "between the two planes around the line with the following "
-               << "3D coordinates: (" << line.line[0] << ", " << line.line[1]
-               << ", " << line.line[2] << ") -- (" << line.line[3] << ", "
-               << line.line[4] << ", " << line.line[5] << "). Hessians are: ["
-               << hessians[0][0] << ", " << hessians[0][1] << ", "
-               << hessians[0][2] << ", " << hessians[0][3] << "] and ["
-               << hessians[1][0] << ", " << hessians[1][1] << ", "
-               << hessians[1][2] << ", " << hessians[1][3] << "].";
+    if (verbose_mode_on_) {
+      LOG(ERROR) << "Error in determining the concavity/convexity of the angle "
+                 << "between the two planes around the line with the following "
+                 << "3D coordinates: (" << line.line[0] << ", " << line.line[1]
+                 << ", " << line.line[2] << ") -- (" << line.line[3] << ", "
+                 << line.line[4] << ", " << line.line[5] << "). Hessians are: ["
+                 << hessians[0][0] << ", " << hessians[0][1] << ", "
+                 << hessians[0][2] << ", " << hessians[0][3] << "] and ["
+                 << hessians[1][0] << ", " << hessians[1][1] << ", "
+                 << hessians[1][2] << ", " << hessians[1][3] << "].";
+    }
     num_lines_discarded_for_convexity_concavity++;
     return false;
   }
@@ -1919,22 +1910,25 @@ bool LineDetector::determineConvexityFromViewpointGivenLineAndMeanPoints(
       return true;
   } else {
     // This case should never be entered.
-    LOG(ERROR) << "Error in determining the concavity/convexity of the angle "
-               << "between the two planes around the line with the following "
-               << "3D coordinates: (" << line.line[0] << ", " << line.line[1]
-               << ", " << line.line[2] << ") -- (" << line.line[3] << ", "
-               << line.line[4] << ", " << line.line[5] << "). Hessians are: ["
-               << line.hessians[0][0] << ", " << line.hessians[0][1] << ", "
-               << line.hessians[0][2] << ", " << line.hessians[0][3] << "] "
-               << "and [" << line.hessians[1][0] << ", "
-               << line.hessians[1][1] << ", " << line.hessians[1][2] << ", "
-               << line.hessians[1][3] << "]. Mean point 1 is ("
-               << mean_point_1_proj[0] << ", " << mean_point_1_proj[1]
-               << ", " << mean_point_1_proj[2] << "). Mean point 2 is ("
-               << mean_point_2_proj[0] << ", " << mean_point_2_proj[1]
-               << ", " << mean_point_2_proj[2] << "). Mean of mean points is ("
-               << mean_of_mean_points[0] << ", " << mean_of_mean_points[1]
-               << ", " << mean_of_mean_points[2] << ").";
+    if (verbose_mode_on_) {
+      LOG(ERROR) << "Error in determining the concavity/convexity of the angle "
+                 << "between the two planes around the line with the following "
+                 << "3D coordinates: (" << line.line[0] << ", " << line.line[1]
+                 << ", " << line.line[2] << ") -- (" << line.line[3] << ", "
+                 << line.line[4] << ", " << line.line[5] << "). Hessians are: ["
+                 << line.hessians[0][0] << ", " << line.hessians[0][1] << ", "
+                 << line.hessians[0][2] << ", " << line.hessians[0][3] << "] "
+                 << "and [" << line.hessians[1][0] << ", "
+                 << line.hessians[1][1] << ", " << line.hessians[1][2] << ", "
+                 << line.hessians[1][3] << "]. Mean point 1 is ("
+                 << mean_point_1_proj[0] << ", " << mean_point_1_proj[1]
+                 << ", " << mean_point_1_proj[2] << "). Mean point 2 is ("
+                 << mean_point_2_proj[0] << ", " << mean_point_2_proj[1]
+                 << ", " << mean_point_2_proj[2] << "). Mean of mean points is "
+                 << "("  << mean_of_mean_points[0] << ", "
+                 << mean_of_mean_points[1] << ", " << mean_of_mean_points[2]
+                 << ").";
+    }
     return false;
   }
 }
@@ -1980,8 +1974,10 @@ void LineDetector::checkIfValidPointsOnPlanesGivenProlongedLine(
     if (std::isnan(cloud.at<cv::Vec3f>(points_in_rect[j])[0])) continue;
     points_left_plane.push_back(cloud.at<cv::Vec3f>(points_in_rect[j]));
   }
-  LOG(INFO) << "Left rectangle contains " << points_left_plane.size()
-            << " points.";
+  if (verbose_mode_on_) {
+    LOG(INFO) << "Left rectangle contains " << points_left_plane.size()
+              << " points.";
+  }
 
   // Find points for the right side.
   findPointsInRectangle(rect_right, &points_in_rect);
@@ -1994,8 +1990,10 @@ void LineDetector::checkIfValidPointsOnPlanesGivenProlongedLine(
     if (std::isnan(cloud.at<cv::Vec3f>(points_in_rect[j])[0])) continue;
     points_right_plane.push_back(cloud.at<cv::Vec3f>(points_in_rect[j]));
   }
-  LOG(INFO) << "Right rectangle contains " << points_right_plane.size()
-            << " points.";
+  if (verbose_mode_on_) {
+    LOG(INFO) << "Right rectangle contains " << points_right_plane.size()
+              << " points.";
+  }
 
   // If the number of points around the plane is too small, either the line
   // segment is too short (but this should not be the case if
@@ -2054,9 +2052,11 @@ void LineDetector::checkIfValidPointsOnPlanesGivenProlongedLine(
     else
       *right_plane_enough_valid_points = true;
   }
-  LOG(INFO) << "Found " << valid_points_left_plane << " valid points on the "
-            << "left plane and " << valid_points_right_plane << " valid points "
-            << "on the right plane.";
+  if (verbose_mode_on_) {
+    LOG(INFO) << "Found " << valid_points_left_plane << " valid points on the "
+              << "left plane and " << valid_points_right_plane << " valid "
+              << "points on the right plane.";
+  }
 }
 
 bool LineDetector::planeRANSAC(const std::vector<cv::Vec3f>& points,
@@ -2298,23 +2298,12 @@ void LineDetector::project2Dto3DwithPlanes(
   std::vector<cv::Vec4f> lines2D =
       fitLinesToBounds(lines2D_in, cloud.cols, cloud.rows);
 
-  //LOG(INFO) << "2D lines before shrinkage:";
-  //std::vector<cv::Vec4f>::iterator line;
-  //for (line = lines2D.begin(); line != lines2D.end(); ++line)
-  //  LOG(INFO) << "(" << (*line)[0] << ", " << (*line)[1] << ") -- (" << (*line)[2]
-  //            << ", " << (*line)[3] << ")";
-
   // Shrink 2D lines to lessen the influence of start and end points
   std::vector<cv::Vec4f> lines2D_shrunk;
   constexpr double kShrinkCoff = 0.8;
   constexpr double kMinLengthAfterShrinking = 1.0;
   shrink2Dlines(lines2D, kShrinkCoff, kMinLengthAfterShrinking,
                 &lines2D_shrunk);
-
-  //LOG(INFO) << "2D lines after shrinkage:";
-  //for (line = lines2D_shrunk.begin(); line != lines2D_shrunk.end(); ++line)
-  //  LOG(INFO) << "(" << (*line)[0] << ", " << (*line)[1] << ") -- ("
-  //            << (*line)[2]  << ", " << (*line)[3] << ")";
 
   find3DlinesRated(cloud, lines2D_shrunk, &lines3D_cand, &rating);
 
@@ -2380,21 +2369,23 @@ void LineDetector::project2Dto3DwithPlanes(
 
       project3DLineTo2D(start_3D, end_3D, camera_P, &reprojected_line);
 
-      LOG(INFO) << "** Candidate line was successfully projected to 3D with "
-                << "index " << num_lines_successfully_projected_to_3D
-                << ":\n   - 2D: (" << lines2D[i][0]  << ", " << lines2D[i][1]
-                << ") -- (" << lines2D[i][2] << ", " << lines2D[i][3]
-                << ").\n   - 3D before adjustment: (" << lines3D_cand[i][0]
-                << ", " << lines3D_cand[i][1] << ", " << lines3D_cand[i][2]
-                << ") -- (" << lines3D_cand[i][3] << ", "
-                << lines3D_cand[i][4] << ", " << lines3D_cand[i][5]
-                << ").\n   - 3D after adjustment: (" << line3D_true.line[0]
-                << ", " << line3D_true.line[1] << ", " << line3D_true.line[2]
-                << ") -- (" << line3D_true.line[3] << ", "
-                << line3D_true.line[4] << ", " << line3D_true.line[5]
-                << ").\n   - 2D after reprojection: (" << reprojected_line[0]
-                << ", " << reprojected_line[1] << ") -- ("
-                << reprojected_line[2] << ", " << reprojected_line[3] << ").";
+      if (verbose_mode_on_) {
+        LOG(INFO) << "** Candidate line was successfully projected to 3D with "
+                  << "index " << num_lines_successfully_projected_to_3D
+                  << ":\n   - 2D: (" << lines2D[i][0]  << ", " << lines2D[i][1]
+                  << ") -- (" << lines2D[i][2] << ", " << lines2D[i][3]
+                  << ").\n   - 3D before adjustment: (" << lines3D_cand[i][0]
+                  << ", " << lines3D_cand[i][1] << ", " << lines3D_cand[i][2]
+                  << ") -- (" << lines3D_cand[i][3] << ", "
+                  << lines3D_cand[i][4] << ", " << lines3D_cand[i][5]
+                  << ").\n   - 3D after adjustment: (" << line3D_true.line[0]
+                  << ", " << line3D_true.line[1] << ", " << line3D_true.line[2]
+                  << ") -- (" << line3D_true.line[3] << ", "
+                  << line3D_true.line[4] << ", " << line3D_true.line[5]
+                  << ").\n   - 2D after reprojection: (" << reprojected_line[0]
+                  << ", " << reprojected_line[1] << ") -- ("
+                  << reprojected_line[2] << ", " << reprojected_line[3] << ").";
+      }
 
       if (visualization_mode_on_) {
         // Display original line/rectangles overlapped with the reprojection
@@ -2722,9 +2713,6 @@ void LineDetector::find3DlinesRated(const cv::Mat& cloud,
     rate_mid = findAndRate3DLine(cloud, lines2D[i], &line3D);
     rate_up = findAndRate3DLine(cloud, upper_line2D, &upper_line3D);
 
-    //LOG(INFO) << "Ratings of lines are:\nUp = " << rate_up << "\nMid = "
-    //          << rate_mid << "\nLow = " << rate_low << "\n";
-
     if (rate_up < rate_mid && rate_up < rate_low) {
       lines3D->push_back(upper_line3D);
       rating->push_back(rate_up);
@@ -2785,7 +2773,9 @@ void LineDetector::runCheckOn3DLines(
       lines3D_out->push_back(line_cand);
       lines2D_out->push_back(line_cand_2D);
     } else {
-      LOG(INFO) << "Line " << i << " is discarded after check with 2D info.";
+      if (verbose_mode_on_) {
+        LOG(INFO) << "Line " << i << " is discarded after check with 2D info.";
+      }
     }
   }
 }

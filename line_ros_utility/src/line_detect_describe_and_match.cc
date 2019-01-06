@@ -70,7 +70,7 @@ namespace line_ros_utility {
     // Detect lines.
     detectLines(image_rgb_msg, cloud_msg, camera_info_msg, &lines,
                 &frame_index);
-    ROS_INFO("Number of lines detected: %d.", lines.size());
+    ROS_INFO("Number of lines detected: %lu.", lines.size());
     // Retrieve descriptor for all lines.
     embeddings.resize(lines.size());
     for (size_t idx = 0; idx < lines.size(); ++idx) {

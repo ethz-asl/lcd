@@ -1147,6 +1147,14 @@ class LineDetector {
     visualization_mode_on_ = on_true_off_false;
   }
 
+  // Set verbose mode.
+  //
+  // Input: on_true_off_false: True if verbose mode should be set to On,
+  //                           false if it should be set to Off.
+  inline void setVerboseMode(bool on_true_off_false) {
+    verbose_mode_on_ = on_true_off_false;
+  }
+
 private:
   cv::Ptr<cv::LineSegmentDetector> lsd_detector_;
   cv::Ptr<cv::line_descriptor::BinaryDescriptor> edl_detector_;
@@ -1156,6 +1164,8 @@ private:
 
   // True if lines/prolonged lines with rectangles should be displayed.
   bool visualization_mode_on_ = false;
+  // True if detailed prints about the lines detected should be displayed.
+  bool verbose_mode_on_ = false;
 
   // Used for visualization purposes when displaying the line/prolonged line
   // with rectangles overlapped on the original image.

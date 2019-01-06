@@ -202,6 +202,9 @@ class InliersWithLabels {
 
  private:
    std::vector<std::pair<cv::Vec3f, unsigned short>> inliers_with_labels_;
+
+   // True if detailed prints about the lines labelled should be displayed.
+   bool verbose_mode_on_ = false;
 };
 
 
@@ -416,9 +419,12 @@ class ListenAndPublish {
  private:
   // True if lines should be displayed, once labelled, overlapped on the
   // instance image.
-  bool labelled_line_visualization_mode_on_ = true;
+  bool labelled_line_visualization_mode_on_ = false;
   // True if the inliers found around the line should be displayed.
-  bool inliers_visualization_mode_on_ = true;
+  bool inliers_visualization_mode_on_ = false;
+  // True if detailed prints about the lines labelled should be displayed.
+  bool verbose_mode_on_ = false;
+
   // Data storage.
   size_t iteration_;
   cv::Mat cv_image_;

@@ -188,10 +188,10 @@ void ListenAndPublish::detectLines() {
   start_time_ = std::chrono::system_clock::now();
   line_detector_.detectLines(cv_img_gray_, detector_method_,
                              &lines2D_not_fused);
-  ROS_INFO("Lines found before fusing: %d", lines2D_not_fused.size());
+  ROS_INFO("Lines found before fusing: %lu", lines2D_not_fused.size());
   lines2D_.clear();
   line_detector_.fuseLines2D(lines2D_not_fused, &lines2D_);
-  ROS_INFO("Lines found after fusing: %d", lines2D_.size());
+  ROS_INFO("Lines found after fusing: %lu", lines2D_.size());
   end_time_ = std::chrono::system_clock::now();
   elapsed_seconds_ = end_time_ - start_time_;
   ROS_INFO("Detecting lines 2D: %f", elapsed_seconds_.count());
@@ -541,22 +541,24 @@ void ListenAndPublish::labelLinesWithInstances(
     for (size_t i = 0u; i < lines.size(); ++i) {
       start = {lines[i].line[0], lines[i].line[1], lines[i].line[2]};
       end = {lines[i].line[3], lines[i].line[4], lines[i].line[5]};
-      LOG(INFO) << "*** Labelling line no." << i << ", (" << start[0] << ", "
-                << start[1] << ", " << start[2] << ") -- (" << end[0] << ", "
-                << end[1] << ", " << end[2] << ").";
-      switch (lines[i].type) {
-        case line_detection::LineType::DISCONT:
-          LOG(INFO) << "Line is of type DISCONT.";
-          break;
-        case line_detection::LineType::PLANE:
-          LOG(INFO) << "Line is of type PLANE.";
-          break;
-        case line_detection::LineType::INTERSECT:
-          LOG(INFO) << "Line is of type INTERSECT.";
-          break;
-        default:
-          LOG(INFO) << "Line is of type EDGE.";
-          break;
+      if (verbose_mode_on_) {
+        LOG(INFO) << "*** Labelling line no." << i << ", (" << start[0] << ", "
+                  << start[1] << ", " << start[2] << ") -- (" << end[0] << ", "
+                  << end[1] << ", " << end[2] << ").";
+        switch (lines[i].type) {
+          case line_detection::LineType::DISCONT:
+            LOG(INFO) << "Line is of type DISCONT.";
+            break;
+          case line_detection::LineType::PLANE:
+            LOG(INFO) << "Line is of type PLANE.";
+            break;
+          case line_detection::LineType::INTERSECT:
+            LOG(INFO) << "Line is of type INTERSECT.";
+            break;
+          default:
+            LOG(INFO) << "Line is of type EDGE.";
+            break;
+        }
       }
       direction = end - start;
       line_detection::normalizeVector3D(&direction);
@@ -644,10 +646,12 @@ void ListenAndPublish::labelLinesWithInstances(
                   most_present_label_right) +
               inliers_with_label_left_after_end.countLabelInInliers(
                   most_present_label_right);
-          LOG(INFO) << "The label most present on the right plane ("
-                    << most_present_label_right << ") has "
-                    << total_occurrences_most_present_label_right
-                    << " occurrences in the 4 prolonged planes.";
+          if (verbose_mode_on_) {
+            LOG(INFO) << "The label most present on the right plane ("
+                      << most_present_label_right << ") has "
+                      << total_occurrences_most_present_label_right
+                      << " occurrences in the 4 prolonged planes.";
+          }
           total_occurrences_most_present_label_left =
               inliers_with_label_right_before_start.countLabelInInliers(
                   most_present_label_left) +
@@ -657,10 +661,12 @@ void ListenAndPublish::labelLinesWithInstances(
                   most_present_label_left) +
               inliers_with_label_left_after_end.countLabelInInliers(
                   most_present_label_left);
-          LOG(INFO) << "The label most present on the left plane ("
-                    << most_present_label_left << ") has "
-                    << total_occurrences_most_present_label_left
-                    << " occurrences in the 4 prolonged planes.";
+          if (verbose_mode_on_) {
+            LOG(INFO) << "The label most present on the left plane ("
+                      << most_present_label_left << ") has "
+                      << total_occurrences_most_present_label_left
+                      << " occurrences in the 4 prolonged planes.";
+          }
           if (total_occurrences_most_present_label_right <
               total_occurrences_most_present_label_left) {
             labels->at(i) = most_present_label_right;
@@ -742,9 +748,6 @@ void ListenAndPublish::assignLabelOfInlierPlaneBasedOnDistance(
       *label = inliers_with_instance_label[1].getLabelByMajorityVote();
     }
   }
-  //LOG(INFO) << "Found majority-vote label for line (" << line.line[0] << ", "
-  //          << line.line[1]  << ", " << line.line[2] << ") -- (" << line.line[3]
-  //          << ", " << line.line[4] << ", " << line.line[5] << ").";
 }
 
 
@@ -802,7 +805,9 @@ void ListenAndPublish::findInliersWithLabelsGivenPlanes(
     end_2D = {line_2D[2], line_2D[3]};
     double line_length = cv::norm(end_2D - start_2D);
     if (line_length < 1e-4) {
-      LOG(INFO) << "Discarding line because too short in 2D.";
+      if (verbose_mode_on_) {
+        LOG(INFO) << "Discarding line because too short in 2D.";
+      }
       // Line collapsed to a point => Return empty vectors as inliers.
       inliers_right->setInliersWithLabels(
           std::vector<std::pair<cv::Vec3f, unsigned short>>());
@@ -1070,10 +1075,12 @@ int InliersWithLabels::getLabelByMajorityVote() {
       ++labels_count[instance_label];
     }
   }
-  LOG(INFO) << "Built map of labels/counts. It looks as follows:";
-  for (auto const& label_with_count: labels_count) {
-    LOG(INFO) << "* " << label_with_count.first << " -> "
-              << label_with_count.second;
+  if (verbose_mode_on_) {
+    LOG(INFO) << "Built map of labels/counts. It looks as follows:";
+    for (auto const& label_with_count: labels_count) {
+      LOG(INFO) << "* " << label_with_count.first << " -> "
+                << label_with_count.second;
+    }
   }
   std::map<unsigned short, size_t>::iterator it_labels = labels_count.begin();
   unsigned short most_frequent_label = it_labels->first;
@@ -1083,9 +1090,11 @@ int InliersWithLabels::getLabelByMajorityVote() {
     if (it_labels->second > labels_count[most_frequent_label])
       most_frequent_label = it_labels->first;
   }
-  LOG(INFO) << "Compared all labels and found the most frequent to be "
-            << most_frequent_label << " with "
-            << labels_count[most_frequent_label] << " occurrences.";
+  if (verbose_mode_on_) {
+    LOG(INFO) << "Compared all labels and found the most frequent to be "
+              << most_frequent_label << " with "
+              << labels_count[most_frequent_label] << " occurrences.";
+  }
 
   // Return most frequent label.
   return most_frequent_label;
@@ -1116,7 +1125,12 @@ bool getDefaultPathsAndVariables(const std::string& path_or_variable_name,
   // Run script to generate the paths_and_variables file
   std::string generating_script_path = line_tools_paths::kLineToolsRootPath +
       "/python/print_paths_and_variables_to_file.sh";
-  system(generating_script_path.c_str());
+  if (!system(generating_script_path.c_str())) {
+    // Error during file open
+    LOG(WARNING) << "Error in executing script " << generating_script_path
+                 << "Exiting.";
+    return false;
+  }
   // Read paths_and_variables file
   std::ifstream paths_and_variables_file(line_tools_paths::kLineToolsRootPath +
                                          "paths_and_variables.txt");
@@ -1153,7 +1167,12 @@ bool getDefaultPathsAndVariables(const std::string& path_or_variable_name,
   // Run script to generate the paths_and_variables file
   std::string generating_script_path = line_tools_paths::kLineToolsRootPath +
       "/python/print_paths_and_variables_to_file.sh";
-  system(generating_script_path.c_str());
+  if (!system(generating_script_path.c_str())) {
+    // Error during file open
+    LOG(WARNING) << "Error in executing script " << generating_script_path
+                 << "Exiting.";
+    return false;
+  }
   // Read paths_and_variables file
   std::ifstream paths_and_variables_file(line_tools_paths::kLineToolsRootPath +
                                          "paths_and_variables.txt");
