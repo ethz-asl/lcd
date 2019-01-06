@@ -5,7 +5,9 @@ import numpy as np
 import os
 import rospy
 from embeddings_retriever import EmbeddingsRetriever
-from line_description.srv import ImageToEmbeddings, ImageToEmbeddingsResponse
+from line_description.srv import ImageToEmbeddings, ImageToEmbeddingsResponse, \
+                                 EmbeddingsRetrieverReady, \
+                                 EmbeddingsRetrieverReadyResponse
 from cv_bridge import CvBridge, CvBridgeError
 
 
@@ -51,9 +53,26 @@ class ImageToEmbeddingsConverter:
         return ImageToEmbeddingsResponse(embeddings)
 
     def start_server(self):
+        # Start ROS node.
         rospy.init_node('image_to_embeddings')
+        # Initialize service.
         s = rospy.Service('image_to_embeddings', ImageToEmbeddings,
                           self.handle_image_to_embeddings)
+        # Inform main node that initialization is completed.
+        rospy.wait_for_service('embeddings_retriever_ready')
+        try:
+            embeddings_retriever_ready = rospy.ServiceProxy(
+                'embeddings_retriever_ready', EmbeddingsRetrieverReady)
+            response = embeddings_retriever_ready(True).message_received
+            if (response is not True):
+                print("Warning: server for service responded with {}. Expected "
+                      "True.".format(response))
+
+        except rospy.ServiceException, e:
+            print(
+                "Failed to call service embeddings_retriever_ready: {}".format(
+                    e))
+
         rospy.spin()
 
 

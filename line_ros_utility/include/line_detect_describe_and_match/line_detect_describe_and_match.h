@@ -6,6 +6,7 @@
 #include "line_matching/line_matching.h"
 
 #include "line_detection/ExtractLines.h"
+#include "line_description/EmbeddingsRetrieverReady.h"
 #include "line_description/ImageToEmbeddings.h"
 #include "line_description/LineToVirtualCameraImage.h"
 
@@ -59,6 +60,11 @@ class LineDetectorDescriptorAndMatcher {
    ros::ServiceClient client_extract_lines_;
    ros::ServiceClient client_line_to_virtual_camera_image_;
    ros::ServiceClient client_image_to_embeddings_;
+   // Service server.
+   ros::ServiceServer server_embeddings_retriever_ready_;
+
+   // Flag used to detect whether the embeddings retriever is ready or not.
+   bool embeddings_retriever_is_ready_;
 
    // Displays the matches between the current frame and the previous one.
    // Input: current_frame_index: Frame index of the current frame.
@@ -143,6 +149,15 @@ class LineDetectorDescriptorAndMatcher {
    bool saveFrame(const std::vector<line_detection::Line2D3DWithPlanes>& lines,
                   const std::vector<line_description::Embedding>& embeddings,
                   const cv::Mat& rgb_image, int frame_index);
+
+  // Helper function that subscribes to the input topics.
+  void subscribeToInputTopics();
+
+   // Callback for the ROS service that informs that the embeddings retriever
+   // is ready.
+  bool embeddingsRetrieverCallback(
+    line_description::EmbeddingsRetrieverReady::Request& req,
+    line_description::EmbeddingsRetrieverReady::Response& res);
 
    // Callback for the ROS messages that store the RGB image, the point cloud
    // and the camera info.

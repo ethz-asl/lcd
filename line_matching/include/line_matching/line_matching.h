@@ -96,7 +96,7 @@ class LineMatcher {
    // Input: frame_index_1/2:      Indices of the frame between which to display
    //                              matches.
    //
-   //        matching_method:      Method (distance) to be use to match lines.
+   //        matching_method:      Method (distance) to use to match lines.
    //
    //        magnification_factor: Factor (default to 2) that expresses by how
    //                              many times the images should be enlarged for
@@ -114,7 +114,7 @@ class LineMatcher {
    // that encode the correspondences between the lines from the two frames.
    // Input: frame_index_1/2:   Index of the frame between which to match lines.
    //
-   //        matching_method:   Method (distance) to be use to match lines.
+   //        matching_method:   Method (distance) to use to match lines.
    //
    // Output: line_indices_1/2: Paired indices of lines from the two frames that
    //                           are matches. The line with index

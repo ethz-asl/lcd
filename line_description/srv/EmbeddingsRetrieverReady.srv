@@ -1,0 +1,5 @@
+# Embeddings retriever sends this request when it is ready
+bool retriever_ready
+---
+# Main node sends this response if the message is received.
+bool message_received

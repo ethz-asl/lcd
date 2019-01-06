@@ -90,6 +90,6 @@ class EmbeddingsRetriever:
             })
         end_time = timer()
 
-        print('Time needed to retrieve desciptors for line: %.3f seconds' %
+        print('Time needed to retrieve descriptors for line: %.3f seconds' %
               (end_time - start_time))
         return output_embeddings

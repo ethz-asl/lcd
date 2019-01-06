@@ -15,10 +15,8 @@ namespace line_ros_utility {
     client_line_to_virtual_camera_image_ =
         node_handle_.serviceClient<line_description::LineToVirtualCameraImage>(
           "line_to_virtual_camera_image");
-    // Subscribe to input topics.
-    image_sub_.subscribe(node_handle_, "/line_tools/image/rgb", 1);
-    cloud_sub_.subscribe(node_handle_, "/line_tools/point_cloud", 1);
-    info_sub_.subscribe(node_handle_, "/line_tools/camera_info", 1);
+    // Wait for the embeddings retriever to be ready.
+    embeddings_retriever_is_ready_ = false;
   }
 
   LineDetectorDescriptorAndMatcher::~LineDetectorDescriptorAndMatcher() {
@@ -26,7 +24,21 @@ namespace line_ros_utility {
   }
 
   void LineDetectorDescriptorAndMatcher::start() {
-    // Connect callback.
+    ROS_INFO("Initializing main node. Please wait...");
+    // Advertise service that checks when the embeddings retriever is ready.
+    server_embeddings_retriever_ready_ =
+       node_handle_.advertiseService(
+           "embeddings_retriever_ready",
+           &LineDetectorDescriptorAndMatcher::embeddingsRetrieverCallback,
+           this);
+  }
+
+  void LineDetectorDescriptorAndMatcher::subscribeToInputTopics() {
+    // Subscribe to input topics.
+    image_sub_.subscribe(node_handle_, "/line_tools/image/rgb", 100);
+    cloud_sub_.subscribe(node_handle_, "/line_tools/point_cloud", 100);
+    info_sub_.subscribe(node_handle_, "/line_tools/camera_info", 100);
+    // Connect main callback.
     sync_ = new message_filters::Synchronizer<MySyncPolicy>(
         MySyncPolicy(10), image_sub_, cloud_sub_, info_sub_);
     sync_->registerCallback(
@@ -263,6 +275,28 @@ namespace line_ros_utility {
       return false;
     }
     return true;
+  }
+
+  bool LineDetectorDescriptorAndMatcher::embeddingsRetrieverCallback(
+    line_description::EmbeddingsRetrieverReady::Request& req,
+    line_description::EmbeddingsRetrieverReady::Response& res) {
+    if (embeddings_retriever_is_ready_) {
+      // This service has already been called before => Shut it down. (The new
+      // call will fail).
+      server_embeddings_retriever_ready_.shutdown();
+      return false;
+    }
+    if (req.retriever_ready != true) {
+      ROS_ERROR("Wrong message received by embeddings retriever. Expected "
+                "true, received false.");
+      return false;
+    } else {
+      // Configure node to listen to other topics.
+      res.message_received = true;
+      embeddings_retriever_is_ready_ = true;
+      subscribeToInputTopics();
+      return true;
+    }
   }
 
   void LineDetectorDescriptorAndMatcher::callback(
