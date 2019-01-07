@@ -4,6 +4,14 @@ source ~/catkin_extended_ws/devel/setup.bash
 source ~/.virtualenvs/line_tools/bin/activate
 CURRENT_DIR=`dirname $0`
 source $CURRENT_DIR/config_paths_and_variables.sh
+TRAJ_NUM=$1
+
+# Check that the trajectory number was passed.
+if [ $# -eq 0 ]
+  then
+    echo "Please provide the trajectory number as argument, e.g. './generate_trajectory_files.sh 1'.";
+    exit 1
+fi
 
 # Check dataset name.
 if [ -z $DATASET_NAME ]
@@ -48,7 +56,7 @@ else
     echo -e "\n**** Playing bag and recording data for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
     roslaunch line_ros_utility detect_cluster_show.launch trajectory:=${TRAJ_NUM} write_path:="$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/ &
     LAUNCH_PID=$!;
-    rosbag play -d 3.5 -r 2 "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenet_traj_${TRAJ_NUM}.bag;
+    rosbag play -d 3.5 --queue 300 -r 10 "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenet_traj_${TRAJ_NUM}.bag;
     sudo kill ${LAUNCH_PID};
     # Repeat process from scratch if not all lines have been generated.
     [ ! -e "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/traj_${TRAJ_NUM}/lines_2D_299.txt ]

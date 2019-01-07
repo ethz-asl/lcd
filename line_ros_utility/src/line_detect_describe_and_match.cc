@@ -311,7 +311,7 @@ namespace line_ros_utility {
     ROS_INFO("...done with detecting, describing and saving line for new "
              "frame.");
     ROS_INFO("Current frame index is %d", current_frame_index);
-    if (current_frame_index == 1) {
+    if (current_frame_index > 0) {
       displayMatchesWithPreviousFrame(current_frame_index);
     }
   }

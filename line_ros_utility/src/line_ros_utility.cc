@@ -123,11 +123,11 @@ ListenAndPublish::ListenAndPublish(int trajectory_number, std::string write_path
   // To publish the lines in 3D to rviz.
   display_clusters_.initPublishing(node_handle_);
 
-  image_sub_.subscribe(node_handle_, "/line_tools/image/rgb", 1);
-  depth_sub_.subscribe(node_handle_, "/line_tools/image/depth", 1);
-  info_sub_.subscribe(node_handle_, "/line_tools/camera_info", 1);
-  cloud_sub_.subscribe(node_handle_, "/line_tools/point_cloud", 1);
-  instances_sub_.subscribe(node_handle_, "/line_tools/image/instances", 1);
+  image_sub_.subscribe(node_handle_, "/line_tools/image/rgb", 100);
+  depth_sub_.subscribe(node_handle_, "/line_tools/image/depth", 100);
+  info_sub_.subscribe(node_handle_, "/line_tools/camera_info", 100);
+  cloud_sub_.subscribe(node_handle_, "/line_tools/point_cloud", 100);
+  instances_sub_.subscribe(node_handle_, "/line_tools/image/instances", 100);
 
   // Connect the dynamic reconfigure callback.
   dynamic_rcf_callback_ =
