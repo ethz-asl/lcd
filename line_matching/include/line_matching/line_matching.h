@@ -117,6 +117,26 @@ class LineMatcher {
    bool displayMatches(unsigned int frame_index_1, unsigned int frame_index_2,
                        MatchingMethod matching_method,
                        unsigned int magnification_factor=2);
+
+   // Display the best num_matches_per_line matches for each line in the frame
+   // with frame index frame_index_1.
+   // Input: frame_index_1/2:      Index of the frame between which to match
+   //                              lines.
+   //
+   //        matching_method:      Method (distance) to use to match lines.
+   //
+   //        num_matches_per_line: (Maximum) number of matches to find per each
+   //                              line in the first frame.
+   //
+   // Output: return:         True if matching was possible, i.e., if frames
+   //                         with both input frame indices were received; false
+   //                         otherwise.
+   bool displayNBestMatchesPerLine(unsigned int frame_index_1,
+                                   unsigned int frame_index_2,
+                                   MatchingMethod matching_method,
+                                   unsigned int num_matches_per_line,
+                                   unsigned int magnification_factor=2);
+
  private:
    // Matches the two frames with the given indices, if frame with those indices
    // were received. Returns two vectors of indices with the same length,

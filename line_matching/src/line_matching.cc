@@ -105,6 +105,89 @@ bool LineMatcher::displayMatches(unsigned int frame_index_1,
   return true;
 }
 
+bool LineMatcher::displayNBestMatchesPerLine(
+    unsigned int frame_index_1, unsigned int frame_index_2,
+    MatchingMethod matching_method, unsigned int num_matches_per_line,
+    unsigned int magnification_factor) {
+  std::vector<MatchWithRating> matches_with_ratings_vec;
+  // Obtain matches for the given frame indices, if possible.
+  if (!matchFramesNBestMatchesPerLine(frame_index_1, frame_index_2,
+                                      matching_method, num_matches_per_line,
+                                      &matches_with_ratings_vec)) {
+    LOG(ERROR) << "Unable to match frames with indices " << frame_index_1
+               << " and " << frame_index_2 << ".";
+    return false;
+  }
+  LOG(INFO) << "Matched the lines: " << matches_with_ratings_vec .size()
+            << " total matches.";
+  // Display the two images side by side with the matched lines connected to
+  // each other.
+  size_t cols = frames_[frame_index_1].image.cols;
+  size_t rows = frames_[frame_index_1].image.rows;
+  cv::Mat large_image(cv::Size(2 * cols, rows),
+                      frames_[frame_index_1].image.type());
+  cv::Mat temp_image(cv::Size(2 * cols, rows),
+                      frames_[frame_index_1].image.type());
+  // Add first image.
+  frames_[frame_index_1].image.copyTo(large_image(cv::Rect(0, 0, cols, rows)));
+  // Add second image.
+  frames_[frame_index_2].image.copyTo(large_image(cv::Rect(cols, 0, cols,
+                                                           rows)));
+  cv::Vec4f line2D_1, line2D_2;
+  cv::Point2f center_line_1, center_line_2;
+  std::string window_title;
+  unsigned int idx_1, idx_2;
+  float match_rating;
+  // Display matches one at a time.
+  for (size_t i = 0; i < matches_with_ratings_vec.size(); ++i) {
+    match_rating = matches_with_ratings_vec[i].first;
+    idx_1 = matches_with_ratings_vec[i].second.first;
+    idx_2 = matches_with_ratings_vec[i].second.second;
+    large_image.copyTo(temp_image);
+    // Draw lines in the first image (in red).
+    line2D_1 = frames_[frame_index_1].lines[idx_1].line2D;
+    cv::line(temp_image, cv::Point(line2D_1[0], line2D_1[1]),
+             cv::Point(line2D_1[2], line2D_1[3]), CV_RGB(255, 0, 0));
+    // Draw lines in the second image (in red).
+    line2D_2 = frames_[frame_index_2].lines[idx_2].line2D;
+    cv::line(temp_image, cv::Point(line2D_2[0] + cols, line2D_2[1]),
+             cv::Point(line2D_2[2] + cols, line2D_2[3]), CV_RGB(255, 0, 0));
+    center_line_1 = {(frames_[frame_index_1].lines[idx_1].line2D[0] +
+                      frames_[frame_index_1].lines[idx_1].line2D[2]) / 2,
+                     (frames_[frame_index_1].lines[idx_1].line2D[1] +
+                      frames_[frame_index_1].lines[idx_1].line2D[3]) / 2};
+    center_line_2 = {(frames_[frame_index_2].lines[idx_2].line2D[0] +
+                      frames_[frame_index_2].lines[idx_2].line2D[2]) / 2,
+                     (frames_[frame_index_2].lines[idx_2].line2D[1] +
+                      frames_[frame_index_2].lines[idx_2].line2D[3]) / 2};
+    // Draw yellow lines between the center of the matched lines.
+    cv::line(temp_image, cv::Point(center_line_1.x, center_line_1.y),
+             cv::Point(center_line_2.x + cols, center_line_2.y),
+             CV_RGB(255, 255, 0));
+    // Resize image.
+    cv::resize(temp_image, temp_image,
+               cv::Size(temp_image.size().width * magnification_factor,
+                        temp_image.size().height * magnification_factor));
+    // Display image.
+    // Display image.
+    window_title = "Match between line " + std::to_string(idx_1) + " in " +
+                   "frame " + std::to_string(frame_index_1) + " and line " +
+                   std::to_string(idx_2) + " in frame " +
+                   std::to_string(frame_index_2) + ". Rating of current match "
+                   "is " + std::to_string(match_rating);
+    cv::imshow(window_title, temp_image);
+    cv::waitKey();
+    try {
+      cv::destroyWindow(window_title);
+    }
+    catch (cv::Exception& e) {
+      LOG(INFO) << "Did not close window '" + window_title + "' because it was "
+                << "not open.";
+    }
+  }
+  return true;
+}
+
 bool LineMatcher::matchFrames(unsigned int frame_index_1,
                               unsigned int frame_index_2,
                               MatchingMethod matching_method,
