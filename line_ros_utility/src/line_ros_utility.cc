@@ -993,6 +993,15 @@ void ListenAndPublish::display2DLineWithRectangleInliers(
   // Display image.
   cv::imshow("Line with inliers", background_image);
   cv::waitKey();
+  try {
+    cv::destroyWindow("Line with inliers");
+  }
+  catch (cv::Exception& e) {
+    if (verbose_mode_on_) {
+      LOG(INFO) << "Did not close window ""Line with inliers"" because it "
+                << "was not open.";
+    }
+  }
 }
 
 void ListenAndPublish::displayLabelledLineOnInstanceImage(
@@ -1038,6 +1047,16 @@ void ListenAndPublish::displayLabelledLineOnInstanceImage(
   cv::imshow("Labelled line with pixels of the same instance",
              background_image);
   cv::waitKey();
+  try {
+    cv::destroyWindow("Labelled line with pixels of the same instance");
+  }
+  catch (cv::Exception& e) {
+    if (verbose_mode_on_) {
+      LOG(INFO) << "Did not close window "
+                << """Labelled line with pixels of the same instance"" "
+                << "because it was not open.";
+    }
+  }
 }
 
 InliersWithLabels::InliersWithLabels() {
@@ -1125,12 +1144,7 @@ bool getDefaultPathsAndVariables(const std::string& path_or_variable_name,
   // Run script to generate the paths_and_variables file
   std::string generating_script_path = line_tools_paths::kLineToolsRootPath +
       "/python/print_paths_and_variables_to_file.sh";
-  if (!system(generating_script_path.c_str())) {
-    // Error during file open
-    LOG(WARNING) << "Error in executing script " << generating_script_path
-                 << "Exiting.";
-    return false;
-  }
+  system(generating_script_path.c_str());
   // Read paths_and_variables file
   std::ifstream paths_and_variables_file(line_tools_paths::kLineToolsRootPath +
                                          "paths_and_variables.txt");
@@ -1167,12 +1181,7 @@ bool getDefaultPathsAndVariables(const std::string& path_or_variable_name,
   // Run script to generate the paths_and_variables file
   std::string generating_script_path = line_tools_paths::kLineToolsRootPath +
       "/python/print_paths_and_variables_to_file.sh";
-  if (!system(generating_script_path.c_str())) {
-    // Error during file open
-    LOG(WARNING) << "Error in executing script " << generating_script_path
-                 << "Exiting.";
-    return false;
-  }
+  system(generating_script_path.c_str());
   // Read paths_and_variables file
   std::ifstream paths_and_variables_file(line_tools_paths::kLineToolsRootPath +
                                          "paths_and_variables.txt");

@@ -1480,6 +1480,11 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
         num_planar_lines++;
         return true;
       } else {
+        if (verbose_mode_on_) {
+          LOG(INFO) << "* Line is discarded either because too few inliers "
+                    << "were found around the center or because too few total "
+                    << "inliers were found.";
+        }
         return false;
       }
     } else {
@@ -1502,13 +1507,23 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                                                 &start_readjusted_line,
                                                 &end_readjusted_line);
 
-      if (!enough_num_inliers)
+      if (!enough_num_inliers) {
+        if (verbose_mode_on_) {
+          LOG(INFO) << "* Line is discarded because too few inliers were "
+                    << "found.";
+        }
         return false;
+      }
       enough_inliers_around_center =
           checkIfValidLineUsingInliers(points, start_readjusted_line,
                                        end_readjusted_line);
-      if (!enough_inliers_around_center)
+      if (!enough_inliers_around_center){
+        if (verbose_mode_on_) {
+          LOG(INFO) << "* Line is discarded because too few inliers were found "
+                    << "around the center.";
+        }
         return false;
+      }
 
       line->line = {start_readjusted_line[0], start_readjusted_line[1],
                     start_readjusted_line[2], end_readjusted_line[0],
@@ -1631,6 +1646,10 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       num_discontinuity_lines++;
       return true;
     } else {
+      if (verbose_mode_on_) {
+        LOG(INFO) << "* Line is discarded because too few inliers were found "
+                  << "around the center.";
+      }
       return false;
     }
   }
@@ -2351,14 +2370,6 @@ void LineDetector::project2Dto3DwithPlanes(
     if (find3DlineOnPlanes(inliers_right, inliers_left, lines3D_cand[i],
                            lines2D[i], cloud, camera_P, planes_found,
                            &line3D_true)) {
-      // Further test: check that the line found and the candidate reference
-      // line are similar in length. It might indeed happen that because of
-      // planes around the line being not perfect fits, the lines readjusted
-      // with inliers are much shorter/longer than the originally detected 3D
-      // line. These lines should be discarded.
-      if (!linesHaveSimilarLength(lines3D_cand[i], line3D_true.line)) {
-        continue;
-      }
 
       // Only push back the reliably found lines.
       lines3D->push_back(line3D_true);
@@ -2397,6 +2408,17 @@ void LineDetector::project2Dto3DwithPlanes(
         cv::imshow("Line with rectangles + reprojected line + prolonged line ("
                    "if any)", image_of_line_with_rectangles);
         cv::waitKey();
+        try {
+          cv::destroyWindow("Line with rectangles + reprojected line + "
+                            "prolonged line (if any)");
+        }
+        catch (cv::Exception& e) {
+          if (verbose_mode_on_) {
+            LOG(INFO) << "Did not close window"
+                      << """Line with rectangles + reprojected line etc."" "
+                      << "because it was not open.";
+          }
+        }
       }
       num_lines_successfully_projected_to_3D++;
     }
@@ -3175,8 +3197,9 @@ void LineDetector::fitDiscontLineToInliers(const std::vector<cv::Vec3f>& points,
   // Now further adjust the line obtained by shifting it towards the inliers.
   // More precisely, as a first step find the inlier point that is closer, in
   // 2D, to the projection of the 3D line obtained so far. Then, take the 3D
-  // distance vector of this point from the 3D line and shift the line by this
-  // distance in the direction of the distance vector.
+  // distance vector from the 3D line of the projection of this point on the
+  // plane and shift the line by this distance in the direction of the distance
+  // vector.
   double min_dist_from_line_2D = 1e9;
   double temp_dist_from_line_2D;
   cv::Vec3f distance_vector_3D, projection_on_line_3D;
@@ -3187,6 +3210,7 @@ void LineDetector::fitDiscontLineToInliers(const std::vector<cv::Vec3f>& points,
   normalizeVector3D(&reference_line_direction_3D);
 
   int idx_point_closest_to_line;
+  cv::Vec3f projection_of_closest_point_on_hessian;
   // Find the inlier point that is closer to the reference line in 2D.
   for (size_t i = 0; i < points.size(); ++i) {
     project3DPointTo2D(points[i], camera_P, &point_2D);
@@ -3199,12 +3223,16 @@ void LineDetector::fitDiscontLineToInliers(const std::vector<cv::Vec3f>& points,
       idx_point_closest_to_line = i;
     }
   }
-  // Shift the 3D line towards the inlier point found above.
+  projection_of_closest_point_on_hessian = projectPointOnPlane(
+      hessian, points[idx_point_closest_to_line]);
+  // Shift the 3D line towards the projection on the plane of the inlier point
+  // found above.
   projection_on_line_3D =
-      start_out_temp + (points[idx_point_closest_to_line] - start_out_temp).dot(
-        reference_line_direction_3D) * reference_line_direction_3D;
+      start_out_temp + (projection_of_closest_point_on_hessian -
+        start_out_temp).dot(reference_line_direction_3D) *
+        reference_line_direction_3D;
   distance_vector_3D =
-      projection_on_line_3D - points[idx_point_closest_to_line];
+      projection_on_line_3D - projection_of_closest_point_on_hessian;
 
   start_out_temp -= distance_vector_3D;
   end_out_temp -= distance_vector_3D;

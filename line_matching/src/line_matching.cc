@@ -94,7 +94,13 @@ bool LineMatcher::displayMatches(unsigned int frame_index_1,
                    "is " + std::to_string(matching_ratings[i]);
     cv::imshow(window_title, temp_image);
     cv::waitKey();
-    cv::destroyWindow(window_title);
+    try {
+      cv::destroyWindow(window_title);
+    }
+    catch (cv::Exception& e) {
+      LOG(INFO) << "Did not close window '" + window_title + "' because it was "
+                << "not open.";
+    }
   }
   return true;
 }

@@ -48,7 +48,7 @@ enum class Detector : unsigned int { LSD = 0, EDL = 1, FAST = 2, HOUGH = 3 };
 // - INTERSECT: intersection line. Line that separates two different objects
 //              where they are in contact with each other. Example: line between
 //              a box and the surface on which the box is placed. Note: 'inlier
-//              planes' have the same properties as the those for an edge line.
+//              planes' have the same properties as those of an edge line.
 //              However, while the inlier points on the two planes around an
 //              edge line all belong to the same object, for intersection lines
 //              the inlier points on one plane belong to an object (e.g. the
@@ -253,10 +253,12 @@ inline double computeSlopeOfLine(const cv::Vec4f line) {
 }
 
 inline void normalizeVector2D(cv::Vec2f* vector) {
+  CHECK_NOTNULL(vector);
   *vector = (*vector) / cv::norm(*vector);
 }
 
 inline void normalizeVector3D(cv::Vec3f* vector) {
+  CHECK_NOTNULL(vector);
   *vector = (*vector) / cv::norm(*vector);
 }
 
@@ -315,7 +317,7 @@ inline cv::Vec3f computeMean(const std::vector<cv::Vec3f>& points) {
 // point lies in the half-space towards which the normal vector points.
 // (Input: point: Point towards which the hessian vector should be pointed.)
 //
-//  Output: hessian: Hessian directed towards the point/origin.
+// Output: hessian: Hessian directed towards the point/origin.
 inline void directHessianTowardsOrigin(cv::Vec4f* hessian) {
   cv::Vec3f origin{0.0f, 0.0f, 0.0f};
   float d = (*hessian)[3];
@@ -324,7 +326,7 @@ inline void directHessianTowardsOrigin(cv::Vec4f* hessian) {
 }
 inline void directHessianTowardsPoint(const cv::Vec3f& point,
                                       cv::Vec4f* hessian) {
-  // Let (x_, y_, z_) be a point in the half-space towards which the hessian
+  // Let (x_, y_, z_) be a point in the half-space towards which the normal
   // of the plane should point. Then, letting the equation of the plane be
   // a * x +  b * y + c * z + d = 0, with WLOG ||(a, b, c)||_2 = 1 (otherwise
   // the equation can be rescaled accordingly) => a^2 + b^2 + c^2 = 1, and
@@ -333,7 +335,9 @@ inline void directHessianTowardsPoint(const cv::Vec3f& point,
   // - a * x_p +  b * y_p + c * z_p + d = 0 (since the projection belongs to the
   //   plane by definition);
   // - There exists t > 0 s.t. x_ = x_p + a * t, y_ = y_p + b * t,
-  //   z_ = z_p + c * t.
+  //   z_ = z_p + c * t. Note that t is positive because we assumed that
+  //   (x_, y_, z_) is in the half-space towards which the normal of the plane
+  //   points.
   // Therefore a * x_ +  b * y_ + c * z_ + d = a * (x_p + a * t) +
   //           b * (y_p + b * t) + c * (z_p + c * t) + d =
   //         = (a * x_p +  b * y_p + c * z_p + d) + t * (a^2 + b^2 + c^2) =
@@ -346,7 +350,7 @@ inline void directHessianTowardsPoint(const cv::Vec3f& point,
 
 inline bool linesHaveSimilarLength(const cv::Vec4f& line_1,
                                    const cv::Vec4f& line_2) {
-  constexpr double kLengthDifference = 1.5;
+  constexpr double kLengthDifference = 3;
   double length_1 = cv::norm(cv::Vec2f({line_1[2], line_1[3]}) -
                              cv::Vec2f({line_1[0], line_1[1]}));
   double length_2 = cv::norm(cv::Vec2f({line_2[2], line_2[3]}) -
@@ -496,8 +500,6 @@ cv::Mat getImageOfLineWithRectangles(
 //        inliers1/2: Points inliers to the two planes around the line.
 //
 //        hessian1/2: Planes around the line.
-//
-// Output: none.
 void displayLineWithPointsAndPlanes(const cv::Vec3f& start,
                                     const cv::Vec3f& end,
                                     const cv::Vec3f& start_guess,
@@ -526,10 +528,10 @@ class LineDetector {
   //
   //        detector: 0-> LSD, 1->EDL, 2->FAST, 3-> HOUGH
   //                  Default is LSD. It is chosen even if an invalid number is
-  //                  given
+  //                  given.
   //
   // Output: lines:   The lines are stored in the following format:
-  //                  {start.x, start.y, end.x, end.y}
+  //                  {start.x, start.y, end.x, end.y}.
   void detectLines(const cv::Mat& image, Detector detector,
                    std::vector<cv::Vec4f>* lines);
   void detectLines(const cv::Mat& image, int detector,
@@ -563,7 +565,6 @@ class LineDetector {
                    bool merge_at_the_end=false);
   // These functions cluster nearby lines in line_in and summarizes them as one
   // line. All new lines are stored in lines_out. Two versions:
-  //
   // * First forms clusters of lines that each have at least one other line in
   //   the cluster to which to be merged into. Then, for all clusters, merge all
   //   the lines in the cluster so as to form an output line.
@@ -646,9 +647,8 @@ class LineDetector {
 
   // (The two following functions are deprecated.They remain here just for
   // back compatibility concerns.)
-  // Uses two sets of points and fit a line,
-  // assuming that the two set of points are from a plane left and right of the
-  // line.
+  // Uses two sets of points and fit a line, assuming that the two set of points
+  // are from a plane left and right of the line.
   // Input: points1/2:  The two set of points.
   //
   //       line_guess:  This is a guess of the line that is used if the two sets
@@ -822,7 +822,6 @@ class LineDetector {
                                std::vector<LineWithPlanes>* lines3D);
 
   // Given a point in 3D and a projection matrix returns a point in 2D.
-  //
   // Input: point_3D:  3D point.
   //
   //        camera_P:  Projection matrix.
@@ -832,7 +831,6 @@ class LineDetector {
                           cv::Vec2f* point_2D);
 
   // Given a line in 3D and a projection matrix returns a line in 2D.
-  //
   // Input: line_3D:
   //           or            3D line.
   //        start_3D/end_3D:
@@ -847,7 +845,6 @@ class LineDetector {
 
   // Given a 2D line and the point cloud image returns the inlier points around
   // the line by fitting rectangles around it.
-  //
   // Input: line_2D:              2D line.
   //
   //        cloud:                Point cloud image of type CV_32FC3.
@@ -894,7 +891,7 @@ class LineDetector {
                              const std::vector<cv::Vec4f>& lines2D,
                              std::vector<cv::Vec6f>* lines3D,
                              std::vector<int>* correspondences);
-  // Overload: without correspondences
+  // Overload: without correspondences.
   void find3DlinesByShortest(const cv::Mat& cloud,
                              const std::vector<cv::Vec4f>& lines2D,
                              std::vector<cv::Vec6f>* lines3D);
@@ -959,7 +956,6 @@ class LineDetector {
                          std::vector<cv::Vec4f>* lines2D_out);
 
   // Checks if a line is valid with 2D information:
-
   // Input: cloud:    Point cloud as CV_32FC3
   //
   //        line:     Line in 3D defined by (start, end).
@@ -1048,7 +1044,6 @@ class LineDetector {
   // All points considered as inliers of the line are projected onto the
   // line and then the pair of points that maximizes the distance of
   // the line are chosen.
-  //
   //  Input:  points: A set of points.
   //
   //          start_in: Initial start point of the line.
@@ -1071,7 +1066,6 @@ class LineDetector {
   // inlier planes, in the current implementation), returns the 3D endpoints
   // of the input line fitted to the given points. The endpoints are selected
   // among the given inlier points.
-  //
   // Input: points:            Set of inlier points among which the output
   //                           endpoints should be selected.
   //
@@ -1100,7 +1094,6 @@ class LineDetector {
   // to the end of the adjusted line and what was defined to be the end in the
   // original line is closer to the start of the adjusted line. If this is the
   // case, these functions switch start and end.
-  //
   // * 2D version
   //   Input: reference_line: 2D original reference line.
   //
@@ -1123,7 +1116,6 @@ class LineDetector {
   // Checks if a line is valid using the inliers of the line. If the ratio of
   // the inliers that lie around the center of the line is smaller than the
   // threshold kRatioThreshold, the line is not valid.
-  //
   // Input: points: A set of points.
   //
   //        start: Start point of the line.
@@ -1140,7 +1132,6 @@ class LineDetector {
   void displayStatistics();
 
   // Set visualization mode.
-  //
   // Input: on_true_off_false: True if visualization mode should be set to On,
   //                           false if it should be set to Off.
   inline void setVisualizationMode(bool on_true_off_false) {
@@ -1148,7 +1139,6 @@ class LineDetector {
   }
 
   // Set verbose mode.
-  //
   // Input: on_true_off_false: True if verbose mode should be set to On,
   //                           false if it should be set to Off.
   inline void setVerboseMode(bool on_true_off_false) {
@@ -1231,7 +1221,6 @@ private:
   // is found or the search reaches the end point. If a starting point was
   // found, then the same procedure is redone from the end point. It returns
   // true if a line was found and false otherwise.
-  //
   // Input: point_cloud:    Mat of type CV_32FC3, that stores the 3D points. A
   //                        point can be accessed by
   //                        point_cloud.at<cv::Point3f>(j, i).x.
