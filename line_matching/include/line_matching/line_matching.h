@@ -29,8 +29,17 @@ struct Frame {
   cv::Mat image;
 };
 
+// (Frame, index).
 typedef std::pair<Frame, int> FrameWithIndex;
+// (Rating, (index_line_in_first_frame, index_line_in_second_frame)).
 typedef std::pair<float, std::pair<int, int>> MatchWithRating;
+
+// Comparator function used to sort candidate matching by increasing rating
+// (lower rating <=> better match).
+inline bool operator<(const MatchWithRating& match_1,
+                      const MatchWithRating& match_2) {
+  return match_1.first < match_2.first;
+}
 
 enum class MatchingMethod : unsigned int {
   MANHATTAN = 0,  // Manhattan distance
@@ -141,14 +150,35 @@ class LineMatcher {
                               std::vector<int>* line_indices_2,
                               std::vector<float>* matching_ratings);
 
-  // Comparator function used to sort candidate matching by increasing rating
-  // (lower rating <=> better match).
-  static inline bool match_comparator(const MatchWithRating& match_1,
-                                      const MatchWithRating& match_2) {
-    return match_1.first < match_2.first;
-  }
+   // Matches EACH line in the frame with frame index frame_index_1 to the
+   // num_matches_per_line lines in the other frame (with frame index
+   // frame_index_2) that have a match with the best (lowest) ratings among all
+   // lines in that frame. If less than num_matches_per_line valid matches are
+   // found, returns as many matches as possible.
+   // NOTE: It is possible that some lines in the frame with frame index
+   // frame_index_2 are assigned to more than one line in the frame with frame
+   // index frame_index_1, i.e., the assignment is not injective.
+   // Input: frame_index_1/2:      Index of the frame between which to match
+   //                              lines.
+   //
+   //        matching_method:      Method (distance) to use to match lines.
+   //
+   //        num_matches_per_line: (Maximum) number of matches to find per each
+   //                              line in the first frame.
+   //
+   // Output: matches_with_ratings_vec: Vector of all matches found for all
+   //                                   lines, with the matching rating and the
+   //                                   indices of the pair of lines matched.
+   //
+   //         return:               True if matching was possible, i.e., if
+   //                               frames with both input frame indices were
+   //                               received; false otherwise.
+   bool matchFramesNBestMatchesPerLine(
+       unsigned int frame_index_1, unsigned int frame_index_2,
+       MatchingMethod matching_method, unsigned int num_matches_per_line,
+       std::vector<MatchWithRating>* matches_with_ratings_vec);
 
-   // Frames received: key = frame_index, value = frame.
+  // Frames received: key = frame_index, value = frame.
    std::map<unsigned int, Frame> frames_;
 };
 }  // namespace line_matching

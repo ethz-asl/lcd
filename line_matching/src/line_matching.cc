@@ -168,8 +168,7 @@ bool LineMatcher::matchFramesBruteForce(unsigned int frame_index_1,
     }
   }
   // Sort vector of possible matches by increasing rating.
-  std::sort(candidate_matches.begin(), candidate_matches.end(),
-            match_comparator);
+  std::sort(candidate_matches.begin(), candidate_matches.end());
   // Set all the lines to be unmatched.
   std::vector<bool> line_in_frame_1_was_matched, line_in_frame_2_was_matched;
   line_in_frame_1_was_matched.assign(num_lines_frame_1, false);
@@ -199,6 +198,72 @@ bool LineMatcher::matchFramesBruteForce(unsigned int frame_index_1,
     }
     current_match_idx++;
   }
+  // Delete matching computer.
+  delete match_rating_computer;
+
+  return true;
+}
+
+bool LineMatcher::matchFramesNBestMatchesPerLine(
+    unsigned int frame_index_1, unsigned int frame_index_2,
+    MatchingMethod matching_method, unsigned int num_matches_per_line,
+    std::vector<MatchWithRating>* matches_with_ratings_vec) {
+  std::vector<MatchWithRating> candidate_matches;
+  MatchRatingComputer* match_rating_computer;
+  size_t num_lines_frame_1, num_lines_frame_2;
+  // Auxiliary variables used to compute the matches.
+  float rating;
+  MatchWithRating candidate_match_curr_line;
+  // The true argument is to keep elements ordered in ascending order.
+  FixedSizePriorityQueue<MatchWithRating> best_matches_curr_line(
+    num_matches_per_line, true);
+  LineWithEmbeddings* line_1;
+  LineWithEmbeddings* line_2;
+
+  CHECK_NOTNULL(matches_with_ratings_vec);
+
+  // Check that frames with the given frame indices exist.
+  if (frames_.count(frame_index_1) == 0 || frames_.count(frame_index_2) == 0) {
+    return false;
+  }
+  // Set the match rating computer depending on the matching method.
+  switch (matching_method) {
+    case MatchingMethod::MANHATTAN:
+      match_rating_computer = new ManhattanRatingComputer;
+      break;
+    case MatchingMethod::EUCLIDEAN:
+      match_rating_computer = new EuclideanRatingComputer;
+      break;
+    default:
+      LOG(ERROR) << "Invalid matching method. Valid methods are MANHATTAN and "
+                 << "EUCLIDEAN.";
+      return false;
+  }
+
+  num_lines_frame_1 = frames_[frame_index_1].lines.size();
+  num_lines_frame_2 = frames_[frame_index_2].lines.size();
+
+  matches_with_ratings_vec->clear();
+
+  for (size_t idx1 = 0; idx1 < num_lines_frame_1; ++idx1) {
+    line_1 = &(frames_[frame_index_1].lines[idx1]);
+    best_matches_curr_line.clear();
+    for (size_t idx2 = 0; idx2 < num_lines_frame_2; ++idx2) {
+      line_2 = &(frames_[frame_index_2].lines[idx2]);
+      if (match_rating_computer->computeMatchRating(line_1->embeddings,
+                                                    line_2->embeddings,
+                                                    &rating)) {
+        candidate_match_curr_line.first = rating;
+        candidate_match_curr_line.second = std::make_pair(idx1, idx2);
+        best_matches_curr_line.push(candidate_match_curr_line);
+      }
+    }
+    // Adds the matches found to the output.
+    while (!best_matches_curr_line.empty()) {
+      matches_with_ratings_vec->push_back(best_matches_curr_line.front());
+    }
+  }
+
   // Delete matching computer.
   delete match_rating_computer;
 
