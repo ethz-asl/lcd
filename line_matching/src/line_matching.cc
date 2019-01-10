@@ -5,7 +5,6 @@
 #include <string>
 
 namespace line_matching {
-
 LineMatcher::LineMatcher() {
 }
 
@@ -344,6 +343,7 @@ bool LineMatcher::matchFramesNBestMatchesPerLine(
     // Adds the matches found to the output.
     while (!best_matches_curr_line.empty()) {
       matches_with_ratings_vec->push_back(best_matches_curr_line.front());
+      best_matches_curr_line.pop();
     }
   }
 
