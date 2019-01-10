@@ -1,21 +1,30 @@
-// This node advertises a service that extracts 2D and lines with planes from
-// input images.
-// "extract_lines":
+// This node advertises two service that extracts 2D and lines with planes from
+// input images:
+// * "extract_lines":
 //
-// sensor_msgs/Image image
-// sensor_msgs/Image cloud
-// sensor_msgs/CameraInfo camera_info
-// uint8 detector
-// ---
-// line_detection/Line3DWithHessians[] lines
-// geometry_msgs/Point[] start2D
-// geometry_msgs/Point[] end2D
-// uint8 frame_index
+//    sensor_msgs/Image image
+//    sensor_msgs/Image cloud
+//    sensor_msgs/CameraInfo camera_info
+//    uint8 detector
+//    ---
+//    line_detection/Line3DWithHessians[] lines
+//    geometry_msgs/Point[] start2D
+//    geometry_msgs/Point[] end2D
+//    uint8 frame_index
+//
+// * "extract_keylines" (for EDL keylines):
+//
+//    sensor_msgs/Image image
+//    ---
+//    line_detection/KeyLine[] keylines
+//    uint8 frame_index
+
 #include <line_detection/line_detection.h>
 
 #include <ros/ros.h>
 
 #include <line_detection/ExtractLines.h>
+#include <line_detection/ExtractKeyLines.h>
 
 #include <cv_bridge/cv_bridge.h>
 #include <glog/logging.h>
@@ -32,6 +41,7 @@ std::vector<cv::Vec4f> lines_2D_fused;
 std::vector<cv::Vec4f> lines_2D_tmp;
 std::vector<line_detection::LineWithPlanes> lines_3D_tmp;
 std::vector<line_detection::LineWithPlanes> lines_3D;
+std::vector<cv::line_descriptor::KeyLine> keylines;
 // To store the image
 cv_bridge::CvImageConstPtr image_cv_ptr;
 cv::Mat cv_image_rgb;
@@ -122,12 +132,51 @@ bool detectLinesCallback(line_detection::ExtractLines::Request& req,
   return true;
 }
 
+bool detectKeyLinesCallback(line_detection::ExtractKeyLines::Request& req,
+                            line_detection::ExtractKeyLines::Response& res) {
+  // Convert to cv_ptr (which has a member ->image (cv::Mat)).
+  image_cv_ptr = cv_bridge::toCvCopy(req.image, "rgb8");
+  cv_image_rgb = image_cv_ptr->image;
+  cv::cvtColor(cv_image_rgb, cv_image_gray, CV_RGB2GRAY);
+
+  // Detect 2D lines.
+  keylines.clear();
+  line_detector.detectLines(cv_image_gray, &keylines);
+
+  // Store lines to the response.
+  res.keylines.resize(keylines.size());
+  res.frame_index = frame_index++;
+
+  for (size_t i = 0u; i < keylines.size(); ++i) {
+    res.keylines[i].angle = keylines[i].angle;
+    res.keylines[i].class_id = keylines[i].class_id;
+    res.keylines[i].endPointX = keylines[i].endPointX;
+    res.keylines[i].endPointY = keylines[i].endPointY;
+    res.keylines[i].ePointInOctaveX = keylines[i].ePointInOctaveX;
+    res.keylines[i].ePointInOctaveY = keylines[i].ePointInOctaveY;
+    res.keylines[i].lineLength = keylines[i].lineLength;
+    res.keylines[i].numOfPixels = keylines[i].numOfPixels;
+    res.keylines[i].octave = keylines[i].octave;
+    res.keylines[i].pt.x = keylines[i].pt.x;
+    res.keylines[i].pt.y = keylines[i].pt.y;
+    res.keylines[i].response = keylines[i].response;
+    res.keylines[i].size = keylines[i].size;
+    res.keylines[i].sPointInOctaveX = keylines[i].sPointInOctaveX;
+    res.keylines[i].sPointInOctaveY = keylines[i].sPointInOctaveY;
+    res.keylines[i].startPointX = keylines[i].startPointX;
+    res.keylines[i].startPointY = keylines[i].startPointY;
+  }
+  return true;
+}
+
 int main(int argc, char** argv) {
   ros::init(argc, argv, "line_detector");
   ros::NodeHandle node_handle;
 
-  ros::ServiceServer server =
+  ros::ServiceServer server_lines =
       node_handle.advertiseService("extract_lines", &detectLinesCallback);
+  ros::ServiceServer server_keylines =
+      node_handle.advertiseService("extract_keylines", &detectKeyLinesCallback);
   frame_index = 0;
   ros::spin();
 }

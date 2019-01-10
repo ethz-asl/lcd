@@ -1,0 +1,4 @@
+line_detection/KeyLine keyline
+sensor_msgs/Image image
+---
+float32[32] descriptor

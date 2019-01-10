@@ -30,7 +30,12 @@ constexpr double kPi = 3.141592653589793;
 // used to visualize lines and rectangles around them.
 constexpr int scale_factor_for_visualization = 4;
 
-enum class Detector : unsigned int { LSD = 0, EDL = 1, FAST = 2, HOUGH = 3 };
+enum class DetectorType : unsigned int {
+  LSD = 0,
+  EDL = 1,
+  FAST = 2,
+  HOUGH = 3
+};
 
 // Meaning of line types:
 // - DISCONT: discontinuity line. Line on a discontinuity edge of an object,
@@ -532,11 +537,14 @@ class LineDetector {
   //
   // Output: lines:   The lines are stored in the following format:
   //                  {start.x, start.y, end.x, end.y}.
-  void detectLines(const cv::Mat& image, Detector detector,
+  void detectLines(const cv::Mat& image, DetectorType detector,
                    std::vector<cv::Vec4f>* lines);
   void detectLines(const cv::Mat& image, int detector,
                    std::vector<cv::Vec4f>* lines);
   void detectLines(const cv::Mat& image, std::vector<cv::Vec4f>* lines);
+// Overload for the EDL detector (returns EDL KeyLines).
+  void detectLines(const cv::Mat& image,
+                   std::vector<cv::line_descriptor::KeyLine>* keylines);
 
   // This function computes the Hessian Normal Form of a plane given points on
   // that plane.

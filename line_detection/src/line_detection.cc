@@ -436,29 +436,30 @@ LineDetector::~LineDetector() {
 void LineDetector::detectLines(const cv::Mat& image, int detector,
                                std::vector<cv::Vec4f>* lines) {
   if (detector == 0)
-    detectLines(image, Detector::LSD, lines);
+    detectLines(image, DetectorType::LSD, lines);
   else if (detector == 1)
-    detectLines(image, Detector::EDL, lines);
+    detectLines(image, DetectorType::EDL, lines);
   else if (detector == 2)
-    detectLines(image, Detector::FAST, lines);
+    detectLines(image, DetectorType::FAST, lines);
   else if (detector == 3)
-    detectLines(image, Detector::HOUGH, lines);
+    detectLines(image, DetectorType::HOUGH, lines);
   else {
     LOG(WARNING)
-        << "LineDetector::detectLines: Detector choice not valid, LSD was "
+        << "LineDetector::detectLines: DetectorType choice not valid, LSD was "
            "chosen as default.";
-    detectLines(image, Detector::LSD, lines);
+    detectLines(image, DetectorType::LSD, lines);
   }
 }
-void LineDetector::detectLines(const cv::Mat& image, Detector detector,
+
+void LineDetector::detectLines(const cv::Mat& image, DetectorType detector,
                                std::vector<cv::Vec4f>* lines) {
   CHECK_NOTNULL(lines);
   lines->clear();
   // Check which detector is chosen by user. If an invalid number is given the
   // default (LSD) is chosen without a warning.
-  if (detector == Detector::LSD) {
+  if (detector == DetectorType::LSD) {
     lsd_detector_->detect(image, *lines);
-  } else if (detector == Detector::EDL) {  // EDL_DETECTOR
+  } else if (detector == DetectorType::EDL) {  // EDL_DETECTOR
     // The edl detector uses a different kind of vector to store the lines in.
     // The conversion is done later.
     std::vector<cv::line_descriptor::KeyLine> edl_lines;
@@ -471,9 +472,9 @@ void LineDetector::detectLines(const cv::Mat& image, Detector detector,
           edl_lines[i].getEndPoint().x, edl_lines[i].getEndPoint().y));
     }
 
-  } else if (detector == Detector::FAST) {  // FAST_DETECTOR
+  } else if (detector == DetectorType::FAST) {  // FAST_DETECTOR
     fast_detector_->detect(image, *lines);
-  } else if (detector == Detector::HOUGH) {  // HOUGH_DETECTOR
+  } else if (detector == DetectorType::HOUGH) {  // HOUGH_DETECTOR
     cv::Mat output;
     // Parameters of the Canny should not be changed (or better: the result is
     // very likely to get worse).
@@ -489,7 +490,18 @@ void LineDetector::detectLines(const cv::Mat& image, Detector detector,
 }
 void LineDetector::detectLines(const cv::Mat& image,
                                std::vector<cv::Vec4f>* lines) {
-  detectLines(image, Detector::LSD, lines);
+  detectLines(image, DetectorType::LSD, lines);
+}
+
+void LineDetector::detectLines(
+    const cv::Mat& image,
+    std::vector<cv::line_descriptor::KeyLine>* keylines) {
+  CHECK_NOTNULL(keylines);
+  keylines->clear();
+  // Use EDL detector to extract keylines.
+  std::vector<cv::line_descriptor::KeyLine> edl_lines;
+  edl_detector_->detect(image, edl_lines);
+  *keylines = edl_lines;
 }
 
 bool LineDetector::hessianNormalFormOfPlane(

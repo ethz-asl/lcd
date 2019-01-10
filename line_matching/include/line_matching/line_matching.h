@@ -15,7 +15,6 @@
 #include <gtest/gtest.h>
 
 namespace line_matching {
-
 struct LineWithEmbeddings {
   cv::Vec4f line2D;
   cv::Vec6f line3D;

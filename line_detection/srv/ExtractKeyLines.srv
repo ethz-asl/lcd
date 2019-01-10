@@ -1,0 +1,5 @@
+# Extract EDL KeyLines.
+sensor_msgs/Image image
+---
+line_detection/KeyLine[] keylines
+uint8 frame_index

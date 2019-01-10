@@ -2,21 +2,40 @@
 
 namespace line_ros_utility {
   LineDetectorDescriptorAndMatcher::LineDetectorDescriptorAndMatcher(
-      line_detection::Detector detector_type) {
+      line_detection::DetectorType detector_type,
+      line_description::DescriptorType descriptor_type) {
     // Set type of detector.
     detector_type_ = detector_type;
+    // Set type of descriptor.
+    descriptor_type_ = descriptor_type;
+    // Check that detector type and descriptor type are compatible.
+    if (detector_type_ != line_detection::DetectorType::EDL &&
+        descriptor_type_ == line_description::DescriptorType::BINARY) {
+      ROS_ERROR("Invalid combination of detector type and descriptor type."
+                "Binary descriptor can only be use with EDL detector.");
+      return;
+     }
     // Initialize service clients.
-    client_extract_lines_ =
-        node_handle_.serviceClient<line_detection::ExtractLines>(
-          "extract_lines");
-    client_image_to_embeddings_ =
-        node_handle_.serviceClient<line_description::ImageToEmbeddings>(
-          "image_to_embeddings");
-    client_line_to_virtual_camera_image_ =
-        node_handle_.serviceClient<line_description::LineToVirtualCameraImage>(
-          "line_to_virtual_camera_image");
-    // Wait for the embeddings retriever to be ready.
-    embeddings_retriever_is_ready_ = false;
+    if (descriptor_type_ == line_description::DescriptorType::BINARY) {
+      client_extract_keylines_ =
+          node_handle_.serviceClient<line_detection::ExtractKeyLines>(
+            "extract_keylines");
+      client_keyline_to_binary_descriptor_ =
+          node_handle_.serviceClient<line_description::KeyLineToBinaryDescriptor>(
+            "keyline_to_binary_descriptor");
+    } else {
+      client_extract_lines_ =
+          node_handle_.serviceClient<line_detection::ExtractLines>(
+            "extract_lines");
+      client_image_to_embeddings_ =
+          node_handle_.serviceClient<line_description::ImageToEmbeddings>(
+            "image_to_embeddings");
+      client_line_to_virtual_camera_image_ =
+          node_handle_.serviceClient<line_description::LineToVirtualCameraImage>(
+            "line_to_virtual_camera_image");
+      // Wait for the embeddings retriever to be ready.
+      embeddings_retriever_is_ready_ = false;
+    }
   }
 
   LineDetectorDescriptorAndMatcher::~LineDetectorDescriptorAndMatcher() {
@@ -25,25 +44,37 @@ namespace line_ros_utility {
 
   void LineDetectorDescriptorAndMatcher::start() {
     ROS_INFO("Initializing main node. Please wait...");
-    // Advertise service that checks when the embeddings retriever is ready.
-    server_embeddings_retriever_ready_ =
-       node_handle_.advertiseService(
-           "embeddings_retriever_ready",
-           &LineDetectorDescriptorAndMatcher::embeddingsRetrieverCallback,
-           this);
+    if (descriptor_type_ == line_description::DescriptorType::BINARY) {
+      // No need to wait for the descriptor retriever to initialize => Can
+      // immediately subscribe to topics.
+      subscribeToInputTopics();
+    } else {
+      // Advertise service that checks when the embeddings retriever is ready.
+      server_embeddings_retriever_ready_ = node_handle_.advertiseService(
+          "embeddings_retriever_ready",
+          &LineDetectorDescriptorAndMatcher::embeddingsRetrieverCallback, this);
+    }
   }
 
   void LineDetectorDescriptorAndMatcher::subscribeToInputTopics() {
-    // Subscribe to input topics.
-    image_sub_.subscribe(node_handle_, "/line_tools/image/rgb", 100);
-    cloud_sub_.subscribe(node_handle_, "/line_tools/point_cloud", 100);
-    info_sub_.subscribe(node_handle_, "/line_tools/camera_info", 100);
-    // Connect main callback.
-    sync_ = new message_filters::Synchronizer<MySyncPolicy>(
-        MySyncPolicy(10), image_sub_, cloud_sub_, info_sub_);
-    sync_->registerCallback(
-        boost::bind(&LineDetectorDescriptorAndMatcher::callback, this, _1, _2,
-                    _3));
+    if (descriptor_type_ == line_description::DescriptorType::BINARY) {
+      image_only_sub_ = node_handle_.subscribe(
+          "/line_tools/image/rgb", 300,
+          &LineDetectorDescriptorAndMatcher::mainCallbackBinaryDescriptor,
+          this);
+    } else {
+      // Subscribe to the image input topic.
+      image_sub_.subscribe(node_handle_, "/line_tools/image/rgb", 300);
+      cloud_sub_.subscribe(node_handle_, "/line_tools/point_cloud", 300);
+      info_sub_.subscribe(node_handle_, "/line_tools/camera_info", 300);
+      // Connect main callback.
+      sync_ = new message_filters::Synchronizer<MySyncPolicy>(
+          MySyncPolicy(10), image_sub_, cloud_sub_, info_sub_);
+      sync_->registerCallback(
+          boost::bind(
+              &LineDetectorDescriptorAndMatcher::mainCallbackNNEmbeddings, this,
+              _1, _2, _3));
+    }
     ROS_INFO("Main node for detection, description and matching is now ready "
              "to receive messages.");
   }
@@ -63,7 +94,7 @@ namespace line_ros_utility {
         line_matching::MatchingMethod::EUCLIDEAN, 5);
   }
 
-  void LineDetectorDescriptorAndMatcher::saveLinesWithEmbeddings(
+  void LineDetectorDescriptorAndMatcher::saveLinesWithNNEmbeddings(
       const sensor_msgs::ImageConstPtr& image_rgb_msg,
       const sensor_msgs::ImageConstPtr& cloud_msg,
       const sensor_msgs::CameraInfoConstPtr& camera_info_msg,
@@ -71,7 +102,12 @@ namespace line_ros_utility {
     CHECK_NOTNULL(frame_index_out);
     int frame_index;
     std::vector<line_detection::Line2D3DWithPlanes> lines;
-    std::vector<line_description::Embedding> embeddings;
+    std::vector<line_description::Descriptor> embeddings;
+    if (descriptor_type_ != line_description::DescriptorType::EMBEDDING_NN) {
+      ROS_ERROR("Expected detector type EMBEDDING_NN, found a different one. "
+                "Please use the correct function call.");
+      return;
+    }
     // Retrieve RGB image.
     cv::Mat image_rgb;
     cv_bridge::CvImageConstPtr cv_img_ptr =
@@ -89,10 +125,47 @@ namespace line_ros_utility {
     // Retrieve descriptor for all lines.
     embeddings.resize(lines.size());
     for (size_t idx = 0; idx < lines.size(); ++idx) {
-      getEmbeddings(lines[idx], image_rgb_msg, cloud_msg, &embeddings[idx]);
+      getNNEmbeddings(lines[idx], image_rgb_msg, cloud_msg, &embeddings[idx]);
     }
     // Save frame.
     saveFrame(lines, embeddings, image_rgb, frame_index);
+    // Output the frame index of the new frame.
+    *frame_index_out = frame_index;
+  }
+
+  void LineDetectorDescriptorAndMatcher::saveLinesWithBinaryDescriptors(
+      const sensor_msgs::ImageConstPtr& image_rgb_msg, int* frame_index_out) {
+    CHECK_NOTNULL(frame_index_out);
+    int frame_index;
+    std::vector<line_detection::KeyLine> keylines_msgs;
+    std::vector<line_description::Descriptor> descriptors;
+    std::vector<cv::Vec4f> lines_2D;
+    if (descriptor_type_ != line_description::DescriptorType::BINARY) {
+      ROS_ERROR("Expected detector type BINARY, found a different one. Please "
+                "use the correct function call.");
+      return;
+    }
+    // Retrieve RGB image.
+    cv::Mat image_rgb;
+    cv_bridge::CvImageConstPtr cv_img_ptr =
+        cv_bridge::toCvShare(image_rgb_msg, "rgb8");
+    image_rgb = cv_img_ptr->image;
+    // Detect lines.
+    detectLines(image_rgb_msg, &keylines_msgs, &frame_index);
+    ROS_INFO("Number of lines detected: %lu.", keylines_msgs.size());
+    // Retrieve descriptor for all lines.
+    descriptors.resize(keylines_msgs.size());
+    lines_2D.clear();
+    for (size_t idx = 0; idx < keylines_msgs.size(); ++idx) {
+      getBinaryDescriptor(keylines_msgs[idx], image_rgb_msg, &descriptors[idx]);
+      // Retrieve 2D lines.
+      lines_2D.push_back({keylines_msgs[idx].startPointX,
+                          keylines_msgs[idx].startPointY,
+                          keylines_msgs[idx].endPointX,
+                          keylines_msgs[idx].endPointY});
+    }
+    // Save frame.
+    saveFrame(lines_2D, descriptors, image_rgb, frame_index);
     // Output the frame index of the new frame.
     *frame_index_out = frame_index;
   }
@@ -112,16 +185,16 @@ namespace line_ros_utility {
     service_extract_lines_.request.cloud = *cloud_msg;
     service_extract_lines_.request.camera_info = *camera_info_msg;
     switch (detector_type_) {
-      case line_detection::Detector::LSD:
+      case line_detection::DetectorType::LSD:
         service_extract_lines_.request.detector = 0;
         break;
-      case line_detection::Detector::EDL:
+      case line_detection::DetectorType::EDL:
         service_extract_lines_.request.detector = 1;
         break;
-      case line_detection::Detector::FAST:
+      case line_detection::DetectorType::FAST:
         service_extract_lines_.request.detector = 2;
         break;
-      case line_detection::Detector::HOUGH:
+      case line_detection::DetectorType::HOUGH:
         service_extract_lines_.request.detector = 3;
         break;
       default:
@@ -188,15 +261,42 @@ namespace line_ros_utility {
     }
   }
 
-  void LineDetectorDescriptorAndMatcher::getEmbeddings(
+  void LineDetectorDescriptorAndMatcher::detectLines(
+      const sensor_msgs::ImageConstPtr& image_rgb_msg,
+      std::vector<line_detection::KeyLine>* keylines_msgs,
+      int* frame_index) {
+    CHECK_NOTNULL(keylines_msgs);
+    CHECK_NOTNULL(frame_index);
+    keylines_msgs->clear();
+    // Create request.
+    service_extract_keylines_.request.image = *image_rgb_msg;
+
+    // Call keyline extraction service.
+    size_t num_lines;
+    if (client_extract_keylines_.call(service_extract_keylines_)) {
+      *frame_index = service_extract_keylines_.response.frame_index;
+      num_lines = service_extract_keylines_.response.keylines.size();
+      keylines_msgs->resize(num_lines);
+      for (size_t i = 0; i < num_lines; ++i) {
+        (*keylines_msgs)[i] = service_extract_keylines_.response.keylines[i];
+      }
+    } else {
+      ROS_ERROR("Failed to call service extract_keylines.");
+    }
+  }
+
+  void LineDetectorDescriptorAndMatcher::getNNEmbeddings(
       const line_detection::Line2D3DWithPlanes& line,
       const sensor_msgs::ImageConstPtr& image_rgb_msg,
       const sensor_msgs::ImageConstPtr& cloud_msg,
-      line_description::Embedding* embedding) {
+      line_description::Descriptor* embedding) {
     CHECK_NOTNULL(embedding);
     cv_bridge::CvImageConstPtr virtual_camera_image_ptr;
     unsigned int line_type;
-
+    if (descriptor_type_ != line_description::DescriptorType::EMBEDDING_NN) {
+      ROS_ERROR("Expected detector type EMBEDDING_NN, found a different one.");
+      return;
+    }
     // Get line type.
     switch (line.type) {
       case line_detection::LineType::DISCONT:
@@ -258,9 +358,39 @@ namespace line_ros_utility {
     }
   }
 
+  void LineDetectorDescriptorAndMatcher::getBinaryDescriptor(
+      const line_detection::KeyLine& keyline_msg,
+      const sensor_msgs::ImageConstPtr& image_rgb_msg,
+      line_description::Descriptor* descriptor) {
+    CHECK_NOTNULL(descriptor);
+    size_t descriptor_length;
+    if (descriptor_type_ != line_description::DescriptorType::BINARY) {
+      ROS_ERROR("Expected detector type BINARY, found a different one.");
+      return;
+    }
+    // Create request for service keyline_to_binary_descriptor.
+    service_keyline_to_binary_descriptor_.request.keyline = keyline_msg;
+    service_keyline_to_binary_descriptor_.request.image = *image_rgb_msg;
+    // Call keyline_to_binary_descriptor service.
+    if (client_keyline_to_binary_descriptor_.call(
+          service_keyline_to_binary_descriptor_)) {
+      // Return descriptor.
+      descriptor->clear();
+      descriptor_length =
+          service_keyline_to_binary_descriptor_.response.descriptor.size();
+      for (size_t i = 0; i < descriptor_length; ++i) {
+        descriptor->push_back(
+            service_keyline_to_binary_descriptor_.response.descriptor[i]);
+      }
+    } else {
+     ROS_ERROR("Failed to call service keyline_to_binary_descriptor.");
+     return;
+    }
+  }
+
   bool LineDetectorDescriptorAndMatcher::saveFrame(
       const std::vector<line_detection::Line2D3DWithPlanes>& lines,
-      const std::vector<line_description::Embedding>& embeddings,
+      const std::vector<line_description::Descriptor>& embeddings,
       const cv::Mat& rgb_image, int frame_index) {
     line_matching::Frame current_frame;
     // Create frame.
@@ -269,6 +399,32 @@ namespace line_ros_utility {
       current_frame.lines[i].line2D = lines[i].line2D;
       current_frame.lines[i].line3D = lines[i].line3D;
       current_frame.lines[i].embeddings = embeddings[i];
+    }
+    current_frame.image = rgb_image;
+    // Try to save frame.
+    if (!line_matcher_.addFrame(current_frame, frame_index)) {
+      ROS_INFO("Could not add frame with index %d, as one with the same "
+               "was previously received.", frame_index);
+      return false;
+    }
+    return true;
+  }
+
+  bool LineDetectorDescriptorAndMatcher::saveFrame(
+      const std::vector<cv::Vec4f>& lines_2D,
+      const std::vector<line_description::Descriptor>& descriptors,
+      const cv::Mat& rgb_image, int frame_index) {
+    line_matching::Frame current_frame;
+    // Create frame.
+    current_frame.lines.resize(lines_2D.size());
+    for (size_t i = 0; i < lines_2D.size(); ++i) {
+      current_frame.lines[i].line2D = lines_2D[i];
+      // Since a line_matching::Frame also contains the 3D lines corresponding
+      // to the 2D lines, create mock 3D lines with (0, 0, 0) endpoints. The
+      // matching will be performed just by looking at the descriptors, so the
+      // 3D line is not taken into account.
+      current_frame.lines[i].line3D = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+      current_frame.lines[i].embeddings = descriptors[i];
     }
     current_frame.image = rgb_image;
     // Try to save frame.
@@ -302,15 +458,29 @@ namespace line_ros_utility {
     }
   }
 
-  void LineDetectorDescriptorAndMatcher::callback(
+  void LineDetectorDescriptorAndMatcher::mainCallbackBinaryDescriptor(
+      const sensor_msgs::ImageConstPtr& rosmsg_image) {
+    int current_frame_index;
+    // Save lines to the line matcher.
+    ROS_INFO("Detecting, describing and saving line for new frame...");
+    saveLinesWithBinaryDescriptors(rosmsg_image, &current_frame_index);
+    ROS_INFO("...done with detecting, describing and saving line for new "
+             "frame.");
+    ROS_INFO("Current frame index is %d", current_frame_index);
+    if (current_frame_index > 0) {
+      displayMatchesWithPreviousFrame(current_frame_index);
+    }
+  }
+
+  void LineDetectorDescriptorAndMatcher::mainCallbackNNEmbeddings(
       const sensor_msgs::ImageConstPtr& rosmsg_image,
       const sensor_msgs::ImageConstPtr& rosmsg_cloud,
       const sensor_msgs::CameraInfoConstPtr& camera_info) {
     int current_frame_index;
     // Save lines to the line matcher.
     ROS_INFO("Detecting, describing and saving line for new frame...");
-    saveLinesWithEmbeddings(rosmsg_image, rosmsg_cloud, camera_info,
-                            &current_frame_index);
+    saveLinesWithNNEmbeddings(rosmsg_image, rosmsg_cloud, camera_info,
+                              &current_frame_index);
     ROS_INFO("...done with detecting, describing and saving line for new "
              "frame.");
     ROS_INFO("Current frame index is %d", current_frame_index);

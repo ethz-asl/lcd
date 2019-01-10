@@ -44,7 +44,7 @@ class LineDetectionTest : public ::testing::Test {
 /*TEST_F(LineDetectionTest, testLSDLineDetection) {
   size_t n_lines;
   // Calling the detector with LSD.
-  line_detector_.detectLines(test_img_gray_, line_detection::Detector::LSD,
+  line_detector_.detectLines(test_img_gray_, line_detection::DetectorType::LSD,
                              &lines_);
   n_lines = lines_.size();
   EXPECT_EQ(n_lines, 716)
@@ -54,7 +54,7 @@ class LineDetectionTest : public ::testing::Test {
 TEST_F(LineDetectionTest, testEDLLineDetection) {
   size_t n_lines;
   // Calling the detector with EDL.
-  line_detector_.detectLines(test_img_gray_, line_detection::Detector::EDL,
+  line_detector_.detectLines(test_img_gray_, line_detection::DetectorType::EDL,
                              &lines_);
   n_lines = lines_.size();
   EXPECT_EQ(n_lines, 172)
@@ -64,7 +64,7 @@ TEST_F(LineDetectionTest, testEDLLineDetection) {
 TEST_F(LineDetectionTest, testFASTLineDetection) {
   size_t n_lines;
   // Calling the detector with FAST.
-  line_detector_.detectLines(test_img_gray_, line_detection::Detector::FAST,
+  line_detector_.detectLines(test_img_gray_, line_detection::DetectorType::FAST,
                              &lines_);
   n_lines = lines_.size();
   EXPECT_EQ(n_lines, 598)
@@ -75,7 +75,7 @@ TEST_F(LineDetectionTest, testFASTLineDetection) {
 /*TEST_F(LineDetectionTest, testHoughLineDetection) {
   size_t n_lines;
   // Calling the detector with HOUGH.
-  line_detector_.detectLines(test_img_gray_, line_detection::Detector::HOUGH,
+  line_detector_.detectLines(test_img_gray_, line_detection::DetectorType::HOUGH,
                              &lines_);
   n_lines = lines_.size();
   EXPECT_EQ(n_lines, 165)

@@ -1,8 +1,11 @@
 <launch>
+  <arg name="detector_type" default ="0" />
+  <arg name="descriptor_type" default ="0" />
   <node
     pkg="line_ros_utility"
     type="matching_visualizer_node"
     name="matching_visualizer_node"
+    args="$(arg detector_type) $(arg descriptor_type)"
     output="screen"
  ></node>
   <node
@@ -21,12 +24,21 @@
     pkg="line_description"
     type="line_to_virtual_camera_image_node.py"
     name="line_to_virtual_camera_image_node"
+    if="$(eval descriptor_type == 0)"
     output="screen"
  ></node>
   <node
     pkg="line_description"
     type="image_to_embeddings_node.py"
     name="image_to_embeddings_node"
+    if="$(eval descriptor_type == 0)"
+    output="screen"
+ ></node>
+  <node
+    pkg="line_description"
+    type="line_binary_descriptor_node"
+    name="line_binary_descriptor_node"
+    if="$(eval descriptor_type == 1)"
     output="screen"
  ></node>
 </launch>
