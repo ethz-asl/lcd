@@ -189,9 +189,9 @@ class LineMatcher {
    //                                   lines, with the matching rating and the
    //                                   indices of the pair of lines matched.
    //
-   //         return:               True if matching was possible, i.e., if
-   //                               frames with both input frame indices were
-   //                               received; false otherwise.
+   //         return:                   True if matching was possible, i.e., if
+   //                                   frames with both input frame indices
+   //                                   were received; false otherwise.
    bool matchFramesNBestMatchesPerLine(
        unsigned int frame_index_1, unsigned int frame_index_2,
        MatchingMethod matching_method, unsigned int num_matches_per_line,

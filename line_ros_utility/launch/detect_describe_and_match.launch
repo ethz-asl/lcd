@@ -1,6 +1,6 @@
 <launch>
-  <arg name="detector_type" default ="0" />
-  <arg name="descriptor_type" default ="0" />
+  <arg name="detector_type" default="0" />
+  <arg name="descriptor_type" default="0" />
   <node
     pkg="line_ros_utility"
     type="matching_visualizer_node"

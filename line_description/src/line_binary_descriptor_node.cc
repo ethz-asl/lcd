@@ -46,6 +46,7 @@ bool callback(line_description::KeyLineToBinaryDescriptor::Request& req,
   for (size_t i = 0; i < res.descriptor.size(); ++i) {
     res.descriptor[i] = descriptor[i];
   }
+  return true;
 }
 
 int main(int argc, char** argv) {

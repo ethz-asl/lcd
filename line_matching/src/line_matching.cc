@@ -168,7 +168,6 @@ bool LineMatcher::displayNBestMatchesPerLine(
                cv::Size(temp_image.size().width * magnification_factor,
                         temp_image.size().height * magnification_factor));
     // Display image.
-    // Display image.
     window_title = "Match between line " + std::to_string(idx_1) + " in " +
                    "frame " + std::to_string(frame_index_1) + " and line " +
                    std::to_string(idx_2) + " in frame " +
@@ -340,7 +339,7 @@ bool LineMatcher::matchFramesNBestMatchesPerLine(
         best_matches_curr_line.push(candidate_match_curr_line);
       }
     }
-    // Adds the matches found to the output.
+    // Add the matches found to the output.
     while (!best_matches_curr_line.empty()) {
       matches_with_ratings_vec->push_back(best_matches_curr_line.front());
       best_matches_curr_line.pop();

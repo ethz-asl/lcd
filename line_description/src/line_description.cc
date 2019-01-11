@@ -1,13 +1,5 @@
 #include "line_description/line_description.h"
 
-/*#include <opencv2/line_descriptor.hpp>
-
-#include "opencv2/core/utility.hpp"
-#include "opencv2/core/private.hpp"
-#include <opencv2/imgproc.hpp>
-#include <opencv2/features2d.hpp>
-#include <opencv2/highgui.hpp>
-*/
 namespace line_description {
   LineDescriber::LineDescriber(DescriptorType descriptor_type) {
     switch (descriptor_type) {
@@ -45,7 +37,6 @@ namespace line_description {
       // Descriptor is of type CV_8UC1.
       descriptor->push_back(
           static_cast<float>(cv_descriptor.at<unsigned char>(0, i)) / 255.0);
-      LOG(INFO) << "Just added " << (*descriptor)[i] << " to the descriptor.";
     }
   }
 
@@ -78,6 +69,4 @@ namespace line_description {
       descriptors->push_back(temp_descriptor);
     }
   }
-
-
 }  // namespace line_description

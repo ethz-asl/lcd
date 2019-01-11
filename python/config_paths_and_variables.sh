@@ -29,10 +29,10 @@
 #   trajectory might need to be considered at the same time in the latter case.
 # * DATASET_NAME: identifies the dataset from which the data being processed
 #   (i.e. the images from which we are extracting lines and generating bags)
-#   comes from. Valid values are 'val' and 'train', indicating respectively
+#   comes from. Valid values are 'val' and 'train_0', indicating respectively
 #   the validation set and the index-0 training set in pySceneNetRGBD, but all
 #   other values that find a correspondence in the protobuf 'database' (in
-#   python/config_protobuf_paths)
+#   python/config_protobuf_paths) can be used.
 
 # *** The following paths are independent of the specific data generation task
 #     being carried out (i.e., on the trajectory number and the dataset from
