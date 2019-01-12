@@ -45,9 +45,11 @@ class ImageToEmbeddingsConverter:
             print(e)
         virtual_camera_image_bgr = np.asarray(virtual_camera_image_bgr)
         virtual_camera_image_depth = np.asarray(virtual_camera_image_depth)
-
+        start_3D = np.array([req.start_3D.x, req.start_3D.y, req.start_3D.z])
+        end_3D = np.array([req.end_3D.x, req.end_3D.y, req.end_3D.z])
         embeddings = self.embeddings_retriever.get_embeddings_from_image(
-            virtual_camera_image_bgr, virtual_camera_image_depth, req.line_type)
+            virtual_camera_image_bgr, virtual_camera_image_depth, req.line_type,
+            start_3D, end_3D)
         embeddings = embeddings.reshape((-1,))
 
         return ImageToEmbeddingsResponse(embeddings)

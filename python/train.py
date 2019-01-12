@@ -9,7 +9,7 @@ from model.datagenerator import ImageDataGenerator
 from model.alexnet import AlexNet
 from model.triplet_loss import batch_all_triplet_loss, batch_hardest_triplet_loss
 from tools.train_set_mean import get_train_set_mean
-from tools.lines_utils import get_line_center
+from tools.lines_utils import get_label_with_line_center, get_geometric_info
 from tools import pathconfig
 
 
@@ -40,15 +40,36 @@ def train(read_as_pickle=True):
         #                     validation set.
         # TODO: fix to use this non-pickle version. The paths in train_files
         # and val_files below should work, but the current version does not
-        # allow to train on different sets with textfiles.
+        # allow to train on different sets with textfiles. Also, textfiles do
+        # not contain the endpoints of the lines, but only their center point,
+        # making it therefore not possible to use the line direction/orthonormal
+        # representation required by the last version of the network.
         train_files = [
             os.path.join(linesandimagesfolder_path, 'train_0/traj_1/train.txt')
         ]
         val_files = [
             os.path.join(linesandimagesfolder_path, 'train_0/traj_1/val.txt')
         ]
+        print("Error: the current version of the network does not support text "
+              "files in the old format. Please use pickle files. Exiting.")
+        return
 
     image_type = 'bgr-d'
+    # Type of line parametrization can be:
+    # * 'direction_and_centerpoint':
+    #      Each line segment is parametrized by its center point and by the
+    #      first two entries of the unit direction vector. The third entry is
+    #      defined automatically by enforcing that the norm should be one, and
+    #      therefore is not fed into the network. To obtain invariance on the
+    #      orientation of the line (i.e., given the two endpoints we do NOT want
+    #      to consider one of them as the start and the other one as the end of
+    #      the line segment), we enforce that the first entry should be
+    #      non-negative. => 5 parameters per line.
+    # * 'orthonormal':
+    #      A line segment is parametrized with a minimum-DOF parametrization
+    #      (4 degrees of freedom) of the infinite line that it belongs to. The
+    #      representation is called orthonormal. => 4 parameters per line.
+    line_parametrization = 'direction_and_centerpoint'
 
     log_files_folder = "./logs/"
 
@@ -87,20 +108,35 @@ def train(read_as_pickle=True):
         input_img = tf.placeholder(
             tf.float32, [None, 227, 227, 4], name="input_img")
 
+    # For each line labels is in the format
+    #   [line_center (3x)] [instance label (1x)]
     labels = tf.placeholder(tf.float32, [None, 4], name="labels")
+    # Dropout probability.
     keep_prob = tf.placeholder(tf.float32, name="keep_prob")
+    # Line types.
     line_types = tf.placeholder(tf.float32, [None, 1], name="line_types")
+    # Geometric information.
+    if line_parametrization == 'direction_and_centerpoint':
+        geometric_info = tf.placeholder(
+            tf.float32, [None, 5], name="geometric_info")
+    elif line_parametrization == 'orthonormal':
+        geometric_info = tf.placeholder(
+            tf.float32, [None, 4], name="geometric_info")
+    else:
+        raise ValueError("Line parametrization should be "
+                         "'direction_and_centerpoint' or 'orthonormal'.")
 
     # Layers for which weights should not be trained.
     no_train_layers = ['conv1', 'pool1', 'norm1', 'conv2', 'pool2', 'norm2']
     # Layers for which ImageNet weights should not be loaded.
-    skip_layers = ['fc8']
+    skip_layers = ['fc8', 'fc9']
 
     # Initialize model.
-    model = AlexNet(input_img, line_types, keep_prob, skip_layers, image_type)
+    model = AlexNet(input_img, line_types, geometric_info, keep_prob,
+                    skip_layers, image_type)
 
     # Retrieve embeddings (cluster descriptors) from model output.
-    embeddings = tf.nn.l2_normalize(model.fc8, axis=1)
+    embeddings = tf.nn.l2_normalize(model.fc9, axis=1)
 
     # Get mean of training set if the training is just starting (i.e., if no
     # previous checkpoints are found).
@@ -274,7 +310,14 @@ def train(read_as_pickle=True):
                 # Pickled files have labels in the endpoints format -> convert
                 # them to center format.
                 if read_as_pickle:
-                    batch_labels_train = get_line_center(batch_labels_train)
+                    batch_start_points_train = batch_labels_train[:, :3]
+                    batch_end_points_train = batch_labels_train[:, 3:6]
+                    batch_geometric_info_train = get_geometric_info(
+                        start_points=batch_start_points_train,
+                        end_points=batch_end_points_train,
+                        line_parametrization=line_parametrization)
+                    batch_labels_train = get_label_with_line_center(
+                        labels_batch=batch_labels_train)
                 # Run the training operation.
                 sess.run(
                     train_op,
@@ -282,6 +325,7 @@ def train(read_as_pickle=True):
                         input_img: batch_input_img_train,
                         labels: batch_labels_train,
                         line_types: batch_line_types_train,
+                        geometric_info: batch_geometric_info_train,
                         keep_prob: dropout_rate
                     })
                 # Generate summary with the current batch of data and write it
@@ -293,6 +337,7 @@ def train(read_as_pickle=True):
                             input_img: batch_input_img_train,
                             labels: batch_labels_train,
                             line_types: batch_line_types_train,
+                            geometric_info: batch_geometric_info_train,
                             keep_prob: 1.
                         })
                     writer.add_summary(s,
@@ -310,7 +355,14 @@ def train(read_as_pickle=True):
                 # Pickled files have labels in the endpoints format -> convert
                 # them to center format.
                 if read_as_pickle:
-                    batch_labels_val = get_line_center(batch_labels_val)
+                    batch_start_points_val = batch_labels_val[:, :3]
+                    batch_end_points_val = batch_labels_val[:, 3:6]
+                    batch_geometric_info_val = get_geometric_info(
+                        start_points=batch_start_points_val,
+                        end_points=batch_end_points_val,
+                        line_parametrization=line_parametrization)
+                    batch_labels_val = get_label_with_line_center(
+                        labels_batch=batch_labels_val)
                 # Obtain validation loss.
                 loss_current = sess.run(
                     loss,
@@ -318,6 +370,7 @@ def train(read_as_pickle=True):
                         input_img: batch_input_img_val,
                         labels: batch_labels_val,
                         line_types: batch_line_types_val,
+                        geometric_info: batch_geometric_info_val,
                         keep_prob: 1.
                     })
                 loss_val += loss_current

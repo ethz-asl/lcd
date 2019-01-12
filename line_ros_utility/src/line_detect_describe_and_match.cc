@@ -349,6 +349,12 @@ namespace line_ros_utility {
     service_image_to_embeddings_.request.virtual_camera_image_depth =
         service_line_to_virtual_camera_image_.response.virtual_camera_image_depth;
     service_image_to_embeddings_.request.line_type = line_type;
+    service_image_to_embeddings_.request.start_3D.x = line.line3D[0];
+    service_image_to_embeddings_.request.start_3D.y = line.line3D[1];
+    service_image_to_embeddings_.request.start_3D.z = line.line3D[2];
+    service_image_to_embeddings_.request.end_3D.x = line.line3D[3];
+    service_image_to_embeddings_.request.end_3D.y = line.line3D[4];
+    service_image_to_embeddings_.request.end_3D.z = line.line3D[5];
     // Call image_to_embeddings service.
     if (client_image_to_embeddings_.call(service_image_to_embeddings_)) {
       *embedding = service_image_to_embeddings_.response.embeddings;

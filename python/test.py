@@ -7,7 +7,7 @@ from timeit import default_timer as timer
 
 from model.datagenerator import ImageDataGenerator
 from tools.visualization import vis_square
-from tools.lines_utils import get_line_center
+from tools.lines_utils import get_label_with_line_center, get_geometric_info
 
 python_root = '../'
 sys.path.insert(0, python_root)
@@ -40,6 +40,7 @@ vis_square(conv1_kernels_rgb.transpose(3, 0, 1, 2))
 vis_square(conv1_kernels_depth.transpose(2, 0, 1))
 
 read_as_pickle = True
+line_parametrization = 'direction_and_centerpoint'
 
 test_files = '/media/francesco/line_tools_data/pickle files/train_0/traj_1/pickled_test.pkl'
 #test_files = '/media/francesco/line_tools_data/pickle files/train_0/traj_1/test.txt'
@@ -75,6 +76,7 @@ else:
     keep_prob = graph.get_tensor_by_name('keep_prob:0')  # dropout probability
     embeddings = graph.get_tensor_by_name('l2_normalize:0')
     line_types = graph.get_tensor_by_name('line_types:0')
+    geometric_info = graph.get_tensor_by_name('geometric_info:0')
 
     batch_size = 128
     test_embeddings_all = np.empty(
@@ -123,10 +125,17 @@ else:
         batch_input_img, batch_labels, batch_line_types = test_generator.next_batch(
             batch_size)
 
-        # Pickled files have labels in the endpoints format -> convert them
-        # to center format
         if read_as_pickle:
-            batch_labels = get_line_center(batch_labels)
+            # Retrieve geometric information.
+            batch_start_points = batch_labels[:, :3]
+            batch_end_points = batch_labels[:, 3:6]
+            batch_geometric_info = get_geometric_info(
+                start_points=batch_start_points,
+                end_points=batch_end_points,
+                line_parametrization=line_parametrization)
+            # Pickled files have labels in the endpoints format -> convert them
+            # to center format.
+            batch_labels = get_label_with_line_center(labels_batch=batch_labels)
 
         start_time = timer()
         output = sess.run(
@@ -135,6 +144,7 @@ else:
                 input_img: batch_input_img,
                 labels: batch_labels,
                 line_types: batch_line_types,
+                geometric_info: batch_geometric_info,
                 keep_prob: 1.
             })
         end_time = timer()
@@ -148,7 +158,7 @@ else:
         #test_count += 1
 
         test_embeddings_all = np.vstack([test_embeddings_all, output])
-        print('Time needed to retrieve desciptors for %d lines: %.3f seconds' %
+        print('Time needed to retrieve descriptors for %d lines: %.3f seconds' %
               (batch_size, (end_time - start_time)))
         # Display every 5 steps
         if i % 5 == 0:

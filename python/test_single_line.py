@@ -11,7 +11,7 @@ from timeit import default_timer as timer
 
 from model.datagenerator import ImageDataGenerator
 from tools.visualization import vis_square
-from tools.lines_utils import get_line_center
+from tools.lines_utils import get_label_with_line_center, get_geometric_info
 
 python_root = '../'
 sys.path.insert(0, python_root)
@@ -38,6 +38,7 @@ vis_square(conv1_kernels_rgb.transpose(3, 0, 1, 2))
 vis_square(conv1_kernels_depth.transpose(2, 0, 1))
 
 read_as_pickle = True
+line_parametrization = 'direction_and_centerpoint'
 
 test_files = '/media/francesco/line_tools_data/pickle files/train_0/traj_1/pickled_test.pkl'
 
@@ -64,6 +65,7 @@ else:
     keep_prob = graph.get_tensor_by_name('keep_prob:0')  # dropout probability
     embeddings = graph.get_tensor_by_name('l2_normalize:0')
     line_types = graph.get_tensor_by_name('line_types:0')
+    geometric_info = graph.get_tensor_by_name('geometric_info:0')
 
     batch_size = 1
     test_embeddings_all = np.empty(
@@ -106,8 +108,14 @@ else:
     # therefore some lines might be visualized in one case but not in the other.
 
     for i in range(test_set_size):
-        batch_input_img, _, batch_line_types = test_generator.next_batch(
+        batch_input_img, batch_labels, batch_line_types = test_generator.next_batch(
             batch_size)
+        batch_start_points = batch_labels[:, :3]
+        batch_end_points = batch_labels[:, 3:6]
+        batch_geometric_info = get_geometric_info(
+            start_points=batch_start_points,
+            end_points=batch_end_points,
+            line_parametrization=line_parametrization)
 
         start_time = timer()
         output = sess.run(
@@ -115,6 +123,7 @@ else:
             feed_dict={
                 input_img: batch_input_img,
                 line_types: batch_line_types,
+                geometric_info: batch_geometric_info,
                 keep_prob: 1.
             })
         end_time = timer()

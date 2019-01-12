@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 import tensorflow as tf
 from timeit import default_timer as timer
+from tools.lines_utils import get_geometric_info
 
 
 class EmbeddingsRetriever:
@@ -30,6 +31,8 @@ class EmbeddingsRetriever:
         embeddings (TensorFlow tensor): Tensor for the descriptor embeddings of
             the lines.
         line_types (TensorFlow tensor): Tensor for the types of the lines.
+        geometric_info (TensorFlow tensor): Tensor for the geometric
+                                            information.
         scale_size (Tuple): Size of the input layer of the neural network.
         image_type (String): Either 'bgr' or 'brg-d', type of the image.
     """
@@ -52,15 +55,18 @@ class EmbeddingsRetriever:
         self.embeddings = self.graph.get_tensor_by_name('l2_normalize:0')
         # Line type tensor.
         self.line_types = self.graph.get_tensor_by_name('line_types:0')
+        # Geometric info tensor.
+        self.geometric_info = self.graph.get_tensor_by_name('geometric_info:0')
         # Retrieve mean of training set.
         self.train_set_mean = self.sess.run('train_set_mean:0')
         print("Train set mean is {}".format(self.train_set_mean))
         self.scale_size = scale_size
         self.image_type = image_type
 
-    def get_embeddings_from_image(self, image_bgr, image_depth, line_type):
-        """ Given a virtual camera image and a line type, returns the
-            corresponding embeddings.
+    def get_embeddings_from_image(self, image_bgr, image_depth, line_type,
+                                  start_3D, end_3D):
+        """ Given a virtual camera image, a line type and geometric information,
+            returns the corresponding embeddings.
         """
         start_time = timer()
         # Rescale image.
@@ -81,11 +87,34 @@ class EmbeddingsRetriever:
         image = image.reshape(1, image.shape[0], image.shape[1], image.shape[2])
         line_type = np.array(line_type).reshape(-1, 1)
 
+        # Retrieve geometric info depending on the type of line parametrization
+        # used when training.
+        if (self.geometric_info.shape[1] == 4):
+            # Line parametrization: 'orthonormal'.
+            geometric_info = get_geometric_info(
+                start_points=start_3D,
+                end_points=end_3D,
+                line_parametrization='orthonormal')
+            geometric_info = np.array(geometric_info).reshape(-1, 4)
+        elif (self.geometric_info.shape[1] == 5):
+            # Line parametrization: 'direction_and_centerpoint'.
+            geometric_info = get_geometric_info(
+                start_points=start_3D,
+                end_points=end_3D,
+                line_parametrization='direction_and_centerpoint')
+            geometric_info = np.array(geometric_info).reshape(-1, 5)
+        else:
+            raise ValueError("The trained geometric_info Tensor should have "
+                             "shape[1] either equal to 4 (line parametrization "
+                             "'orthonormal') or equal to 5 (line "
+                             "parametrization 'direction_and_centerpoint).")
+
         output_embeddings = self.sess.run(
             self.embeddings,
             feed_dict={
                 self.input_img: image,
                 self.line_types: line_type,
+                self.geometric_info: geometric_info,
                 self.keep_prob: 1.
             })
         end_time = timer()
