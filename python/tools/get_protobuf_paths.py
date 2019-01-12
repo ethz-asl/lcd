@@ -2,7 +2,7 @@
 The following script reads the 'database' containing the correspondences between
 a DATASET_NAME and a protobuf file. If called directly as a Python script it
 prints the result of the query if a match is found and nothing if no dataset
-name is given as input, if the protobuf name corresponding ot the dataset name
+name is given as input, if the protobuf name corresponding to the dataset name
 is not found or if the the configuration file is not found.
 """
 import os
@@ -18,13 +18,13 @@ def get_protobuf_path(dataset_name):
         with open(os.path.join(parent_dir, 'config_protobuf_paths')) as f:
             lines = f.readlines()
             for line in lines:
-                # Exclude comments
+                # Exclude comments.
                 if line[0] != '#':
                     line_split = line.split(':')
                     name = line_split[0]
-                    # Remove leading whitespaces in path if any
+                    # Remove leading whitespaces in path if any.
                     path = line_split[1].lstrip()
-                    # Remove terminating new line characters if any
+                    # Remove terminating new line characters if any.
                     path = path.rstrip("\n\r")
                     if dataset_name == name:
                         return path

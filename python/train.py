@@ -9,7 +9,7 @@ from model.datagenerator import ImageDataGenerator
 from model.alexnet import AlexNet
 from model.triplet_loss import batch_all_triplet_loss, batch_hardest_triplet_loss
 from tools.train_set_mean import get_train_set_mean
-from tools.get_line_center import get_line_center
+from tools.lines_utils import get_line_center
 from tools import pathconfig
 
 

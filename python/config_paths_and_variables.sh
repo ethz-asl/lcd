@@ -14,9 +14,8 @@
 #   scenenet_to_rosbag.py (or where ROS bags are already stored).
 # * LINESANDIMAGESFOLDER_PATH: path where to store the output data. In
 #   particular, the lines files produced by the detector are stored under
-#   OUTPUTDALINESANDIMAGESFOLDER_PATHTA_PATH/$DATASET_NAME_lines, whereas the
-#   virtual camera images are stored under
-#   LINESANDIMAGESFOLDER_PATH/$DATASET_NAME.
+#   LINESANDIMAGESFOLDER_PATH/$DATASET_NAME_lines, whereas the virtual camera
+#   images are stored under LINESANDIMAGESFOLDER_PATH/$DATASET_NAME.
 # * PYTHONSCRIPTS_PATH: path that contains the line_tools Python scripts.
 # * TARFILES_PATH: path where to store the archive files containing the text
 #   lines files and the virtual camera images.

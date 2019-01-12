@@ -12,7 +12,7 @@ namespace line_ros_utility {
     if (detector_type_ != line_detection::DetectorType::EDL &&
         descriptor_type_ == line_description::DescriptorType::BINARY) {
       ROS_ERROR("Invalid combination of detector type and descriptor type."
-                "Binary descriptor can only be use with EDL detector.");
+                "Binary descriptor can only be used with EDL detector.");
       return;
      }
     // Initialize service clients.

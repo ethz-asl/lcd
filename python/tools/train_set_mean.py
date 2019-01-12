@@ -18,25 +18,24 @@ def get_train_set_mean(file_path, image_type, read_as_pickle):
         depth_mean = 0
         total_images = 0
         pickled_dict = {}
-        # Merge dictionaries extracted from all the pickle files in file_path
+        # Merge dictionaries extracted from all the pickle files in file_path.
         for file_ in file_path:
             temp_dict = joblib.load(file_)
             merge_pickled_dictionaries(pickled_dict, temp_dict)
         for dataset_name in pickled_dict.keys():
             dataset_name_dict = pickled_dict[dataset_name]
             for trajectory_number in dataset_name_dict.keys():
-                trajectory_number_dict = dataset_name_dict[
-                    trajectory_number]
+                trajectory_number_dict = dataset_name_dict[trajectory_number]
                 for frame_number in trajectory_number_dict.keys():
                     frame_number_dict = trajectory_number_dict[frame_number]
                     for line_number in frame_number_dict['rgb'].keys():
                         total_images += 1
-                        # BGR image
+                        # BGR image.
                         img_bgr = frame_number_dict['rgb'][line_number]['img']
                         blue_mean += np.mean(img_bgr[:, :, 0])
                         green_mean += np.mean(img_bgr[:, :, 1])
                         red_mean += np.mean(img_bgr[:, :, 2])
-                        # Depth image
+                        # Depth image.
                         img_depth = frame_number_dict['depth'][line_number][
                             'img']
                         depth_mean += np.mean(img_depth)
@@ -50,7 +49,7 @@ def get_train_set_mean(file_path, image_type, read_as_pickle):
             raise ValueError("Image type should be 'bgr' or 'bgr-d'")
     else:
         image_paths = []
-        # In non-pickle mode only consider first file in list
+        # In non-pickle mode only consider first file in list.
         with open(file_path[0]) as f:
             lines = f.readlines()
             for l in lines:

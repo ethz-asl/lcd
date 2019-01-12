@@ -7,7 +7,7 @@ from timeit import default_timer as timer
 
 from model.datagenerator import ImageDataGenerator
 from tools.visualization import vis_square
-from tools.get_line_center import get_line_center
+from tools.lines_utils import get_line_center
 
 python_root = '../'
 sys.path.insert(0, python_root)
@@ -76,7 +76,7 @@ else:
     embeddings = graph.get_tensor_by_name('l2_normalize:0')
     line_types = graph.get_tensor_by_name('line_types:0')
 
-    batch_size = int(input_img.shape[0])
+    batch_size = 128
     test_embeddings_all = np.empty(
         (0, int(embeddings.shape[1])), dtype=np.float32)
     test_generator.reset_pointer()

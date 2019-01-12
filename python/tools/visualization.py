@@ -25,7 +25,8 @@ from camera_pose_and_intrinsics_example import camera_to_world_with_pose, interp
 
 def get_lines_world_coordinates_with_instances(dataset_name, trajectory,
                                                frames):
-    """For some frames in a trajectory, get lines start and end points world coordinates and the instance labels assigned to lines.
+    """For some frames in a trajectory, get lines start and end points world
+       coordinates and the instance labels assigned to lines.
     """
     lines_world = {}
     frames_count = {}
@@ -33,7 +34,7 @@ def get_lines_world_coordinates_with_instances(dataset_name, trajectory,
 
     path_to_lines_root = os.path.join(linesandimagesfolder_path,
                                       '{}_lines/'.format(dataset_name))
-    # Find protobuf file associated to dataset_name
+    # Find protobuf file associated to dataset_name.
     protobuf_path = get_protobuf_path(dataset_name)
     print(
         "visualization.py/get_lines_world_coordinates_with_instances: using {} as protobuf_path".
@@ -53,12 +54,12 @@ def get_lines_world_coordinates_with_instances(dataset_name, trajectory,
     frames_with_lines = []
 
     for frame_id in frames:
-        # View data for current frame
+        # View data for current frame.
         view = trajectories.trajectories[trajectory].views[frame_id]
         # Get ground truth pose of camera
         ground_truth_pose = interpolate_poses(view.shutter_open,
                                               view.shutter_close, 0.5)
-        # Transformation matrix from camera coordinate to world coordinate
+        # Transformation matrix from camera coordinate to world coordinate.
         camera_to_world_matrix = camera_to_world_with_pose(ground_truth_pose)
 
         path_to_lines = os.path.join(
@@ -82,7 +83,7 @@ def get_lines_world_coordinates_with_instances(dataset_name, trajectory,
             line_start_point_camera = np.append(line[:3], [1])
             line_end_point_camera = np.append(line[3:6], [1])
 
-            # Get world coordinates of start and end point
+            # Get world coordinates of start and end point.
             line_start_point_world = camera_to_world_matrix.dot(
                 line_start_point_camera)
             line_end_point_world = camera_to_world_matrix.dot(
@@ -92,7 +93,7 @@ def get_lines_world_coordinates_with_instances(dataset_name, trajectory,
                                                                               3]
             lines_world_with_instances[line_idx, 3:6] = line_end_point_world[:3]
             # Instance is last value of the line (cf. virtual_camera_pose in
-            # scenenet_utils.py)
+            # scenenet_utils.py).
             lines_world_with_instances[line_idx, 6] = line[-1]
 
             line_idx += 1
@@ -130,16 +131,20 @@ def pcl_lines_for_plot(data_lines, lines_color, visualizer):
         interpolate = np.linspace(0, 1, 100)
 
         points = np.vstack((start + n * vector for n in interpolate))
-        if np.unique(lines_color).shape[0] > 3:
+        if np.unique(lines_color).shape[0] > 4:
             np.random.seed(lines_color[i])
             rgb = np.random.randint(255, size=(1, 3)) / 255.0
         else:
-            if lines_color[i] == 0:  # discontinuty line
+            # This assumes that if no more than four different colours have been
+            # assigned to the lines, these colours encode the line type.
+            if lines_color[i] == 0:  # Discontinuity line (red).
                 rgb = np.array([1, 0, 0])
-            if lines_color[i] == 1:  # plane(surface) line
+            if lines_color[i] == 1:  # Planar line (green).
                 rgb = np.array([[0, 1, 0]])
-            if lines_color[i] == 2:  # intersection line
+            if lines_color[i] == 2:  # Edge line (blue).
                 rgb = np.array([[0, 0, 1]])
+            if lines_color[i] == 3:  # Intersection line (yellow).
+                rgb = np.array([[1, 1, 0]])
         rgbs = np.vstack((rgb for n in interpolate))
 
         if visualizer == 'open3d':
@@ -155,7 +160,7 @@ def pcl_lines_for_plot(data_lines, lines_color, visualizer):
 
 def plot_lines_with_matplotlib(pcl_lines):
     """ Plots a set of lines (in the format outputted by pcl_lines_for_plot) in
-        matplotlib
+        matplotlib.
     """
     num_lines = len(pcl_lines)
 
@@ -171,7 +176,7 @@ def plot_lines_with_matplotlib(pcl_lines):
 
 def plot_lines_with_open3d(pcl_lines, window_name="Open3D"):
     """ Plots a set of lines (in the format outputted by pcl_lines_for_plot) in
-        open3d
+        open3d.
     """
     vis = open3d.Visualizer()
     vis.create_window(window_name=window_name)
@@ -183,23 +188,23 @@ def plot_lines_with_open3d(pcl_lines, window_name="Open3D"):
 
 def vis_square(data):
     """Take an array of shape (n, height, width) or (n, height, width, 3)
-       and visualize each (height, width) thing in a grid of size approx. sqrt(n) by sqrt(n).
+       and visualize each (height, width) element in a grid of size approx.
+       sqrt(n) by sqrt(n).
     """
-
-    # normalize data for display
+    # Normalize data for display.
     data = (data - data.min()) / (data.max() - data.min())
 
-    # force the number of filters to be square
+    # Force the number of filters to be square.
     n = int(np.ceil(np.sqrt(data.shape[0])))
-    # add some space between filters
+    # Add some space between filters.
     padding = (
         ((0, n**2 - data.shape[0]), (0, 1), (0, 1)) + ((0, 0),) *
-        (data.ndim - 3))  # don't pad the last dimension (if there is one)
+        (data.ndim - 3))  # Do not pad the last dimension (if there is one).
     data = np.pad(
         data, padding, mode='constant',
-        constant_values=1)  # pad with ones (white)
+        constant_values=1)  # Pad with ones (white).
 
-    # tile the filters into an image
+    # Tile the filters into an image.
     data = data.reshape((n, n) + data.shape[1:]).transpose(
         (0, 2, 1, 3) + tuple(range(4, data.ndim + 1)))
     data = data.reshape((n * data.shape[1], n * data.shape[3]) + data.shape[4:])

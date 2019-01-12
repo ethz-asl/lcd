@@ -11,3 +11,4 @@ tensorflow
 tensorboard
 pyyaml
 python-dateutil>=2.5.0
+transforms3d

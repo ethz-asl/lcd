@@ -11,7 +11,7 @@ from timeit import default_timer as timer
 
 from model.datagenerator import ImageDataGenerator
 from tools.visualization import vis_square
-from tools.get_line_center import get_line_center
+from tools.lines_utils import get_line_center
 
 python_root = '../'
 sys.path.insert(0, python_root)
@@ -120,7 +120,7 @@ else:
         end_time = timer()
 
         test_embeddings_all = np.vstack([test_embeddings_all, output])
-        print('Time needed to retrieve desciptors for line %d: %.3f seconds' %
+        print('Time needed to retrieve descriptors for line %d: %.3f seconds' %
               (i, (end_time - start_time)))
 
     print("Writing embeddings to file")
