@@ -1,13 +1,14 @@
-import sys
-import os
 import numpy as np
+import os
+import sys
 import tensorflow as tf
-import matplotlib.pyplot as plt
+from tensorflow.contrib import tensorboard
 from timeit import default_timer as timer
 
 from model.datagenerator import ImageDataGenerator
-from tools.visualization import vis_square
+from tools.cluster_lines import cluster_lines_affinity_propagation, cluster_lines_kmeans
 from tools.lines_utils import get_label_with_line_center, get_geometric_info
+from tools.visualization import pcl_lines_for_plot
 
 python_root = '../'
 sys.path.insert(0, python_root)
@@ -18,43 +19,19 @@ sess = tf.InteractiveSession()
 saver = tf.train.import_meta_graph(
     os.path.join(log_files_folder,
                  'triplet_loss_batch_all_ckpt/bgr-d_model_epoch10.ckpt.meta')
-    #os.path.join(log_files_folder,
-    #             'triplet_loss_batch_all_ckpt/model_epoch100.ckpt.meta')
 )
 saver.restore(
     sess,
     os.path.join(log_files_folder,
                  'triplet_loss_batch_all_ckpt/bgr-d_model_epoch10.ckpt')
-    #os.path.join(log_files_folder,
-    #             'triplet_loss_batch_all_ckpt/model_epoch100.ckpt')
 )
 
-# Visualize kernels
-conv1_kernels = sess.run('conv1/weights:0')
-conv1_kernels_rgb = conv1_kernels[:, :, :3, :]
-conv1_kernels_depth = conv1_kernels[:, :, -1, :]
-
-plt.rcParams['figure.figsize'] = (10, 10)
-
-vis_square(conv1_kernels_rgb.transpose(3, 0, 1, 2))
-vis_square(conv1_kernels_depth.transpose(2, 0, 1))
-
 read_as_pickle = True
-line_parametrization = 'direction_and_centerpoint'
 
 test_files = '/media/francesco/line_tools_data/pickle files/train_0/traj_1/pickled_test.pkl'
-#test_files = '/media/francesco/line_tools_data/pickle files/train_0/traj_1/test.txt'
-#test_files = '/media/francesco/line_tools_data/pickle files/train_0/traj_2/test_edited.txt'
 
-# For the last models trained, that also store train_set_mean in the model
+# Retrieve mean of the training set.
 train_set_mean = sess.run('train_set_mean:0')
-
-# 0611180855
-#train_set_mean = np.array([22.26707982, 22.24587975, 19.15592466, 668.46125445])
-# 1311181041
-#train_set_mean = np.array([21.3586346, 19.12882567, 5.41484424, 601.17042995])
-# Chengkun's
-#train_set_mean = np.array([22.4536157, 20.11461999, 5.61416132, 605.87199598])
 
 print("Train set mean is {}".format(train_set_mean))
 
@@ -64,7 +41,7 @@ test_generator = ImageDataGenerator(
     mean=train_set_mean,
     read_as_pickle=read_as_pickle)
 
-# Check if embeddings have already been generated. If not generate them
+# Check if embeddings have already been generated. If not, generate them.
 embeddings_path = os.path.join(log_files_folder, 'embeddings.npy')
 if os.path.isfile(embeddings_path):
     print("Using embeddings found at {}".format(embeddings_path))
@@ -72,9 +49,9 @@ if os.path.isfile(embeddings_path):
 else:
     graph = tf.get_default_graph()
     # Input image tensor.
-    input_img = graph.get_tensor_by_name('input_img:0')  # input images
+    input_img = graph.get_tensor_by_name('input_img:0')
     # Dropout probability tensor.
-    keep_prob = graph.get_tensor_by_name('keep_prob:0')  # dropout probability
+    keep_prob = graph.get_tensor_by_name('keep_prob:0')
     # Embeddings tensor.
     embeddings = graph.get_tensor_by_name('l2_normalize:0')
     # Line type tensor.
@@ -113,7 +90,7 @@ else:
 
     print("Test set has {} lines ".format(test_set_size))
 
-    # Obtain embeddings for lines test set
+    # Obtain embeddings for lines test set.
 
     # NOTE: Pickle files might store lines images in a different 'order' than
     # the one corresponding to the list of images in the text file. This means
@@ -127,13 +104,9 @@ else:
     # different in the two reading modes for the reasons explained above and
     # therefore some lines might be visualized in one case but not in the other.
 
-    #test_loss = 0.
-    #test_count = 0
-
     for i in range(test_set_size / batch_size):
         batch_input_img, batch_labels, batch_line_types = test_generator.next_batch(
             batch_size)
-
         # Create dictionary of the values to feed to the tensors to run the
         # operation.
         feed_dict = {
@@ -142,17 +115,36 @@ else:
             keep_prob: 1.
         }
 
+        # To ensure backcompatibility, geometric information is fed into the
+        # network only if the version of the network trained contains the
+        # associated tensor.
         if read_as_pickle and geometric_info_found:
-            # Retrieve geometric information.
-            # To ensure backcompatibility, geometric information is fed into the
-            # network only if the version of the network trained contains the
-            # associated tensor.
+            # Retrieve geometric info depending on the type of line
+            # parametrization used when training.
             batch_start_points = batch_labels[:, :3]
             batch_end_points = batch_labels[:, 3:6]
-            batch_geometric_info = get_geometric_info(
-                start_points=batch_start_points,
-                end_points=batch_end_points,
-                line_parametrization=line_parametrization)
+            if (geometric_info.shape[1] == 4):
+                # Line parametrization: 'orthonormal'.
+                batch_geometric_info = get_geometric_info(
+                    start_points=start_3D,
+                    end_points=end_3D,
+                    line_parametrization='orthonormal')
+                batch_geometric_info = np.array(batch_geometric_info).reshape(
+                    -1, 4)
+            elif (self.geometric_info.shape[1] == 5):
+                # Line parametrization: 'direction_and_centerpoint'.
+                batch_geometric_info = get_geometric_info(
+                    start_points=start_3D,
+                    end_points=end_3D,
+                    line_parametrization='direction_and_centerpoint')
+                batch_geometric_info = np.array(batch_geometric_info).reshape(
+                    -1, 5)
+            else:
+                raise ValueError("The trained geometric_info Tensor should "
+                                 "have shape[1] either equal to 4 (line "
+                                 "parametrization 'orthonormal') or equal to 5 "
+                                 "(line parametrization "
+                                 "'direction_and_centerpoint').")
             feed_dict[geometric_info] = batch_geometric_info
 
         start_time = timer()
@@ -162,23 +154,20 @@ else:
         test_embeddings_all = np.vstack([test_embeddings_all, output])
         print('Time needed to retrieve descriptors for %d lines: %.3f seconds' %
               (batch_size, (end_time - start_time)))
-        # Display every 5 steps
+        # Display every 5 steps.
         if i % 5 == 0:
             print("Embeddings got for {} lines ".format(
                 test_embeddings_all.shape[0]))
 
     lines_total = test_embeddings_all.shape[0]
     print("In total, embeddings got for {} lines ".format(lines_total))
-    #average_test_loss = test_loss / test_count
-    #print("{} Average loss for test set = {:.4f}".format(
-    #    datetime.now(), average_test_loss))
 
     print("Writing embeddings to file")
     np.save(embeddings_path, test_embeddings_all)
 
-number_of_lines_with_embeddings = len(test_embeddings_all)
+num_lines_with_embeddings = len(test_embeddings_all)
 
-# Retrieve true instances
+# Retrieve true instances.
 if read_as_pickle:
     data_lines_world = np.array(test_generator.pickled_labels, dtype=np.float32)
     print('Shape of data_lines_world is {}'.format(data_lines_world.shape))
@@ -187,23 +176,19 @@ else:
     data_lines_world = get_lines_world_coordinates_with_instances(
         trajectory=traj, frames=test, dataset_name='train')
 
-# Only keep the lines for which an embedding was seeked (since data is processed
+# Only keep the lines for which an embedding was sought (since data is processed
 # in batches only for a number of lines multiple of the batch size the embedding
-# is computed, cf. above)
-data_lines_world = data_lines_world[:number_of_lines_with_embeddings]
+# is computed, cf. above).
+data_lines_world = data_lines_world[:num_lines_with_embeddings]
 instance_labels = data_lines_world[:, -1]
 
-# Instances obtained via K-means clustering on obtained embeddings
-from sklearn.cluster import KMeans
+# Cluster lines.
+cluster_labels, num_clusters = cluster_lines_affinity_propagation(
+    embeddings=test_embeddings_all)
 
-lines_features = test_embeddings_all
-n_clusters = 12
-#n_clusters = int(max(instance_labels))
-kmeans = KMeans(n_clusters, init='k-means++').fit(lines_features)
-cluster_labels = kmeans.labels_
-#count = cluster_labels.shape[0]
+print("Found {} clusters.".format(num_clusters))
 
-# To display frequencies
+# To display frequencies.
 count_map_cluster_labels_to_instance_labels = np.zeros(
     [max(cluster_labels) + 1,
      int(max(instance_labels)) + 1])
@@ -213,34 +198,41 @@ for label_index in range(len(cluster_labels)):
     count_map_cluster_labels_to_instance_labels[
         cluster_label, corresponding_instance_label] += 1
 
-# Map real instances and instances from clustering
-from tools.visualization import pcl_lines_for_plot
+# Map real instances and instances from clustering and display lines with
+# colours. Lines with the same colour belong to the same cluster.
+# Possible values for visualizer: 'open3d', 'matplotlib'.
+visualizer = 'open3d'
 
-pcl_lines_open3d_cluster = pcl_lines_for_plot(
-    data_lines_world, lines_color=cluster_labels, visualizer='open3d')
-pcl_lines_open3d_ground_truth = pcl_lines_for_plot(
-    data_lines_world,
-    lines_color=np.int32(instance_labels),
-    visualizer='open3d')
-pcl_lines_matplotlib_cluster = pcl_lines_for_plot(
-    data_lines_world, lines_color=cluster_labels, visualizer='matplotlib')
-pcl_lines_matplotlib_ground_truth = pcl_lines_for_plot(
-    data_lines_world,
-    lines_color=np.int32(instance_labels),
-    visualizer='matplotlib')
+if visualizer == 'open3d':
+    from tools.visualization import plot_lines_with_open3d
+    pcl_lines_open3d_cluster = pcl_lines_for_plot(
+        data_lines_world, lines_color=cluster_labels, visualizer='open3d')
+    pcl_lines_open3d_ground_truth = pcl_lines_for_plot(
+        data_lines_world,
+        lines_color=np.int32(instance_labels),
+        visualizer='open3d')
+    print("Displaying scene with obtained instances")
+    plot_lines_with_open3d(pcl_lines_open3d_cluster, "Clusterized instances")
+    print("Displaying scene with ground-truth instances")
+    plot_lines_with_open3d(pcl_lines_open3d_ground_truth,
+                           "Ground-truth instances")
 
-from tools.visualization import plot_lines_with_open3d
-#from tools.visualization import plot_lines_with_matplotlib
+elif visualizer == 'matplotlib':
+    from tools.visualization import plot_lines_with_matplotlib
+    pcl_lines_matplotlib_cluster = pcl_lines_for_plot(
+        data_lines_world, lines_color=cluster_labels, visualizer='matplotlib')
+    pcl_lines_matplotlib_ground_truth = pcl_lines_for_plot(
+        data_lines_world,
+        lines_color=np.int32(instance_labels),
+        visualizer='matplotlib')
+    print("Displaying scene with obtained instances")
+    plot_lines_with_matplotlib(pcl_lines_matplotlib_cluster,
+                               "Clusterized instances")
+    print("Displaying scene with ground-truth instances")
+    plot_lines_with_matplotlib(pcl_lines_matplotlib_ground_truth,
+                               "Ground-truth instances")
 
-print("Displaying scene with obtained instances")
-plot_lines_with_open3d(pcl_lines_open3d_cluster, "Clusterized instances")
-#plot_lines_with_matplotlib(pcl_lines_matplotlib_cluster)
-print("Displaying scene with ground-truth instances")
-plot_lines_with_open3d(pcl_lines_open3d_ground_truth, "Ground-truth instances")
-#plot_lines_with_matplotlib(pcl_lines_matplotlib_ground_truth)
-
-# # See embeddings in the feature space, colored with instance label
-from tensorflow.contrib.tensorboard.plugins import projector
+# Display embeddings in the feature space, coloured with instance label.
 LOG_DIR = os.path.join(log_files_folder, 'embedding_logs')
 if not os.path.isdir(LOG_DIR): os.makedirs(LOG_DIR)
 metadata = os.path.join(LOG_DIR, 'embedding_metadata.tsv')
@@ -256,12 +248,12 @@ with tf.Session() as sess:
     sess.run(test_embeddings.initializer)
     saver.save(sess, os.path.join(LOG_DIR, 'test_embeddings.ckpt'))
 
-    config = projector.ProjectorConfig()
+    config = tensorboard.plugins.projector.ProjectorConfig()
     # One can add multiple embeddings.
     embedding = config.embeddings.add()
     embedding.tensor_name = test_embeddings.name
-    print('test_embeddings: {0}'.format(test_embeddings))
     # Link this tensor to its metadata file (e.g. labels).
     embedding.metadata_path = metadata
     # Saves a config file that TensorBoard will read during startup.
-    projector.visualize_embeddings(tf.summary.FileWriter(LOG_DIR), config)
+    tensorboard.plugins.projector.visualize_embeddings(
+        tf.summary.FileWriter(LOG_DIR), config)

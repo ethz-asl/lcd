@@ -158,13 +158,13 @@ def pcl_lines_for_plot(data_lines, lines_color, visualizer):
     return pcl_lines
 
 
-def plot_lines_with_matplotlib(pcl_lines):
+def plot_lines_with_matplotlib(pcl_lines, window_name="matplotlib"):
     """ Plots a set of lines (in the format outputted by pcl_lines_for_plot) in
         matplotlib.
     """
     num_lines = len(pcl_lines)
 
-    fig = plt.figure()
+    fig = plt.figure(window_name)
     ax = fig.gca(projection='3d')
     for i in range(num_lines):
         x = pcl_lines[i]['points'][:, 0]
