@@ -173,7 +173,7 @@ def pluecker_to_orthonormal_representation(pluecker_coordinates):
         raise ValueError('Matrix U is not a rotation matrix.')
     # Find the Euler angles associated to the two rotation matrices.
     theta_1, theta_2, theta_3 = mat2euler(U, axes='sxyz')
-    theta_4 = np.arccos(W[0, 0])
+    theta_4 = np.arctan2(W[1, 0], W[0, 0])
     # Assign the angles to the parameter vector.
     theta = np.array([theta_1, theta_2, theta_3, theta_4])
 

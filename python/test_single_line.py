@@ -60,12 +60,20 @@ if os.path.isfile(embeddings_path):
     test_embeddings_all = np.load(embeddings_path)
 else:
     graph = tf.get_default_graph()
-    input_img = graph.get_tensor_by_name('input_img:0')  # input images
+    # Input image tensor.
+    input_img = graph.get_tensor_by_name('input_img:0')
     labels = graph.get_tensor_by_name('labels:0')  # labels of input images
     keep_prob = graph.get_tensor_by_name('keep_prob:0')  # dropout probability
     embeddings = graph.get_tensor_by_name('l2_normalize:0')
+    # Line type tensor.
     line_types = graph.get_tensor_by_name('line_types:0')
-    geometric_info = graph.get_tensor_by_name('geometric_info:0')
+    # Geometric info tensor.
+    try:
+        geometric_info = graph.get_tensor_by_name('geometric_info:0')
+    except KeyError:
+        geometric_info_found = False
+    else:
+        geometric_info_found = True
 
     batch_size = 1
     test_embeddings_all = np.empty(
@@ -108,24 +116,31 @@ else:
     # therefore some lines might be visualized in one case but not in the other.
 
     for i in range(test_set_size):
-        batch_input_img, batch_labels, batch_line_types = test_generator.next_batch(
-            batch_size)
-        batch_start_points = batch_labels[:, :3]
-        batch_end_points = batch_labels[:, 3:6]
-        batch_geometric_info = get_geometric_info(
-            start_points=batch_start_points,
-            end_points=batch_end_points,
-            line_parametrization=line_parametrization)
+        # Initialize dictionary of the values to feed to the tensors to run the
+        # operation.
+        feed_dict = {}
+        # To ensure backcompatibility, geometric information is fed into the
+        # network only if the version of the network trained contains the
+        # associated tensor.
+        if geometric_info_found:
+            batch_input_img, batch_labels, batch_line_types = test_generator.next_batch(
+                batch_size)
+            batch_start_points = batch_labels[:, :3]
+            batch_end_points = batch_labels[:, 3:6]
+            batch_geometric_info = get_geometric_info(
+                start_points=batch_start_points,
+                end_points=batch_end_points,
+                line_parametrization=line_parametrization)
+            feed_dict[geometric_info] = batch_geometric_info
+        else:
+            batch_input_img, _, batch_line_types = test_generator.next_batch(
+                batch_size)
+        feed_dict[input_img] = batch_input_img
+        feed_dict[line_types] = batch_line_types
+        feed_dict[keep_prob] = 1.
 
         start_time = timer()
-        output = sess.run(
-            embeddings,
-            feed_dict={
-                input_img: batch_input_img,
-                line_types: batch_line_types,
-                geometric_info: batch_geometric_info,
-                keep_prob: 1.
-            })
+        output = sess.run(embeddings, feed_dict=feed_dict)
         end_time = timer()
 
         test_embeddings_all = np.vstack([test_embeddings_all, output])

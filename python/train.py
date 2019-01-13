@@ -74,7 +74,7 @@ def train(read_as_pickle=True):
     log_files_folder = "./logs/"
 
     # Learning parameters.
-    learning_rate = 0.01
+    learning_rate = 0.0001
     num_epochs = 30
     batch_size = 128
     margin = 0.2
