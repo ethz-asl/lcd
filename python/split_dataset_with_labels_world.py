@@ -180,14 +180,14 @@ if __name__ == '__main__':
         # Dataset from SceneNN.
         start_frame = 2
         if not args.end_frame:
-            print("It is required to indicate the index of the last frame when "
-                  "using SceneNN dataset. Please use the argument -end_frame.")
-            return
+            sys.exit("It is required to indicate the index of the last frame "
+                     "when using SceneNN dataset. Please use the argument "
+                     "-end_frame.")
+
         if not args.dataset_path:
-            print("It is required to indicate the path of the dataset when "
-                  "using SceneNN dataset. Please use the argument "
-                  "-dataset_path.")
-            return
+            sys.exit("It is required to indicate the path of the dataset when "
+                     "using SceneNN dataset. Please use the argument "
+                     "-dataset_path.")
 
     # Compose auxiliary paths
     path_to_linesfiles = os.path.join(linesandimagesfolder_path,

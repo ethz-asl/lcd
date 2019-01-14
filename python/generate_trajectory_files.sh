@@ -55,7 +55,7 @@ case ${DATASET_NAME%_*} in
 esac
 
 # Generate bag.
-if [ "$SCENENET_TRUE_SCENENN_FALSE" = true]
+if [ "$SCENENET_TRUE_SCENENN_FALSE" = true ]
 then
   if [ -e "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenet_traj_${TRAJ_NUM}.bag ]
   then
@@ -88,6 +88,7 @@ else
   START_FRAME=2
 fi
 
+echo -e "The bag contains ${NUM_FRAMES_IN_BAG} frames."
 END_FRAME=$(($START_FRAME + $NUM_FRAMES_IN_BAG - 1))
 
 # Create folders to store the data.
@@ -103,9 +104,9 @@ else
     rm "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/traj_${TRAJ_NUM}/*
     # Play bag and record data.
     echo -e "\n**** Playing bag and recording data for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
-    roslaunch line_ros_utility detect_and_save_lines.launch trajectory:=${TRAJ_NUM} write_path:="$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/ scenenet_true_scenenn_false:=$SCENENET_TRUE_SCENENN_FALSE &
+    roslaunch line_ros_utility detect_and_save_lines.launch trajectory:=${TRAJ_NUM} write_path:="$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/ scenenet_true_scenenn_false:=$SCENENET_TRUE_SCENENN_FALSE start_frame:=${START_FRAME} &
     LAUNCH_PID=$!;
-    if [ "$SCENENET_TRUE_SCENENN_FALSE" = true]
+    if [ "$SCENENET_TRUE_SCENENN_FALSE" = true ]
     then
       rosbag play -d 3.5 --queue 300 -r 10 "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenet_traj_${TRAJ_NUM}.bag;
     else
@@ -129,7 +130,7 @@ then
 else
    # Generate virtual camera images.
    echo -e "\n**** Generating virtual camera images for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
-   if [ "$SCENENET_TRUE_SCENENN_FALSE" = true]
+   if [ "$SCENENET_TRUE_SCENENN_FALSE" = true ]
    then
      python "$PYTHONSCRIPTS_PATH"/get_virtual_camera_images.py -trajectory ${TRAJ_NUM} -scenenetscripts_path "$SCENENET_SCRIPTS_PATH" -dataset_name ${DATASET_NAME} -dataset_path "$SCENENET_DATASET_PATH"/data/${DATASET_NAME%_*}/ -linesandimagesfolder_path "$LINESANDIMAGESFOLDER_PATH"/ -end_frame ${END_FRAME};
    else
@@ -151,7 +152,7 @@ tar -cf - ${DATASET_NAME}/traj_${TRAJ_NUM} ${DATASET_NAME}_lines/traj_${TRAJ_NUM
 
 # Split dataset.
 echo -e "\n**** Splitting dataset for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
-if [ "$SCENENET_TRUE_SCENENN_FALSE" = true]
+if [ "$SCENENET_TRUE_SCENENN_FALSE" = true ]
 then
   python "$PYTHONSCRIPTS_PATH"/split_dataset_with_labels_world.py -trajectory ${TRAJ_NUM} -linesandimagesfolder_path "$LINESANDIMAGESFOLDER_PATH" -output_path "$LINESANDIMAGESFOLDER_PATH" -scenenetscripts_path "$SCENENET_SCRIPTS_PATH" -dataset_name ${DATASET_NAME}
 else

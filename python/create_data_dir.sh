@@ -39,7 +39,7 @@ mkdir -p "$DATA_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM} "$DATA_PATH"/${DATASET_NA
 frame="frame_";
 rgb="rgb";
 depth="depth";
-for i in {$START_FRAME..$END_FRAME..1}; do
+for i in $(seq $START_FRAME $END_FRAME); do
     mkdir -p "$DATA_PATH/${DATASET_NAME}/traj_${TRAJ_NUM}/${frame}${i}/${rgb}"
     mkdir -p "$DATA_PATH/${DATASET_NAME}/traj_${TRAJ_NUM}/${frame}${i}/${depth}"
 done

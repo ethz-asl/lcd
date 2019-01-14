@@ -23,7 +23,6 @@ class SceneNetCameraToWorldMatrixRetriever:
     def __init__(self, trajectory, dataset_name, scenenetscripts_path):
         sys.path.append(scenenetscripts_path)
         import scenenet_pb2 as sn
-        from camera_pose_and_intrinsics_example import camera_to_world_with_pose, interpolate_poses
 
         trajectories = sn.Trajectories()
 
@@ -52,6 +51,8 @@ class SceneNetCameraToWorldMatrixRetriever:
         Returns:
             camera_to_world_matrix: Camera-to-world matrix.
         """
+        from camera_pose_and_intrinsics_example import camera_to_world_with_pose, interpolate_poses
+
         view = self.views[frame_id]
         ground_truth_pose = interpolate_poses(view.shutter_open,
                                               view.shutter_close, 0.5)

@@ -26,6 +26,7 @@ int main(int argc, char** argv) {
     // frame 0 (cf. scenenn_ros_tools/scenenn_to_rosbag.py) an argument that
     // handles the index assigned to the first frame is required.
     iss.clear();
+    iss.str(argv[3]);
     if (iss >> start_frame) {
       ROS_INFO("Asked to label the first frame as %d.", start_frame);
     } else {

@@ -14,7 +14,7 @@ from tools import pathconfig
 from tools import get_protobuf_paths
 
 
-def get_virtual_camera_images_scenenet_rgbd():
+def get_virtual_camera_images_scenenet_rgbd(trajectory):
     impainting = False
     trajectories = sn.Trajectories()
     try:
@@ -128,7 +128,7 @@ def get_virtual_camera_images_scenenet_rgbd():
         print('Average time per line: %.3f seconds' % average_time_per_line)
 
 
-def get_virtual_camera_images_scenenn():
+def get_virtual_camera_images_scenenn(trajectory, dataset_path):
     impainting = False
     print("dataset_path is {0}, trajectory is  {1}".format(dataset_path, trajectory))
     path_to_photos = os.path.join(dataset_path, trajectory)
@@ -313,20 +313,20 @@ if __name__ == '__main__':
             # Compose script arguments if necessary
             dataset_path = os.path.join(scenenet_dataset_path, 'data/',
                                         dataset_name.split('_')[0])
-        get_virtual_camera_images_scenenet_rgbd()
+        get_virtual_camera_images_scenenet_rgbd(trajectory)
     elif dataset_name == "scenenn":
         # Dataset from SceneNN.
         if not args.end_frame:
-            print("It is required to indicate the index of the last frame when "
-                  "using SceneNN dataset. Please use the argument -end_frame.")
-            return
+            sys.exit("It is required to indicate the index of the last frame "
+                     "when using SceneNN dataset. Please use the argument "
+                     "-end_frame.")
         if not args.dataset_path:
             scenenn_dataset_path = pathconfig.obtain_paths_and_variables(
                 "SCENENN_DATASET_PATH")
             # Compose script arguments if necessary
             dataset_path = os.path.join(scenenn_dataset_path, 'data/',
                                         dataset_name.split('_')[0])
-        get_virtual_camera_images_scenenn()
+        get_virtual_camera_images_scenenn(trajectory, dataset_path)
     else:
         raise ValueError("Invalid dataset name. Valid names are 'val', "
                          "'train_NUM', where NUM is a number between 0 and 16, "
