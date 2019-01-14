@@ -29,7 +29,7 @@ if __name__ == '__main__':
         "-dataset_name",
         help="Either train or val, indicating whether "
         "the data being pickled comes from the train or val dataset of "
-        "pySceneNetRGBD.")
+        "SceneNetRGBD.")
 
     args = parser.parse_args()
     if (args.splittingfiles_path and args.output_path and args.dataset_name):

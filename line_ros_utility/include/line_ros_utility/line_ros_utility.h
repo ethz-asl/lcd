@@ -212,7 +212,8 @@ class InliersWithLabels {
 // and line_ros_utility implemented. Fully functional in a ros node.
 class ListenAndPublish {
  public:
-  ListenAndPublish(int trajectory_number, std::string write_path);
+  ListenAndPublish(int trajectory_number, std::string write_path,
+                   int start_frame);
   ~ListenAndPublish();
 
   void start();

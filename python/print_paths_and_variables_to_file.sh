@@ -19,6 +19,7 @@ then
 fi
 touch paths_and_variables.txt
 echo "SCENENET_DATASET_PATH $SCENENET_DATASET_PATH" >> paths_and_variables.txt
+echo "SCENENN_DATASET_PATH $SCENENN_DATASET_PATH" >> paths_and_variables.txt
 echo "SCENENET_SCRIPTS_PATH $SCENENET_SCRIPTS_PATH" >> paths_and_variables.txt
 echo "BAGFOLDER_PATH $BAGFOLDER_PATH" >> paths_and_variables.txt
 echo "LINESANDIMAGESFOLDER_PATH $LINESANDIMAGESFOLDER_PATH" >> paths_and_variables.txt

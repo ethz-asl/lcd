@@ -1,0 +1,32 @@
+<launch>
+  <arg name="trajectory" default="1" />
+  <arg name="write_path" />
+  <arg name="scenenet_true_scenenn_false" default="true" />
+  <arg name="start_frame" default="0" />
+  <node
+    pkg="rqt_reconfigure"
+    type="rqt_reconfigure"
+    name="rqt_reconfigure"
+ ></node>
+  <node
+    if="$(eval scenenet_true_scenenn_false == true)"
+    pkg="line_ros_utility"
+    type="scenenet_to_line_tools"
+    name="scenenet_to_line_tools"
+    output="screen"
+ ></node>
+  <node
+    if="$(eval scenenet_true_scenenn_false == false)"
+    pkg="line_ros_utility"
+    type="scenenn_to_line_tools"
+    name="scenenn_to_line_tools"
+    output="screen"
+ ></node>
+  <node
+    pkg="line_ros_utility"
+    type="detect_and_save_lines"
+    name="detect_and_save_lines"
+    args="$(arg trajectory) $(arg write_path) $(arg start_frame)"
+    output="screen"
+ ></node>
+</launch>

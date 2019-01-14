@@ -16,7 +16,7 @@ fi
 # Check dataset name.
 if [ -z $DATASET_NAME ]
 then
-    echo "Please provide the name of dataset to use. Possible options are and 'val' and 'train_NUM', where NUM is a number between 0 and 16. Exiting."
+    echo "Please provide the name of dataset to use. Possible options are and 'val' and 'train_NUM', where NUM is a number between 0 and 16, 'scenenn'. Exiting."
     exit 1
 fi
 
@@ -29,21 +29,70 @@ mkdir -p "$PICKLEANDSPLIT_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM}/;
 # Stop the entire rather than a single command when Ctrl+C.
 trap "exit" INT
 
+# Set a flag depending on whether the dataset belongs to SceneNetRGBD or
+# SceneNN.
+# Check that name of the dataset is valid
+case ${DATASET_NAME%_*} in
+    train)
+        if [ ${DATASET_NAME#*_} -ge 0 ] && [ ${DATASET_NAME#*_} -le 16 ]
+        then
+          SCENENET_TRUE_SCENENN_FALSE=true
+        else
+          echo "Invalid argument $DATASET_NAME. Valid options are 'val' and 'train_NUM', where NUM is between 0 and 16, and 'scenenn'."
+          exit 1
+        fi
+        ;;
+    val)
+        SCENENET_TRUE_SCENENN_FALSE=true
+        ;;
+    scenenn)
+        SCENENET_TRUE_SCENENN_FALSE=false
+        ;;
+    *)
+        echo "Invalid argument $DATASET_NAME. Valid options are 'val' and 'train_NUM', where NUM is between 0 and 16, and 'scenenn'."
+        exit 1
+        ;;
+esac
+
 # Generate bag.
-if [ -e "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenet_traj_${TRAJ_NUM}.bag ]
+if [ "$SCENENET_TRUE_SCENENN_FALSE" = true]
 then
-    echo "Bag file for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set already exists. Using bag found.";
+  if [ -e "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenet_traj_${TRAJ_NUM}.bag ]
+  then
+      echo "Bag file for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set already exists. Using bag found.";
+  else
+      echo -e "\n****  Generating bag for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
+      echo -e "PLEASE NOTE! If an error occurs during the formation of the bag (e.g."
+      echo -e "early termination by interrupt) the script will not check if the bag "
+      echo -e "is valid. Therefore invalid bags should be manually removed.\n"
+      rosrun scenenet_ros_tools scenenet_to_rosbag.py -scenenet_path "$SCENENET_DATASET_PATH" -trajectory $TRAJ_NUM -dataset_type ${DATASET_NAME} -output_bag "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenet_traj_${TRAJ_NUM}.bag;
+  fi
+  # Get number of frames in the bag.
+  NUM_FRAMES_IN_BAG=$(python "$PYTHONSCRIPTS_PATH"/tools/get_number_of_frames_in_bag.py -rosbag_path "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenet_traj_${TRAJ_NUM}.bag);
+  START_FRAME=0
 else
-    echo -e "\n****  Generating bag for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
-    echo -e "PLEASE NOTE! If an error occurs during the formation of the bag (e.g."
-    echo -e "early termination by interrupt) the script will not check if the bag "
-    echo -e "is valid. Therefore invalid bags should be manually removed.\n"
-    rosrun scenenet_ros_tools scenenet_to_rosbag.py -scenenet_path "$SCENENET_DATASET_PATH" -trajectory $TRAJ_NUM -dataset_type ${DATASET_NAME} -output_bag "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenet_traj_${TRAJ_NUM}.bag;
+  if [ -e "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenn_traj_${TRAJ_NUM}.bag ]
+  then
+      echo "Bag file for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set already exists. Using bag found.";
+  else
+      echo -e "\n****  Generating bag for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
+      echo -e "PLEASE NOTE! The process will take a long time. If an error occurs "
+      echo -e "during the formation of the bag (e.g.early termination by interrupt) "
+      echo -e "the script will not check if the bag is valid. Therefore invalid "
+      echo -e "bags should be manually removed.\n"
+      rosrun scenenn_ros_tools scenenn_to_rosbag.py -scenenn_data_folder "$SCENENN_DATASET_PATH" -scene_id $TRAJ_NUM -output_bag "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenn_traj_${TRAJ_NUM}.bag;
+  fi
+  # Get number of frames in the bag.
+  NUM_FRAMES_IN_BAG=$(python "$PYTHONSCRIPTS_PATH"/tools/get_number_of_frames_in_bag.py -rosbag_path "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenn_traj_${TRAJ_NUM}.bag);
+  # ROS bags from SceneNN start from frame 2 (cf. scenenn_ros_tools/scenenn_to_rosbag.py).
+  START_FRAME=2
 fi
+
+END_FRAME=$(($START_FRAME + $NUM_FRAMES_IN_BAG - 1))
 
 # Create folders to store the data.
 echo -e "\n**** Creating folders to store the data for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
-bash "$CURRENT_DIR"/create_data_dir.sh $TRAJ_NUM "$LINESANDIMAGESFOLDER_PATH" $DATASET_NAME;
+bash "$CURRENT_DIR"/create_data_dir.sh $TRAJ_NUM "$LINESANDIMAGESFOLDER_PATH" $DATASET_NAME $START_FRAME $END_FRAME;
 # Only create lines files if not there already (and valid).
 if [ -e "$LINESANDIMAGESFOLDER_PATH"/VALID_LINES_FILES_${TRAJ_NUM}_${DATASET_NAME} ]
 then
@@ -54,12 +103,17 @@ else
     rm "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/traj_${TRAJ_NUM}/*
     # Play bag and record data.
     echo -e "\n**** Playing bag and recording data for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
-    roslaunch line_ros_utility detect_cluster_show.launch trajectory:=${TRAJ_NUM} write_path:="$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/ &
+    roslaunch line_ros_utility detect_and_save_lines.launch trajectory:=${TRAJ_NUM} write_path:="$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/ scenenet_true_scenenn_false:=$SCENENET_TRUE_SCENENN_FALSE &
     LAUNCH_PID=$!;
-    rosbag play -d 3.5 --queue 300 -r 10 "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenet_traj_${TRAJ_NUM}.bag;
+    if [ "$SCENENET_TRUE_SCENENN_FALSE" = true]
+    then
+      rosbag play -d 3.5 --queue 300 -r 10 "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenet_traj_${TRAJ_NUM}.bag;
+    else
+      rosbag play -d 3.5 --queue 1000 -r 0.3 "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenn_traj_${TRAJ_NUM}.bag;
+    fi
     sudo kill ${LAUNCH_PID};
     # Repeat process from scratch if not all lines have been generated.
-    [ ! -e "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/traj_${TRAJ_NUM}/lines_2D_299.txt ]
+    [ ! -e "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/traj_${TRAJ_NUM}/lines_2D_${END_FRAME}.txt ]
   do
     :
   done
@@ -73,9 +127,15 @@ if [ -e "$LINESANDIMAGESFOLDER_PATH"/VALID_VIRTUAL_CAMERA_IMAGES_${TRAJ_NUM}_${D
 then
    echo 'Found valid virtual camera images. Using them.'
 else
-   # Generate virtual camera images
+   # Generate virtual camera images.
    echo -e "\n**** Generating virtual camera images for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
-   python "$PYTHONSCRIPTS_PATH"/get_virtual_camera_images.py -trajectory ${TRAJ_NUM} -scenenetscripts_path "$SCENENET_SCRIPTS_PATH" -dataset_name ${DATASET_NAME} -dataset_path "$SCENENET_DATASET_PATH"/data/${DATASET_NAME%_*}/ -linesandimagesfolder_path "$LINESANDIMAGESFOLDER_PATH"/;
+   if [ "$SCENENET_TRUE_SCENENN_FALSE" = true]
+   then
+     python "$PYTHONSCRIPTS_PATH"/get_virtual_camera_images.py -trajectory ${TRAJ_NUM} -scenenetscripts_path "$SCENENET_SCRIPTS_PATH" -dataset_name ${DATASET_NAME} -dataset_path "$SCENENET_DATASET_PATH"/data/${DATASET_NAME%_*}/ -linesandimagesfolder_path "$LINESANDIMAGESFOLDER_PATH"/ -end_frame ${END_FRAME};
+   else
+     python "$PYTHONSCRIPTS_PATH"/get_virtual_camera_images.py -trajectory ${TRAJ_NUM} -scenenetscripts_path "$SCENENET_SCRIPTS_PATH" -dataset_name ${DATASET_NAME} -dataset_path "$SCENENN_DATASET_PATH" -linesandimagesfolder_path "$LINESANDIMAGESFOLDER_PATH"/ -end_frame ${END_FRAME};
+   fi
+
    # Creates a file to say that virtual camera images have been generated, to
    # avoid creating them again if reexecuting the script before moving files.
    touch "$LINESANDIMAGESFOLDER_PATH"/VALID_VIRTUAL_CAMERA_IMAGES_${TRAJ_NUM}_${DATASET_NAME};
@@ -91,7 +151,12 @@ tar -cf - ${DATASET_NAME}/traj_${TRAJ_NUM} ${DATASET_NAME}_lines/traj_${TRAJ_NUM
 
 # Split dataset.
 echo -e "\n**** Splitting dataset for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
-python "$PYTHONSCRIPTS_PATH"/split_dataset_with_labels_world.py -trajectory ${TRAJ_NUM} -linesandimagesfolder_path "$LINESANDIMAGESFOLDER_PATH" -output_path "$LINESANDIMAGESFOLDER_PATH" -scenenetscripts_path "$SCENENET_SCRIPTS_PATH" -dataset_name ${DATASET_NAME}
+if [ "$SCENENET_TRUE_SCENENN_FALSE" = true]
+then
+  python "$PYTHONSCRIPTS_PATH"/split_dataset_with_labels_world.py -trajectory ${TRAJ_NUM} -linesandimagesfolder_path "$LINESANDIMAGESFOLDER_PATH" -output_path "$LINESANDIMAGESFOLDER_PATH" -scenenetscripts_path "$SCENENET_SCRIPTS_PATH" -dataset_name ${DATASET_NAME}
+else
+  python "$PYTHONSCRIPTS_PATH"/split_dataset_with_labels_world.py -trajectory ${TRAJ_NUM} -linesandimagesfolder_path "$LINESANDIMAGESFOLDER_PATH" -output_path "$LINESANDIMAGESFOLDER_PATH" -scenenetscripts_path "$SCENENET_SCRIPTS_PATH" -dataset_name ${DATASET_NAME} -dataset_path "$SCENENN_DATASET_PATH" -end_frame ${END_FRAME}
+fi
 echo -e "\n**** Pickling files for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
 python "$PYTHONSCRIPTS_PATH"/pickle_files.py -splittingfiles_path "$LINESANDIMAGESFOLDER_PATH" -output_path "$PICKLEANDSPLIT_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM}/ -dataset_name ${DATASET_NAME}
 for word in test train val all_lines; do

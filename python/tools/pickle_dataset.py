@@ -6,9 +6,17 @@ from sklearn.externals import joblib
 
 def pickle_images(input_text_file, output_pickle_file, dataset_name):
     """ Creates a pickle file containing a nested dictionary with images in
-    correspondence with dataset_name (i.e., whether the data being
-    pickled comes from the train or val dataset of pySceneNetRGBD), trajectory
-    number, frame number, image type (rgb or depth) and line number """
+        correspondence with dataset_name ('val' or 'train_NUM' - where 'NUM' is
+        a number between 0 and 16 - if the data comes from the SceneNetRGBD
+        dataset, 'scenenn' if the data comes from the SceneNN dataset),
+        trajectory number, frame number, image type (rgb or depth) and line
+        number.
+    Args:
+        input_text_file: Input text files containing the list of frames to
+            include in the pickle file, together with its image and its lines.
+        output_pickle_file: Output pickle file.
+        dataset_name: Dataset name (see docs above).
+    """
     nested_dict = lambda: defaultdict(nested_dict)
     data_dict = nested_dict()
 
@@ -101,12 +109,13 @@ def pickle_images(input_text_file, output_pickle_file, dataset_name):
 
 def merge_pickled_dictionaries(dict_to_update, dict_to_add):
     """ Merge pickled dictionary dict_to_add in pickled dictionary
-    dict_to_update, therefore modifying dict_to_update. Values from
-    dict_to_update are overwritten only if dict_to_add contains an entry which
-    has same dataset_name, trajectory_number and frame_number, i.e., if both
-    dictionaries contain the images and labels associated to frame frame_number
-    in trajectory trajectory_number from the pySceneNetRGBD dataset
-    dataset_name. In all other cases, dictionaries are simply merged.
+        dict_to_update, therefore modifying dict_to_update. Values from
+        dict_to_update are overwritten only if dict_to_add contains an entry
+        which  has same dataset_name, trajectory_number and frame_number, i.e.,
+        if both dictionaries contain the images and labels associated to frame
+        frame_number in trajectory trajectory_number from the SceneNetRGBD
+        dataset dataset_name. In all other cases, dictionaries are simply
+        merged.
     """
     for dataset_name_dict_to_add in dict_to_add.keys():
         if dataset_name_dict_to_add in dict_to_update.keys():

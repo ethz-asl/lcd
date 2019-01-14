@@ -14,11 +14,14 @@ cs_add_library(line_detect_describe_and_match
   src/line_detect_describe_and_match.cc
 )
 
-add_executable(detect_cluster_show src/detect_cluster_show_node.cc)
-target_link_libraries(detect_cluster_show ${PROJECT_NAME})
+add_executable(detect_and_save_lines src/detect_and_save_lines_node.cc)
+target_link_libraries(detect_and_save_lines ${PROJECT_NAME})
 
 add_executable(scenenet_to_line_tools src/scenenet_to_line_tools_node.cc)
 target_link_libraries(scenenet_to_line_tools ${PROJECT_NAME})
+
+add_executable(scenenn_to_line_tools src/scenenn_to_line_tools_node.cc)
+target_link_libraries(scenenn_to_line_tools ${PROJECT_NAME})
 
 add_executable(freiburg_to_line_tools src/freiburg_to_line_tools_node.cc)
 target_link_libraries(freiburg_to_line_tools ${PROJECT_NAME})

@@ -10,28 +10,15 @@ import argparse
 from tools import pathconfig
 from tools import scenenet_utils
 from tools import get_protobuf_paths
-from camera_pose_and_intrinsics_example import camera_to_world_with_pose, interpolate_poses
+from tools.camera_utils import SceneNetCameraToWorldMatrixRetriever
 
 
 def split_dataset():
-    sys.path.append(scenenetscripts_path)
-    import scenenet_pb2 as sn
-
-    trajectories = sn.Trajectories()
-    try:
-        with open(protobuf_path, 'rb') as f:
-            trajectories.ParseFromString(f.read())
-    except IOError:
-        print('split_dataset_with_labels_world.py: Scenenet protobuf data not '
-              'found at location:{0}'.format(protobuf_path))
-        print('Please ensure you have copied the pb file to the datadirectory')
-
-    frames_total = 300
     train = []
     val = []
     test = []
 
-    for frame_id in range(frames_total):
+    for frame_id in range(start_frame, end_frame + 1):
         if frame_id % 5 == 1:
             val.append(frame_id)
             continue
@@ -46,27 +33,37 @@ def split_dataset():
     dataset['train'] = train
     dataset['val'] = val
     dataset['test'] = test
-    dataset['all_lines'] = [i for i in range(frames_total)]
+    dataset['all_lines'] = [i for i in range(start_frame, end_frame + 1)]
+
+    if (dataset_name in ["val"] + ["train_{}".format(i) for i in range(17)]):
+        camera_to_world_matrix_retriever = SceneNetCameraToWorldMatrixRetriever(
+            trajectory=trajectory,
+            dataset_name=dataset_name,
+            scenenetscripts_path=scenenetscripts_path)
+        frame_step = 1
+    elif dataset_name == "scenenn":
+        camera_to_world_matrix_retriever = SceneNNCameraToWorldMatrixRetriever(
+            trajectory=trajectory, dataset_path=dataset_path)
+        # Only use one every 30 frames for SceneNN (the computation would be too
+        # long and it would not be possible to pickle so large a file later on).
+        frame_step = 30
 
     for key, frames in dataset.iteritems():
         for frame_id in frames:
+            if frame_id % frame_step != 0:
+                continue
             path_to_lines = os.path.join(
                 path_to_linesfiles,
                 'lines_with_labels_{0}.txt'.format(frame_id))
-
-            #print('Path_to_lines is {0}'.format(path_to_lines))
             try:
                 data_lines = pd.read_csv(path_to_lines, sep=" ", header=None)
                 data_lines = data_lines.values
                 lines_count = data_lines.shape[0]
             except pd.errors.EmptyDataError:
                 lines_count = 0
-
-            view = trajectories.trajectories[trajectory].views[frame_id]
-            ground_truth_pose = interpolate_poses(view.shutter_open,
-                                                  view.shutter_close, 0.5)
-            camera_to_world_matrix = camera_to_world_with_pose(
-                ground_truth_pose)
+            # Retrieve camera-to-world matrix.
+            camera_to_world_matrix = camera_to_world_matrix_retriever.get_camera_to_world_matrix(
+                frame_id)
 
             for i in range(lines_count):
                 path_to_write = path_to_virtualcameraimages + \
@@ -121,6 +118,11 @@ if __name__ == '__main__':
         'validation set.')
     parser.add_argument("-trajectory", help="Trajectory number.")
     parser.add_argument(
+        "-end_frame",
+        type=int,
+        help="Index of the last frame "
+        "in the trajectory.")
+    parser.add_argument(
         "-scenenetscripts_path",
         help="Path to the scripts from pySceneNetRGBD (e.g. "
         "'../pySceneNetRGBD/').")
@@ -137,16 +139,26 @@ if __name__ == '__main__':
     parser.add_argument(
         "-output_path",
         help="Path where to write the txt files with the splitting.")
+    parser.add_argument(
+        "-dataset_path",
+        help="Path to folder containing the different image files from the "
+        "dataset. It is only needed for the SceneNN datasets, for which the "
+        "path should contain a subfolder XYZ for each scene (where XYZ is a "
+        "three-digit ID associated to the scene, e.g. 005) and a subfolder "
+        "'intrinsic'.")
 
     args = parser.parse_args()
-    if (args.trajectory and args.scenenetscripts_path and args.dataset_name and
-            args.linesandimagesfolder_path and args.output_path):
-        # All arguments passed
+    if (args.trajectory and args.end_frame and args.scenenetscripts_path and
+            args.dataset_name and args.linesandimagesfolder_path and
+            args.output_path and args.dataset_path):
+        # All arguments passed.
         trajectory = int(args.trajectory)
+        end_frame = args.end_frame
         scenenetscripts_path = args.scenenetscripts_path
         dataset_name = args.dataset_name
         linesandimagesfolder_path = args.linesandimagesfolder_path
         output_path = args.output_path
+        dataset_path = args.dataset_path
     else:
         print("split_dataset_with_labels_world.py: Some arguments are missing. "
               "Using default ones in config_paths_and_variables.sh.")
@@ -158,11 +170,25 @@ if __name__ == '__main__':
         trajectory = pathconfig.obtain_paths_and_variables("TRAJ_NUM")
         dataset_name = pathconfig.obtain_paths_and_variables("DATASET_NAME")
         output_path = os.path.join(linesandimagesfolder_path)
-    # Find protobuf file associated to dataset_name
-    protobuf_path = get_protobuf_paths.get_protobuf_path(dataset_name)
-    if protobuf_path is None:
-        sys.exit('split_dataset_with_labels_world.py: Error in retrieving '
-                 'protobuf_path.')
+
+    if (dataset_name in ["val"] + ["train_{}".format(i) for i in range(17)]):
+        # Dataset from SceneNetRGBD.
+        start_frame = 0
+        if not args.end_frame:
+            end_frame = 299
+    elif dataset_name == "scenenn":
+        # Dataset from SceneNN.
+        start_frame = 2
+        if not args.end_frame:
+            print("It is required to indicate the index of the last frame when "
+                  "using SceneNN dataset. Please use the argument -end_frame.")
+            return
+        if not args.dataset_path:
+            print("It is required to indicate the path of the dataset when "
+                  "using SceneNN dataset. Please use the argument "
+                  "-dataset_path.")
+            return
+
     # Compose auxiliary paths
     path_to_linesfiles = os.path.join(linesandimagesfolder_path,
                                       '{0}_lines/traj_{1}/'.format(

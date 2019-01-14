@@ -109,9 +109,10 @@ bool printToFile(const std::vector<cv::Vec4f>& lines2D,
   }
 }
 
-ListenAndPublish::ListenAndPublish(int trajectory_number, std::string write_path) :
+ListenAndPublish::ListenAndPublish(int trajectory_number,
+    std::string write_path, int start_frame) :
     params_(),  tree_classifier_(), trajectory_number_(trajectory_number),
-    kWritePath_(write_path) {
+    kWritePath_(write_path), iteration_(start_frame) {
   ros::NodeHandle node_handle_;
   // The Pointcloud publisher and transformation for RVIZ.
   pcl_pub_ = node_handle_.advertise<pcl::PointCloud<pcl::PointXYZRGB> >(
@@ -136,7 +137,6 @@ ListenAndPublish::ListenAndPublish(int trajectory_number, std::string write_path
 
   // Add the parameters utility to line_detection.
   line_detector_ = line_detection::LineDetector(&params_);
-  iteration_ = 0;
   // Retrieve trees.
   if (clustering_with_random_forest) {
     tree_classifier_.getTrees();
