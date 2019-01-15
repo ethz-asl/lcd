@@ -118,7 +118,7 @@ def train(read_as_pickle=True):
     # Geometric information.
     if line_parametrization == 'direction_and_centerpoint':
         geometric_info = tf.placeholder(
-            tf.float32, [None, 5], name="geometric_info")
+            tf.float32, [None, 6], name="geometric_info")
     elif line_parametrization == 'orthonormal':
         geometric_info = tf.placeholder(
             tf.float32, [None, 4], name="geometric_info")
@@ -407,7 +407,7 @@ if __name__ == '__main__':
         "-job_name",
         help="Name of the job, to be used for the "
         "log folders.",
-        default=datetime.now().strftime("%d%m%Y_%H%M"))
+        default=datetime.now().strftime("%d%m%y_%H%M"))
     args = parser.parse_args()
     if args.job_name:
         job_name = args.job_name

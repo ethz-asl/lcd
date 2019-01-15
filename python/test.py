@@ -126,23 +126,23 @@ else:
             if (geometric_info.shape[1] == 4):
                 # Line parametrization: 'orthonormal'.
                 batch_geometric_info = get_geometric_info(
-                    start_points=start_3D,
-                    end_points=end_3D,
+                    start_points=batch_start_points,
+                    end_points=batch_end_points,
                     line_parametrization='orthonormal')
                 batch_geometric_info = np.array(batch_geometric_info).reshape(
                     -1, 4)
-            elif (self.geometric_info.shape[1] == 5):
+            elif (geometric_info.shape[1] == 6):
                 # Line parametrization: 'direction_and_centerpoint'.
                 batch_geometric_info = get_geometric_info(
-                    start_points=start_3D,
-                    end_points=end_3D,
+                    start_points=batch_start_points,
+                    end_points=batch_end_points,
                     line_parametrization='direction_and_centerpoint')
                 batch_geometric_info = np.array(batch_geometric_info).reshape(
-                    -1, 5)
+                    -1, 6)
             else:
                 raise ValueError("The trained geometric_info Tensor should "
                                  "have shape[1] either equal to 4 (line "
-                                 "parametrization 'orthonormal') or equal to 5 "
+                                 "parametrization 'orthonormal') or equal to 6 "
                                  "(line parametrization "
                                  "'direction_and_centerpoint').")
             feed_dict[geometric_info] = batch_geometric_info

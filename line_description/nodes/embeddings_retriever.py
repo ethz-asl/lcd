@@ -116,17 +116,17 @@ class EmbeddingsRetriever:
                     end_points=end_3D,
                     line_parametrization='orthonormal')
                 geometric_info = np.array(geometric_info).reshape(-1, 4)
-            elif (self.geometric_info.shape[1] == 5):
+            elif (self.geometric_info.shape[1] == 6):
                 # Line parametrization: 'direction_and_centerpoint'.
                 geometric_info = get_geometric_info(
                     start_points=start_3D,
                     end_points=end_3D,
                     line_parametrization='direction_and_centerpoint')
-                geometric_info = np.array(geometric_info).reshape(-1, 5)
+                geometric_info = np.array(geometric_info).reshape(-1, 6)
             else:
                 raise ValueError("The trained geometric_info Tensor should "
                                  "have shape[1] either equal to 4 (line "
-                                 "parametrization 'orthonormal') or equal to 5 "
+                                 "parametrization 'orthonormal') or equal to 6 "
                                  "(line parametrization "
                                  "'direction_and_centerpoint').")
             feed_dict[self.geometric_info] = geometric_info
