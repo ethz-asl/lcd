@@ -96,6 +96,7 @@ def endpoints_to_centerpoint_and_direction(start_point, end_point):
     direction = end_point - start_point
     direction = direction / np.linalg.norm(direction)
 
+    direction = direction.reshape(3, 1)
     if direction[0] < 0:
         direction = -direction
 
