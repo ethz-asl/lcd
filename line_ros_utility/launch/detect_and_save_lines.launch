@@ -3,6 +3,7 @@
   <arg name="write_path" />
   <arg name="scenenet_true_scenenn_false" default="true" />
   <arg name="start_frame" default="0" />
+  <arg name="frame_step" default="1" />
   <node
     pkg="rqt_reconfigure"
     type="rqt_reconfigure"
@@ -26,7 +27,7 @@
     pkg="line_ros_utility"
     type="detect_and_save_lines"
     name="detect_and_save_lines"
-    args="$(arg trajectory) $(arg write_path) $(arg start_frame)"
+    args="$(arg trajectory) $(arg write_path) $(arg start_frame) $(arg frame_step)"
     output="screen"
  ></node>
 </launch>

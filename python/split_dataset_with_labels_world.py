@@ -18,12 +18,14 @@ def split_dataset():
     val = []
     test = []
 
-    for frame_id in range(start_frame, end_frame + 1):
-        if frame_id % 5 == 1:
+    idx_for_split = 0
+    for frame_id in range(start_frame, end_frame + 1, frame_step):
+        idx_for_split += 1
+        if idx_for_split % 5 == 1:
             val.append(frame_id)
             continue
 
-        if frame_id % 5 == 3:
+        if idx_for_split % 5 == 3:
             test.append(frame_id)
             continue
 
@@ -33,25 +35,19 @@ def split_dataset():
     dataset['train'] = train
     dataset['val'] = val
     dataset['test'] = test
-    dataset['all_lines'] = [i for i in range(start_frame, end_frame + 1)]
+    dataset['all_lines'] = [i for i in range(start_frame, end_frame + 1, frame_step)]
 
     if (dataset_name in ["val"] + ["train_{}".format(i) for i in range(17)]):
         camera_to_world_matrix_retriever = SceneNetCameraToWorldMatrixRetriever(
             trajectory=trajectory,
             dataset_name=dataset_name,
             scenenetscripts_path=scenenetscripts_path)
-        frame_step = 1
     elif dataset_name == "scenenn":
         camera_to_world_matrix_retriever = SceneNNCameraToWorldMatrixRetriever(
             trajectory=trajectory, dataset_path=dataset_path)
-        # Only use one every 30 frames for SceneNN (the computation would be too
-        # long and it would not be possible to pickle so large a file later on).
-        frame_step = 30
 
     for key, frames in dataset.iteritems():
         for frame_id in frames:
-            if frame_id % frame_step != 0:
-                continue
             path_to_lines = os.path.join(
                 path_to_linesfiles,
                 'lines_with_labels_{0}.txt'.format(frame_id))
@@ -117,6 +113,10 @@ if __name__ == '__main__':
         description='Split frames in the input trajectory in train, test and '
         'validation set.')
     parser.add_argument("-trajectory", help="Trajectory number.")
+    parser.add_argument("-frame_step", type=int, help="Number of frames in one "
+                        "step of the rosbag used to detect lines, i.e., "
+                        "(frame_step - 1) frames were originally skipped after "
+                        "each frame inserted in the rosbag.")
     parser.add_argument(
         "-end_frame",
         type=int,
@@ -148,11 +148,13 @@ if __name__ == '__main__':
         "'intrinsic'.")
 
     args = parser.parse_args()
-    if (args.trajectory and args.end_frame and args.scenenetscripts_path and
-            args.dataset_name and args.linesandimagesfolder_path and
-            args.output_path and args.dataset_path):
+    if (args.trajectory and args.frame_step and args.end_frame and
+        args.scenenetscripts_path and args.dataset_name and
+        args.linesandimagesfolder_path and args.output_path and
+        args.dataset_path):
         # All arguments passed.
         trajectory = int(args.trajectory)
+        frame_step = args.frame_step
         end_frame = args.end_frame
         scenenetscripts_path = args.scenenetscripts_path
         dataset_name = args.dataset_name
@@ -174,16 +176,20 @@ if __name__ == '__main__':
     if (dataset_name in ["val"] + ["train_{}".format(i) for i in range(17)]):
         # Dataset from SceneNetRGBD.
         start_frame = 0
+        if not args.frame_step:
+            frame_step = 1
         if not args.end_frame:
             end_frame = 299
     elif dataset_name == "scenenn":
         # Dataset from SceneNN.
         start_frame = 2
+        if not args.frame_step:
+            sys.exit("It is required to indicate the frame_step when using "
+                     "SceneNN dataset. Please use the argument -frame_step.")
         if not args.end_frame:
             sys.exit("It is required to indicate the index of the last frame "
                      "when using SceneNN dataset. Please use the argument "
                      "-end_frame.")
-
         if not args.dataset_path:
             sys.exit("It is required to indicate the path of the dataset when "
                      "using SceneNN dataset. Please use the argument "

@@ -109,10 +109,10 @@ bool printToFile(const std::vector<cv::Vec4f>& lines2D,
   }
 }
 
-ListenAndPublish::ListenAndPublish(int trajectory_number,
-    std::string write_path, int start_frame) :
-    params_(),  tree_classifier_(), trajectory_number_(trajectory_number),
-    kWritePath_(write_path), iteration_(start_frame) {
+ListenAndPublish::ListenAndPublish(std::string trajectory_number,
+    std::string write_path, int start_frame, int frame_step) :
+    params_(),  tree_classifier_(), kTrajectoryNumber_(trajectory_number),
+    kWritePath_(write_path), iteration_(start_frame), frame_step_(frame_step) {
   ros::NodeHandle node_handle_;
   // The Pointcloud publisher and transformation for RVIZ.
   pcl_pub_ = node_handle_.advertise<pcl::PointCloud<pcl::PointXYZRGB> >(
@@ -372,18 +372,18 @@ void ListenAndPublish::masterCallback(
 
   if (write_labeled_lines) {
     std::string path =
-        kWritePath_ + "/traj_" + std::to_string(trajectory_number_) +
-        "/lines_with_labels_" + std::to_string(iteration_) + ".txt";
+        kWritePath_ + "/traj_" + kTrajectoryNumber_ + "/lines_with_labels_" +
+        std::to_string(iteration_) + ".txt";
     ROS_INFO("path is %s", path.c_str());
 
     std::string path_2D_kept =
-        kWritePath_ + "/traj_" + std::to_string(trajectory_number_) +
-        "/lines_2D_kept_" + std::to_string(iteration_) + ".txt";
+        kWritePath_ + "/traj_" + kTrajectoryNumber_ + "/lines_2D_kept_" +
+        std::to_string(iteration_) + ".txt";
     ROS_INFO("path_2D_kept is %s", path_2D_kept.c_str());
 
     std::string path_2D =
-        kWritePath_ + "/traj_" + std::to_string(trajectory_number_) +
-        "/lines_2D_" + std::to_string(iteration_) + ".txt";
+        kWritePath_ + "/traj_" + kTrajectoryNumber_ + "/lines_2D_" +
+        std::to_string(iteration_) + ".txt";
     ROS_INFO("path_2D is %s", path_2D.c_str());
 
     // 3D lines data. NOTE: This lines are in the camera frame and should be
@@ -404,7 +404,7 @@ void ListenAndPublish::masterCallback(
   pcl_cloud_.header.stamp = 0;
   ROS_INFO("**** Started publishing ****");
   publish();
-  ++iteration_;
+  iteration_ += frame_step_;
 }
 
 void ListenAndPublish::labelLinesWithInstancesByMajorityVoting(

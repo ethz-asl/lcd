@@ -7,6 +7,7 @@
 #include <ros/ros.h>
 
 #include <cv_bridge/cv_bridge.h>
+#include <geometry_msgs/TransformStamped.h>
 #include <image_geometry/pinhole_camera_model.h>
 #include <dynamic_reconfigure/server.h>
 #include <message_filters/subscriber.h>
@@ -212,8 +213,8 @@ class InliersWithLabels {
 // and line_ros_utility implemented. Fully functional in a ros node.
 class ListenAndPublish {
  public:
-  ListenAndPublish(int trajectory_number, std::string write_path,
-                   int start_frame);
+  ListenAndPublish(std::string trajectory_number, std::string write_path,
+                   int start_frame, int frame_step);
   ~ListenAndPublish();
 
   void start();
@@ -428,6 +429,7 @@ class ListenAndPublish {
 
   // Data storage.
   size_t iteration_;
+  size_t frame_step_;
   cv::Mat cv_image_;
   cv::Mat cv_img_gray_;
   cv::Mat cv_cloud_;
@@ -485,7 +487,7 @@ class ListenAndPublish {
   TreeClassifier tree_classifier_;
   line_clustering::KMedoidsCluster kmedoids_cluster_;
   // To handle trajectories with a general index (not necessarily 1)
-  int trajectory_number_;
+  const std::string kTrajectoryNumber_;
   // Path where to write the lines files
   const std::string kWritePath_;
 };

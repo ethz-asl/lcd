@@ -6,6 +6,7 @@ DATA_PATH=${2:-"../data"}
 DATASET_NAME=${3:-"train_0"}
 START_FRAME=${4:-0}
 END_FRAME=${5:-300}
+FRAME_STEP=${6:-1}
 
 # Check that name of the dataset is valid
 case ${DATASET_NAME%_*} in
@@ -39,7 +40,7 @@ mkdir -p "$DATA_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM} "$DATA_PATH"/${DATASET_NA
 frame="frame_";
 rgb="rgb";
 depth="depth";
-for i in $(seq $START_FRAME $END_FRAME); do
+for i in $(seq $START_FRAME $FRAME_STEP $END_FRAME); do
     mkdir -p "$DATA_PATH/${DATASET_NAME}/traj_${TRAJ_NUM}/${frame}${i}/${rgb}"
     mkdir -p "$DATA_PATH/${DATASET_NAME}/traj_${TRAJ_NUM}/${frame}${i}/${depth}"
 done

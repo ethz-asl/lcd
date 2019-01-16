@@ -144,7 +144,7 @@ def get_virtual_camera_images_scenenn(trajectory, dataset_path):
     camera_model = scenenet_utils.get_camera_model()
     # Distance between virtual camera origin and line's center.
     distance = 3
-    for frame_id in range(2, end_frame + 1):
+    for frame_id in range(2, end_frame + 1, frame_step):
         start_time = timer()
         photo_id = frame_id
 
@@ -237,6 +237,10 @@ if __name__ == '__main__':
         description='Get virtual camera image for each line in the input '
         'trajectory.')
     parser.add_argument("-trajectory", type=str, help="Trajectory number.")
+    parser.add_argument("-frame_step", type=int, help="Number of frames in one "
+                        "step of the rosbag used to detect lines, i.e., "
+                        "(frame_step - 1) frames were originally skipped after "
+                        "each frame inserted in the rosbag.")
     parser.add_argument("-end_frame", type=int, help="Index of the last frame "
         "in the trajectory.")
     parser.add_argument(
@@ -272,12 +276,13 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if (args.trajectory and args.scenenetscripts_path and args.dataset_name and
             args.dataset_path and args.linesandimagesfolder_path and
-            args.end_frame):  # All arguments passed
+            args.frame_step and args.end_frame):  # All arguments passed
         trajectory = args.trajectory
         scenenetscripts_path = args.scenenetscripts_path
         dataset_name = args.dataset_name
         dataset_path = args.dataset_path
         linesandimagesfolder_path = args.linesandimagesfolder_path
+        frame_step = args.frame_step
         end_frame = args.end_frame
     else:
         print("get_virtual_camera_images.py: Some arguments are missing. Using "
@@ -310,12 +315,15 @@ if __name__ == '__main__':
         if not args.dataset_path:
             scenenet_dataset_path = pathconfig.obtain_paths_and_variables(
                 "SCENENET_DATASET_PATH")
-            # Compose script arguments if necessary
+            # Compose script arguments if necessary.
             dataset_path = os.path.join(scenenet_dataset_path, 'data/',
                                         dataset_name.split('_')[0])
         get_virtual_camera_images_scenenet_rgbd(trajectory)
     elif dataset_name == "scenenn":
         # Dataset from SceneNN.
+        if not args.frame_step:
+            sys.exit("It is required to indicate the frame_step when using "
+                     "SceneNN dataset. Please use the argument -frame_step.")
         if not args.end_frame:
             sys.exit("It is required to indicate the index of the last frame "
                      "when using SceneNN dataset. Please use the argument "
@@ -323,7 +331,7 @@ if __name__ == '__main__':
         if not args.dataset_path:
             scenenn_dataset_path = pathconfig.obtain_paths_and_variables(
                 "SCENENN_DATASET_PATH")
-            # Compose script arguments if necessary
+            # Compose script arguments if necessary.
             dataset_path = os.path.join(scenenn_dataset_path, 'data/',
                                         dataset_name.split('_')[0])
         get_virtual_camera_images_scenenn(trajectory, dataset_path)

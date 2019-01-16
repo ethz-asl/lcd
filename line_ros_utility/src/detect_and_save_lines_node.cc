@@ -6,19 +6,17 @@
 
 int main(int argc, char** argv) {
   ros::init(argc, argv, "detect_and_save_lines");
-  int traj_num;
+  std::string traj_num;
   std::string write_path;
   int start_frame;
-  if (argc >= 4) {  // Found number-of-trajectory, write-path and start frame
-                    // arguments.
+  int frame_step;
+  std::istringstream iss;
+  if (argc >= 5) {  // Found number-of-trajectory, write-path, start frame and
+                    // frame step arguments.
     // Number of trajectory.
-    std::istringstream iss(argv[1]);
-    if (iss >> traj_num) {
-      ROS_INFO("Asked to perform detection for trajectory no.%d.", traj_num);
-    } else {
-      ROS_ERROR("Unable to parse trajectory number argument.");
-      return -1;
-    }
+    traj_num.assign(argv[1]);
+    ROS_INFO("Asked to perform detection for trajectory no.%s.",
+             traj_num.c_str());
     // Write path.
     write_path.assign(argv[2]);
     ROS_INFO("Using %s as output path", write_path.c_str());
@@ -31,6 +29,18 @@ int main(int argc, char** argv) {
       ROS_INFO("Asked to label the first frame as %d.", start_frame);
     } else {
       ROS_ERROR("Unable to parse start frame argument.");
+      return -1;
+    }
+    // Frame step. It indicates the step (in number of frames of the original
+    // trajectory) between a frame in the ROS bag and the subsequent one. For
+    // instance, with frame_step = 3 and start_frame = 1, the actual indices of
+    // the frames received are 1, 4, 7, etc.
+    iss.clear();
+    iss.str(argv[4]);
+    if (iss >> frame_step) {
+      ROS_INFO("Asked to use a frame step of %d.", frame_step);
+    } else {
+      ROS_ERROR("Unable to parse frame step argument.");
       return -1;
     }
   } else {
@@ -58,9 +68,13 @@ int main(int argc, char** argv) {
     start_frame = 0;
     ROS_INFO("NOTE: using start frame 0. This might not be coherent if using "
              "SceneNN dataset.");
+    frame_step = 1;
+    ROS_INFO("NOTE: using frame step 1. This might not be coherent if using "
+             "SceneNN dataset.");
     ROS_INFO("traj_num is %d, write_path is %s", traj_num, write_path.c_str());
   }
-  line_ros_utility::ListenAndPublish ls(traj_num, write_path, start_frame);
+  line_ros_utility::ListenAndPublish ls(traj_num, write_path, start_frame,
+                                        frame_step);
   ls.start();
   ros::spin();
   return 0;
