@@ -67,13 +67,16 @@ namespace line_ros_utility {
       image_sub_.subscribe(node_handle_, "/line_tools/image/rgb", 300);
       cloud_sub_.subscribe(node_handle_, "/line_tools/point_cloud", 300);
       info_sub_.subscribe(node_handle_, "/line_tools/camera_info", 300);
+      camera_to_world_matrix_sub_.subscribe(
+          node_handle_, "/line_tools/camera_to_world_matrix", 300);
       // Connect main callback.
       sync_ = new message_filters::Synchronizer<MySyncPolicy>(
-          MySyncPolicy(10), image_sub_, cloud_sub_, info_sub_);
+          MySyncPolicy(10), image_sub_, cloud_sub_, info_sub_,
+          camera_to_world_matrix_sub_);
       sync_->registerCallback(
           boost::bind(
               &LineDetectorDescriptorAndMatcher::mainCallbackNNEmbeddings, this,
-              _1, _2, _3));
+              _1, _2, _3, _4));
     }
     ROS_INFO("Main node for detection, description and matching is now ready "
              "to receive messages.");
@@ -98,6 +101,7 @@ namespace line_ros_utility {
       const sensor_msgs::ImageConstPtr& image_rgb_msg,
       const sensor_msgs::ImageConstPtr& cloud_msg,
       const sensor_msgs::CameraInfoConstPtr& camera_info_msg,
+      const geometry_msgs::TransformStampedConstPtr& camera_to_world_matrix_msg,
       int* frame_index_out) {
     CHECK_NOTNULL(frame_index_out);
     int frame_index;
@@ -125,7 +129,8 @@ namespace line_ros_utility {
     // Retrieve descriptor for all lines.
     embeddings.resize(lines.size());
     for (size_t idx = 0; idx < lines.size(); ++idx) {
-      getNNEmbeddings(lines[idx], image_rgb_msg, cloud_msg, &embeddings[idx]);
+      getNNEmbeddings(lines[idx], image_rgb_msg, cloud_msg,
+                      camera_to_world_matrix_msg, &embeddings[idx]);
     }
     // Save frame.
     saveFrame(lines, embeddings, image_rgb, frame_index);
@@ -289,6 +294,7 @@ namespace line_ros_utility {
       const line_detection::Line2D3DWithPlanes& line,
       const sensor_msgs::ImageConstPtr& image_rgb_msg,
       const sensor_msgs::ImageConstPtr& cloud_msg,
+      const geometry_msgs::TransformStampedConstPtr& camera_to_world_matrix_msg,
       line_description::Descriptor* embedding) {
     CHECK_NOTNULL(embedding);
     cv_bridge::CvImageConstPtr virtual_camera_image_ptr;
@@ -355,6 +361,8 @@ namespace line_ros_utility {
     service_image_to_embeddings_.request.end_3D.x = line.line3D[3];
     service_image_to_embeddings_.request.end_3D.y = line.line3D[4];
     service_image_to_embeddings_.request.end_3D.z = line.line3D[5];
+    service_image_to_embeddings_.request.camera_to_world_matrix =
+        *camera_to_world_matrix_msg;
     // Call image_to_embeddings service.
     if (client_image_to_embeddings_.call(service_image_to_embeddings_)) {
       *embedding = service_image_to_embeddings_.response.embeddings;
@@ -481,11 +489,14 @@ namespace line_ros_utility {
   void LineDetectorDescriptorAndMatcher::mainCallbackNNEmbeddings(
       const sensor_msgs::ImageConstPtr& rosmsg_image,
       const sensor_msgs::ImageConstPtr& rosmsg_cloud,
-      const sensor_msgs::CameraInfoConstPtr& camera_info) {
+      const sensor_msgs::CameraInfoConstPtr& rosmsg_camera_info,
+      const geometry_msgs::TransformStampedConstPtr&
+          rosmsg_camera_to_world_matrix) {
     int current_frame_index;
     // Save lines to the line matcher.
     ROS_INFO("Detecting, describing and saving line for new frame...");
-    saveLinesWithNNEmbeddings(rosmsg_image, rosmsg_cloud, camera_info,
+    saveLinesWithNNEmbeddings(rosmsg_image, rosmsg_cloud, rosmsg_camera_info,
+                              rosmsg_camera_to_world_matrix,
                               &current_frame_index);
     ROS_INFO("...done with detecting, describing and saving line for new "
              "frame.");

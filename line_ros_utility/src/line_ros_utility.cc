@@ -386,7 +386,8 @@ void ListenAndPublish::masterCallback(
         "/lines_2D_" + std::to_string(iteration_) + ".txt";
     ROS_INFO("path_2D is %s", path_2D.c_str());
 
-    // 3D lines data
+    // 3D lines data. NOTE: This lines are in the camera frame and should be
+    // converted to world coordinate frame.
     printToFile(lines3D_with_planes_, labels_, path);
 
     // 2D lines kept (bijection with 3D lines above)

@@ -3,5 +3,6 @@ sensor_msgs/Image virtual_camera_image_depth
 uint8 line_type
 geometry_msgs/Point start_3D
 geometry_msgs/Point end_3D
+geometry_msgs/TransformStamped camera_to_world_matrix
 ---
 float32[] embeddings

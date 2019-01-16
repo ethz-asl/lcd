@@ -37,7 +37,7 @@ if __name__ == '__main__':
         output_path = args.output_path
         dataset_name = args.dataset_name
     else:
-        print("pickle_files.py: ome arguments are missing. Using default ones "
+        print("pickle_files.py: some arguments are missing. Using default ones "
               "in config_paths_and_variables.sh.")
         # Obtain paths and variables
         linesandimagesfolder_path = pathconfig.obtain_paths_and_variables(

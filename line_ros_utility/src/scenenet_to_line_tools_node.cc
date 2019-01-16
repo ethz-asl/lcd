@@ -1,9 +1,12 @@
 #include <ros/ros.h>
+#include <ros/time.h>
 
 #include <pcl/conversions.h>
 #include <pcl/point_types.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl_ros/publisher.h>
+
+#include <tf/transform_listener.h>
 
 #include <line_ros_utility/line_ros_utility.h>
 
@@ -27,6 +30,9 @@ class convertSceneNetToLineTools {
         "/line_tools/camera_info", 2);
     cloud_pub_ = node_handle_.advertise<sensor_msgs::Image>(
         "/line_tools/point_cloud", 2);
+    camera_to_world_matrix_pub_ =
+        node_handle_.advertise<geometry_msgs::TransformStamped>(
+            "/line_tools/camera_to_world_matrix", 2);
 
     image_sub_.subscribe(node_handle_, "/camera/rgb/image_raw", 1);
     depth_sub_.subscribe(node_handle_, "/camera/depth/image_raw", 1);
@@ -63,6 +69,9 @@ class convertSceneNetToLineTools {
                 const sensor_msgs::ImageConstPtr& rosmsg_instances,
                 const sensor_msgs::CameraInfoConstPtr& camera_info,
                 const sensor_msgs::PointCloud2ConstPtr& rosmsg_cloud) {
+    ros::Time stamp;
+    tf::StampedTransform transform;
+    geometry_msgs::TransformStamped transform_msg;
     pcl::fromROSMsg(*rosmsg_cloud, pcl_cloud_);
     pclFromSceneNetToMat(pcl_cloud_, &(cvimage_cloud_.image));
     cvimage_cloud_.header = rosmsg_cloud->header;
@@ -73,6 +82,16 @@ class convertSceneNetToLineTools {
     depth_pub_.publish(*rosmsg_depth);
     info_pub_.publish(*camera_info);
     instances_pub_.publish(*rosmsg_instances);
+
+    // Retrieve timestamp from any message above (they are all synchronized and
+    // therefore have the same stamp).
+    stamp = rosmsg_image->header.stamp;
+    // Obtain TF message at the given timestamp.
+    tf_listener_.lookupTransform("/scenenet_camera_frame", "/world", stamp,
+                                 transform);
+    // Convert TF to geometry_msgs/TransformStamped and publish it.
+    tf::transformStampedTFToMsg(transform, transform_msg);
+    camera_to_world_matrix_pub_.publish(transform_msg);
   }
 
  protected:
@@ -87,6 +106,8 @@ class convertSceneNetToLineTools {
   ros::Publisher depth_pub_;
   ros::Publisher info_pub_;
   ros::Publisher instances_pub_;
+  ros::Publisher camera_to_world_matrix_pub_;
+  tf::TransformListener tf_listener_;
 
   pcl::PointCloud<pcl::PointXYZRGB> pcl_cloud_;
   cv_bridge::CvImage cvimage_cloud_;

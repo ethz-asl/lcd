@@ -17,6 +17,7 @@
 #include <cv_bridge/cv_bridge.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
+#include <geometry_msgs/TransformStamped.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/sync_policies/exact_time.h>
 #include <message_filters/synchronizer.h>
@@ -28,8 +29,8 @@
 namespace line_ros_utility {
 
 typedef message_filters::sync_policies::ExactTime<
-    sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo>
-    MySyncPolicy;
+    sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo,
+    geometry_msgs::TransformStamped> MySyncPolicy;
 
 class LineDetectorDescriptorAndMatcher {
  public:
@@ -61,6 +62,8 @@ class LineDetectorDescriptorAndMatcher {
    message_filters::Subscriber<sensor_msgs::Image> image_sub_;
    message_filters::Subscriber<sensor_msgs::Image> cloud_sub_;
    message_filters::Subscriber<sensor_msgs::CameraInfo> info_sub_;
+   message_filters::Subscriber<geometry_msgs::TransformStamped>
+       camera_to_world_matrix_sub_;
    // Node handle.
    ros::NodeHandle node_handle_;
    // Services.
@@ -91,22 +94,30 @@ class LineDetectorDescriptorAndMatcher {
    // the image, retrieve the NN-embedding/binary descriptors and save the
    // result in the current frame of the line matcher.
    // * NN-embedding descriptor version:
-   //   Input: image_rgb_msg:   ROS message containing the RGB image from which
-   //                           to detect lines (it gets converted to grayscale
-   //                           by the line_extractor node).
+   //   Input: image_rgb_msg:              ROS message containing the RGB image
+   //                                      from which to detect lines (it gets
+   //                                      converted to grayscale by the
+   //                                      line_extractor node).
    //
-   //          cloud_msg:       ROS message containing the point cloud image, in
-   //                           the format CV32FC3, in which each pixel has 3
-   //                           channels that correspond to the x, y and z
-   //                           coordinate of the 3D point shown at that pixel.
+   //          cloud_msg:                  ROS message containing the point
+   //                                      cloud image, in the format CV32FC3,
+   //                                      in which each pixel has 3 channels
+   //                                      that correspond to the x, y and z
+   //                                      coordinate of the 3D point shown at
+   //                                      that pixel.
    //
-   //          camera_info_msg: ROS message containing the camera info.
+   //          camera_info_msg:            ROS message containing the camera
+   //                                      info.
+   //
+   //          camera_to_world_matrix_msg: ROS message containing the
+   //                                      camera-to-world matrix.
    //
    //   Output: frame_index_out: Frame index with which the new frame is saved.
    void saveLinesWithNNEmbeddings(
        const sensor_msgs::ImageConstPtr& image_rgb_msg,
        const sensor_msgs::ImageConstPtr& cloud_msg,
        const sensor_msgs::CameraInfoConstPtr& camera_info_msg,
+       const geometry_msgs::TransformStampedConstPtr& camera_to_world_matrix_msg,
        int* frame_index_out);
    // * Binary descriptor version:
    //   Input: image_rgb_msg:   ROS message containing the RGB image from which
@@ -168,17 +179,24 @@ class LineDetectorDescriptorAndMatcher {
    //                       that correspond to the x, y and z coordinate of the
    //                       3D point shown at that pixel.
    // Output: embeddings:   NN-embedding descriptor for the input line.
-   void getNNEmbeddings(const line_detection::Line2D3DWithPlanes& line,
-                        const sensor_msgs::ImageConstPtr& image_rgb_msg,
-                        const sensor_msgs::ImageConstPtr& cloud_msg,
-                        line_description::Descriptor* embedding);
+   void getNNEmbeddings(
+       const line_detection::Line2D3DWithPlanes& line,
+       const sensor_msgs::ImageConstPtr& image_rgb_msg,
+       const sensor_msgs::ImageConstPtr& cloud_msg,
+       const geometry_msgs::TransformStampedConstPtr& camera_to_world_matrix_msg,
+       line_description::Descriptor* embedding);
    // Given an EDL KeyLine and the RGB image it was extracted from, returns the
    // binary descriptor associated to it.
-   // Input: keyline_msg:   ROS message containing the EDL KeyLine detected.
+   // Input: keyline_msg:                ROS message containing the EDL KeyLine
+   //                                    detected.
    //
-   //        image_rgb_msg: ROS message containing the RGB image from which to
-   //                       detect lines (it gets converted to grayscale by the
-   //                       line_extractor node).
+   //        image_rgb_msg:              ROS message containing the RGB image
+   //                                    from which to detect lines (it gets
+   //                                    converted to grayscale by the
+   //                                    line_extractor node).
+   //
+   //        camera_to_world_matrix_msg: ROS message containing the
+   //                                    camera-to-world matrix.
    //
    // Output: descriptor:   Binary descriptor for the input line.
    void getBinaryDescriptor(const line_detection::KeyLine& keyline_msg,
@@ -222,13 +240,15 @@ class LineDetectorDescriptorAndMatcher {
    // descriptor type is binary descriptor.
    void mainCallbackBinaryDescriptor(
        const sensor_msgs::ImageConstPtr& rosmsg_image);
-   // Callback for the ROS messages that store the RGB image, the point cloud
-   // and the camera info. Used when the descriptor type is neural-network
-   // embeddings.
+   // Callback for the ROS messages that store the RGB image, the point cloud,
+   // the camera info and the camera-to-world matrix. Used when the descriptor
+   // type is neural-network embeddings.
    void mainCallbackNNEmbeddings(
        const sensor_msgs::ImageConstPtr& rosmsg_image,
        const sensor_msgs::ImageConstPtr& rosmsg_cloud,
-       const sensor_msgs::CameraInfoConstPtr& camera_info);
+       const sensor_msgs::CameraInfoConstPtr& rosmsg_camera_info,
+       const geometry_msgs::TransformStampedConstPtr&
+           rosmsg_camera_to_world_matrix);
 };
 
 }  // namespace line_ros_utility
