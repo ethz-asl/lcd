@@ -26,14 +26,12 @@ def get_geometric_info(start_points, end_points, line_parametrization):
     """Given a set of lines parametrized by their two endpoints, returns the
        following geometric info according to the line parametrization type:
        * 'direction_and_centerpoint':
-             Each line segment is parametrized by its center point and by the
-             first two entries of the unit direction vector. The third entry is
-             defined automatically by enforcing that the norm should be one, and
-             therefore is not fed into the network. To obtain invariance on the
-             orientation of the line (i.e., given the two endpoints we do NOT
-             want to consider one of them as the start and the other one as the
-             end of the line segment), we enforce that the first entry should be
-             non-negative. => 5 parameters per line.
+             Each line segment is parametrized by its center point and by its
+             unit direction vector. To obtain invariance on the orientation of
+             the line (i.e., given the two endpoints we do NOT want to consider
+             one of them as the start and the other one as the end of the line
+             segment), we enforce that the first entry should be non-negative.
+             => 6 parameters per line.
        * 'orthonormal':
              A line segment is parametrized with a minimum-DOF parametrization
              (4 degrees of freedom) of the infinite line that it belongs to. The
@@ -55,7 +53,7 @@ def get_geometric_info(start_points, end_points, line_parametrization):
     assert (start_points.shape[1] == end_points.shape[1] == 3)
     num_lines = start_points.shape[0]
     if line_parametrization == 'direction_and_centerpoint':
-        geometric_info = np.empty([num_lines, 5])
+        geometric_info = np.empty([num_lines, 6])
         for idx in range(num_lines):
             start_point = start_points[idx, :]
             end_point = end_points[idx, :]
@@ -81,28 +79,28 @@ def get_geometric_info(start_points, end_points, line_parametrization):
 def endpoints_to_centerpoint_and_direction(start_point, end_point):
     """ Given the endpoints of a line segment returns an array with the
         following format:
-          [center point (3x)] [first two entries of unit direction vector (2x)]
-        where, furthermore, the first two entries of the unit direction vector
-        are such that the first one is non-negative.
+          [center point (3x)] [unit direction vector (3x)]
+        where, furthermore, the unit direction vector is such that its first
+        entry is non-negative.
     Args:
         start_point, end_point: shape (3, ): Endpoints of the input line.
 
     Returns:
-        Array of shape (5, ), with the first three elements representing the
-        center point of the line segment and the last two elements representing
-        the first two entries of the unit direction vector, with the first of
-        these two entries strictly non-negative.
+        Array of shape (6, ), with the first three elements representing the
+        center point of the line segment and the last three elements
+        representing the unit direction vector, with the first of its entries
+        strictly non-negative.
     """
     assert (start_point.shape == end_point.shape == (3,))
     center_point = ((start_point + end_point) / 2.).reshape(3, 1)
     direction = end_point - start_point
     direction = direction / np.linalg.norm(direction)
-    # Take first two entries.
-    direction = direction[:2].reshape(2, 1)
+
+    direction = direction.reshape(3, 1)
     if direction[0] < 0:
         direction = -direction
 
-    return np.vstack((center_point, direction)).reshape(5,)
+    return np.vstack((center_point, direction)).reshape(6,)
 
 
 def endpoints_to_pluecker_coordinates(start_point, end_point):
