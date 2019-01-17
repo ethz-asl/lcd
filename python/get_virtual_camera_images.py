@@ -14,7 +14,7 @@ from tools import pathconfig
 from tools import get_protobuf_paths
 
 
-def get_virtual_camera_images_scenenet_rgbd(trajectory):
+def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path):
     impainting = False
     trajectories = sn.Trajectories()
     try:
@@ -237,11 +237,17 @@ if __name__ == '__main__':
         description='Get virtual camera image for each line in the input '
         'trajectory.')
     parser.add_argument("-trajectory", type=str, help="Trajectory number.")
-    parser.add_argument("-frame_step", type=int, help="Number of frames in one "
-                        "step of the rosbag used to detect lines, i.e., "
-                        "(frame_step - 1) frames were originally skipped after "
-                        "each frame inserted in the rosbag.")
-    parser.add_argument("-end_frame", type=int, help="Index of the last frame "
+    parser.add_argument(
+        "-frame_step",
+        type=int,
+        help="Number of frames in one "
+        "step of the rosbag used to detect lines, i.e., "
+        "(frame_step - 1) frames were originally skipped after "
+        "each frame inserted in the rosbag.")
+    parser.add_argument(
+        "-end_frame",
+        type=int,
+        help="Index of the last frame "
         "in the trajectory.")
     parser.add_argument(
         "-scenenetscripts_path",
@@ -275,15 +281,13 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     if (args.trajectory and args.scenenetscripts_path and args.dataset_name and
-            args.dataset_path and args.linesandimagesfolder_path and
-            args.frame_step and args.end_frame):  # All arguments passed
+            args.dataset_path and args.linesandimagesfolder_path):
+        # All stricly necessary arguments passed.
         trajectory = args.trajectory
         scenenetscripts_path = args.scenenetscripts_path
         dataset_name = args.dataset_name
         dataset_path = args.dataset_path
         linesandimagesfolder_path = args.linesandimagesfolder_path
-        frame_step = args.frame_step
-        end_frame = args.end_frame
     else:
         print("get_virtual_camera_images.py: Some arguments are missing. Using "
               "default ones in config_paths_and_variables.sh. In particular, "
@@ -296,10 +300,14 @@ if __name__ == '__main__':
         trajectory = pathconfig.obtain_paths_and_variables("TRAJ_NUM")
         dataset_name = pathconfig.obtain_paths_and_variables("DATASET_NAME")
 
+    if (args.frame_step):
+        frame_step = args.frame_step
+    if (args.end_frame):
+        end_frame = args.end_frame
+
     linesfiles_path = os.path.join(linesandimagesfolder_path,
                                    '{}_lines'.format(dataset_name))
     output_path = os.path.join(linesandimagesfolder_path, dataset_name)
-    end_frame = args.end_frame
 
     # Include the pySceneNetRGBD folder to the path and import its modules.
     sys.path.append(scenenetscripts_path)
@@ -318,7 +326,7 @@ if __name__ == '__main__':
             # Compose script arguments if necessary.
             dataset_path = os.path.join(scenenet_dataset_path, 'data/',
                                         dataset_name.split('_')[0])
-        get_virtual_camera_images_scenenet_rgbd(trajectory)
+        get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path)
     elif dataset_name == "scenenn":
         # Dataset from SceneNN.
         if not args.frame_step:

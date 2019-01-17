@@ -148,19 +148,14 @@ if __name__ == '__main__':
         "'intrinsic'.")
 
     args = parser.parse_args()
-    if (args.trajectory and args.frame_step and args.end_frame and
-        args.scenenetscripts_path and args.dataset_name and
-        args.linesandimagesfolder_path and args.output_path and
-        args.dataset_path):
-        # All arguments passed.
+    if (args.trajectory and args.scenenetscripts_path and args.dataset_name and
+        args.linesandimagesfolder_path and args.output_path):
+        # All stricly arguments passed.
         trajectory = int(args.trajectory)
-        frame_step = args.frame_step
-        end_frame = args.end_frame
         scenenetscripts_path = args.scenenetscripts_path
         dataset_name = args.dataset_name
         linesandimagesfolder_path = args.linesandimagesfolder_path
         output_path = args.output_path
-        dataset_path = args.dataset_path
     else:
         print("split_dataset_with_labels_world.py: Some arguments are missing. "
               "Using default ones in config_paths_and_variables.sh.")
@@ -178,19 +173,29 @@ if __name__ == '__main__':
         start_frame = 0
         if not args.frame_step:
             frame_step = 1
+        else:
+            frame_step = args.frame_step
         if not args.end_frame:
             end_frame = 299
+        else:
+            end_frame = args.end_frame
     elif dataset_name == "scenenn":
         # Dataset from SceneNN.
         start_frame = 2
-        if not args.frame_step:
+        if args.frame_step:
+            frame_step = args.frame_step
+        else:
             sys.exit("It is required to indicate the frame_step when using "
                      "SceneNN dataset. Please use the argument -frame_step.")
-        if not args.end_frame:
+        if args.end_frame:
+            end_frame = args.end_frame
+        else:
             sys.exit("It is required to indicate the index of the last frame "
                      "when using SceneNN dataset. Please use the argument "
                      "-end_frame.")
-        if not args.dataset_path:
+        if args.dataset_path:
+            dataset_path = args.dataset_path
+        else:
             sys.exit("It is required to indicate the path of the dataset when "
                      "using SceneNN dataset. Please use the argument "
                      "-dataset_path.")
