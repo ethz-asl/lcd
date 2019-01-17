@@ -9,7 +9,10 @@ import pandas as pd
 import argparse
 from timeit import default_timer as timer
 
+from tools import cloud_utils
+from tools import scenenn_utils
 from tools import scenenet_utils
+from tools import virtual_camera_utils
 from tools import pathconfig
 from tools import get_protobuf_paths
 
@@ -38,8 +41,11 @@ def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path):
 
     print('Path_to_lines_root is {0}'.format(path_to_lines_root))
 
-    # Virtual camera model
-    camera_model = scenenet_utils.get_camera_model()
+    # Virtual camera is of the SceneNetRGBD (pinhole) camera model.
+    virtual_camera = scenenet_utils.get_camera_model()
+    # Camera from which the images were taken, SceneNetRGBD (pinhole) camera
+    # model.
+    real_camera = scenenet_utils.get_camera_model()
     # Distance between virtual camera origin and line's center
     distance = 3
     for frame_id in range(300):
@@ -54,7 +60,9 @@ def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path):
             os.path.join(path_to_photos, 'depth/{0}.png'.format(photo_id)),
             cv2.IMREAD_UNCHANGED)
 
-        pcl = scenenet_utils.rgbd_to_pcl(rgb_image, depth_image, camera_model)
+        # Obtain coloured point cloud from RGB-D image.
+        pcl = real_camera.rgbd_to_pcl(
+            rgb_image=rgb_image, depth_image=depth_image, visualize_cloud=True)
         path_to_lines = os.path.join(
             path_to_lines_root, 'lines_with_labels_{0}.txt'.format(frame_id))
 
@@ -70,7 +78,8 @@ def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path):
         average_time_per_line = 0
         for i in range(lines_count):
             start_time_line = timer()
-            T, _ = scenenet_utils.virtual_camera_pose_from_file_line(
+            # Obtain the pose of the virtual camera for each line.
+            T, _ = virtual_camera_utils.virtual_camera_pose_from_file_line(
                 data_lines[i, :], distance)
             # Draw the line in the virtual camera image.
             start_point = data_lines[i, :3]
@@ -84,11 +93,16 @@ def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path):
                     np.hstack([(start_point + idx / float(num_points_in_line) *
                                 (end_point - start_point)), [0, 0, 255]])
                 ])
-            pcl_from_line_view = scenenet_utils.pcl_transform(
+            # Transform the point cloud so as to make it appear as seen from
+            # the virtual camera pose.
+            pcl_from_line_view = cloud_utils.pcl_transform(
                 np.vstack([pcl, line_3D]), T)
+            # Obtain the RGB and depth virtual camera images by reprojecting the
+            # point cloud on the image plane, under the view of the virtual
+            # camera.
             rgb_image_from_line_view, depth_image_from_line_view = \
-                scenenet_utils.project_pcl_to_image(pcl_from_line_view,
-                                                    camera_model)
+                cloud_utils.project_pcl_to_image(pcl_from_line_view,
+                                                 virtual_camera)
             if (impainting):
                 # Inpaint the virtual camera image.
                 reds = rgb_image_from_line_view[:, :, 2]
@@ -130,7 +144,6 @@ def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path):
 
 def get_virtual_camera_images_scenenn(trajectory, dataset_path):
     impainting = False
-    print("dataset_path is {0}, trajectory is  {1}".format(dataset_path, trajectory))
     path_to_photos = os.path.join(dataset_path, trajectory)
 
     print('Path to photos is {}'.format(path_to_photos))
@@ -140,8 +153,11 @@ def get_virtual_camera_images_scenenn(trajectory, dataset_path):
 
     print('Path_to_lines_root is {0}'.format(path_to_lines_root))
 
-    # Virtual camera model
-    camera_model = scenenet_utils.get_camera_model()
+    # Virtual camera is of the SceneNetRGBD (pinhole) camera model.
+    virtual_camera = scenenet_utils.get_camera_model()
+    # Camera from which the images were taken, SceneNN (pinhole) camera model.
+    real_camera = scenenn_utils.get_camera_model()
+
     # Distance between virtual camera origin and line's center.
     distance = 3
     for frame_id in range(2, end_frame + 1, frame_step):
@@ -158,7 +174,9 @@ def get_virtual_camera_images_scenenn(trajectory, dataset_path):
                          'depth/depth{:05d}.png'.format(photo_id)),
             cv2.IMREAD_UNCHANGED)
 
-        pcl = scenenet_utils.rgbd_to_pcl(rgb_image, depth_image, camera_model)
+        # Obtain coloured point cloud from RGB-D image.
+        pcl = real_camera.rgbd_to_pcl(
+            rgb_image=rgb_image, depth_image=depth_image, visualize_cloud=True)
         path_to_lines = os.path.join(
             path_to_lines_root, 'lines_with_labels_{0}.txt'.format(frame_id))
 
@@ -174,7 +192,8 @@ def get_virtual_camera_images_scenenn(trajectory, dataset_path):
         average_time_per_line = 0
         for i in range(lines_count):
             start_time_line = timer()
-            T, _ = scenenet_utils.virtual_camera_pose_from_file_line(
+            # Obtain the pose of the virtual camera for each line.
+            T, _ = virtual_camera_utils.virtual_camera_pose_from_file_line(
                 data_lines[i, :], distance)
             # Draw the line in the virtual camera image.
             start_point = data_lines[i, :3]
@@ -188,11 +207,16 @@ def get_virtual_camera_images_scenenn(trajectory, dataset_path):
                     np.hstack([(start_point + idx / float(num_points_in_line) *
                                 (end_point - start_point)), [0, 0, 255]])
                 ])
-            pcl_from_line_view = scenenet_utils.pcl_transform(
+            # Transform the point cloud so as to make it appear as seen from
+            # the virtual camera pose.
+            pcl_from_line_view = cloud_utils.pcl_transform(
                 np.vstack([pcl, line_3D]), T)
+            # Obtain the RGB and depth virtual camera images by reprojecting the
+            # point cloud on the image plane, under the view of the virtual
+            # camera.
             rgb_image_from_line_view, depth_image_from_line_view = \
-                scenenet_utils.project_pcl_to_image(pcl_from_line_view,
-                                                    camera_model)
+                cloud_utils.project_pcl_to_image(pcl_from_line_view,
+                                                 virtual_camera)
             if (impainting):
                 # Inpaint the virtual camera image.
                 reds = rgb_image_from_line_view[:, :, 2]

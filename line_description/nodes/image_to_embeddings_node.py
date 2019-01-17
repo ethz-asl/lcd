@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""ROS node that provides the response to the ImageToEmbeddings service.
+""" ROS node that provides the response to the ImageToEmbeddings service.
 """
 import tf
 import numpy as np

@@ -4,7 +4,9 @@ Get virtual camera image for each line in the given frame.
 import numpy as np
 import cv2
 
+from tools import cloud_utils
 from tools import scenenet_utils
+from tools import virtual_camera_utils
 
 
 class VirtualCameraImageRetriever:
@@ -46,10 +48,11 @@ class VirtualCameraImageRetriever:
         Returns:
             RGB and depth virtual camera images (Tuple).
         """
-        # Virtual camera model
-        camera_model = scenenet_utils.get_camera_model()
+        # Virtual camera is of the SceneNetRGBD (pinhole) camera model.
+        virtual_camera = scenenet_utils.get_camera_model()
 
-        T, _ = scenenet_utils.virtual_camera_pose(
+        # Obtain the pose of the virtual camera for each line.
+        T, _ = virtual_camera_utils.virtual_camera_pose(
             start3D=start3D,
             end3D=end3D,
             hessian_left=hessian_left,
@@ -70,12 +73,18 @@ class VirtualCameraImageRetriever:
         # Construct the coloured point cloud.
         image_rgb = image_rgb.reshape(-1, 3)
         cloud = cloud.reshape(-1, 3)
-        coloured_cloud = np.hstack([image_rgb, cloud])
-        
-        pcl_from_line_view = scenenet_utils.pcl_transform(
+        coloured_cloud = np.hstack([cloud, image_rgb])
+
+        # Transform the point cloud so as to make it appear as seen from
+        # the virtual camera pose.
+        pcl_from_line_view = cloud_utils.pcl_transform(
             np.vstack([coloured_cloud, line_3D]), T)
+        # Obtain the RGB and depth virtual camera images by reprojecting the
+        # point cloud on the image plane, under the view of the virtual
+        # camera.
         rgb_image_from_line_view, depth_image_from_line_view = \
-           scenenet_utils.project_pcl_to_image(pcl_from_line_view, camera_model)
+           cloud_utils.project_pcl_to_image(pcl_from_line_view, virtual_camera)
+
         if (self.impainting_mode_on):
             # Inpaint the virtual camera image.
             reds = rgb_image_from_line_view[:, :, 2]
@@ -90,8 +99,7 @@ class VirtualCameraImageRetriever:
             rgb_image_from_line_view = cv2.inpaint(
                 rgb_image_from_line_view, dilated_mask, 10, cv2.INPAINT_TELEA)
             depth_image_from_line_view = cv2.inpaint(
-                depth_image_from_line_view, dilated_mask, 10,
-                cv2.INPAINT_TELEA)
+                depth_image_from_line_view, dilated_mask, 10, cv2.INPAINT_TELEA)
 
         # Return virtual image.
         return rgb_image_from_line_view, depth_image_from_line_view

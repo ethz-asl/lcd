@@ -153,7 +153,13 @@ cd "$LINESANDIMAGESFOLDER_PATH";
 # (the --no-name option is to prevent gzip from inserting time info in the
 # header, so that two archives containing the exact same files can in fact have
 # same md5 hash)
-tar -cf - ${DATASET_NAME}/traj_${TRAJ_NUM} ${DATASET_NAME}_lines/traj_${TRAJ_NUM} | gzip --no-name > "$TARFILES_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM}.tar.gz
+if [ -f "$TARFILES_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM}.tar.gz ]
+then
+  echo -e "Archive file "$TARFILES_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM}.tar.gz is already existent. Please delete it or rename, and relaunch this script to generate a new one."
+  exit 1
+else
+  tar -cf - ${DATASET_NAME}/traj_${TRAJ_NUM} ${DATASET_NAME}_lines/traj_${TRAJ_NUM} | gzip --no-name > "$TARFILES_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM}.tar.gz
+fi
 
 # Split dataset.
 echo -e "\n**** Splitting dataset for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";

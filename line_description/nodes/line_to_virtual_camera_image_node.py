@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""ROS node that provides the response to the LineToVirtualCameraImage service.
+""" ROS node that provides the response to the LineToVirtualCameraImage service.
 """
 import numpy as np
 import rospy
