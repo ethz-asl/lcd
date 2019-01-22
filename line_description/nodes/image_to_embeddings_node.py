@@ -60,7 +60,9 @@ class ImageToEmbeddingsConverter:
         T = tf.transformations.translation_matrix(t)
         camera_to_world_matrix = np.dot(R, T)
         start_3D = np.dot(camera_to_world_matrix, np.hstack([start_3D, 1]))[:3]
+        start_3D = start_3D.reshape(-1, 3)
         end_3D = np.dot(camera_to_world_matrix, np.hstack([end_3D, 1]))[:3]
+        end_3D = end_3D.reshape(-1, 3)
         embeddings = self.embeddings_retriever.get_embeddings_from_image(
             virtual_camera_image_bgr, virtual_camera_image_depth, req.line_type,
             start_3D, end_3D)
