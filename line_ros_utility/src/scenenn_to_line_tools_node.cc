@@ -86,6 +86,8 @@ class convertSceneNNToLineTools {
     // therefore have the same stamp).
     stamp = rosmsg_image->header.stamp;
     // Obtain TF message at the given timestamp.
+    tf_listener_.waitForTransform("/scenenn_camera_frame", "/world", stamp,
+                                  ros::Duration(1.0));
     tf_listener_.lookupTransform("/scenenn_camera_frame", "/world", stamp,
                                  transform);
     // Convert TF to geometry_msgs/TransformStamped and publish it.
