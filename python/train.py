@@ -7,8 +7,10 @@ from datetime import datetime
 
 from model.datagenerator import ImageDataGenerator
 from model.alexnet import AlexNet
-from model.triplet_loss import batch_all_triplet_loss, batch_hardest_triplet_loss
-from tools.train_set_mean import get_train_set_mean
+from model.triplet_loss import batch_all_triplet_loss, \
+                               batch_hardest_triplet_loss
+from tools.train_utils import get_train_set_mean, \
+                              print_batch_triplets_statistics
 from tools.lines_utils import get_label_with_line_center, get_geometric_info
 from tools import pathconfig
 
@@ -108,7 +110,7 @@ def train(read_as_pickle=True):
         input_img = tf.placeholder(
             tf.float32, [None, 227, 227, 4], name="input_img")
 
-    # For each line labels is in the format
+    # For each line, labels is in the format
     #   [line_center (3x)] [instance label (1x)]
     labels = tf.placeholder(tf.float32, [None, 4], name="labels")
     # Dropout probability.
@@ -132,8 +134,13 @@ def train(read_as_pickle=True):
     skip_layers = ['fc8', 'fc9']
 
     # Initialize model.
-    model = AlexNet(input_img, line_types, geometric_info, keep_prob,
-                    skip_layers, image_type)
+    model = AlexNet(
+        x=input_img,
+        line_types=line_types,
+        geometric_info=geometric_info,
+        keep_prob=keep_prob,
+        skip_layer=skip_layers,
+        input_images=image_type)
 
     # Retrieve embeddings (cluster descriptors) from model output.
     embeddings = tf.nn.l2_normalize(model.fc9, axis=1)
@@ -180,11 +187,13 @@ def train(read_as_pickle=True):
     # Define loss.
     with tf.name_scope("triplet_loss"):
         if triplet_strategy == "batch_all":
-            loss, fraction = batch_all_triplet_loss(
+            loss, fraction, mask, pairwise_dist = batch_all_triplet_loss(
                 labels, embeddings, margin=margin, squared=False)
         elif triplet_strategy == "batch_hard":
-            loss = batch_hardest_triplet_loss(
-                labels, embeddings, margin=margin, squared=False)
+            loss, mask_anchor_positive, mask_anchor_negative,  \
+            hardest_positive_dist, hardest_negative_dist, pairwise_dist = \
+                batch_hardest_triplet_loss(
+                    labels, embeddings, margin=margin, squared=False)
         else:
             raise ValueError(
                 "Triplet strategy not recognized: {}".format(triplet_strategy))
@@ -318,6 +327,51 @@ def train(read_as_pickle=True):
                         line_parametrization=line_parametrization)
                     batch_labels_train = get_label_with_line_center(
                         labels_batch=batch_labels_train)
+
+                # Display statistics.
+                instance_labels_for_stats = batch_labels_train
+                if (triplet_strategy == 'batch_all'):
+                    pairwise_dist_for_stats, mask_for_stats = sess.run(
+                        [pairwise_dist, mask],
+                        feed_dict={
+                            input_img: batch_input_img_train,
+                            labels: batch_labels_train,
+                            line_types: batch_line_types_train,
+                            geometric_info: batch_geometric_info_train,
+                            keep_prob: dropout_rate
+                        })
+                    print_batch_triplets_statistics(
+                        triplet_strategy=triplet_strategy,
+                        batch_index=step,
+                        instance_labels=instance_labels_for_stats,
+                        pairwise_dist=pairwise_dist_for_stats,
+                        mask=mask_for_stats,
+                        write_folder='logs/')
+                elif (triplet_strategy == 'batch_hard'):
+                    pairwise_dist_for_stats, mask_anchor_positive_for_stats, \
+                    mask_anchor_negative_for_stats, \
+                    hardest_positive_dist_for_stats, \
+                    hardest_negative_dist_for_stats = sess.run(
+                        [pairwise_dist, mask_anchor_positive, \
+                        mask_anchor_negative, hardest_positive_dist, \
+                        hardest_negative_dist],
+                        feed_dict={
+                            input_img: batch_input_img_train,
+                            labels: batch_labels_train,
+                            line_types: batch_line_types_train,
+                            geometric_info: batch_geometric_info_train,
+                            keep_prob: dropout_rate
+                        })
+                    print_batch_triplets_statistics(
+                        triplet_strategy=triplet_strategy,
+                        batch_index=step,
+                        instance_labels=instance_labels_for_stats,
+                        pairwise_dist=pairwise_dist_for_stats,
+                        mask_anchor_positive=mask_anchor_positive_for_stats,
+                        mask_anchor_negative=mask_anchor_negative_for_stats,
+                        hardest_positive_dist=hardest_positive_dist_for_stats,
+                        hardest_negative_dist=hardest_negative_dist_for_stats,
+                        write_folder='logs/')
                 # Run the training operation.
                 sess.run(
                     train_op,

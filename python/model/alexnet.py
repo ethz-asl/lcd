@@ -81,7 +81,7 @@ class AlexNet(object):
             name='dropout_with_geo_info')
 
         geo_info_length = self.GEOMETRIC_INFO.shape[1]
-        # 8th layer: FC (4101 x 4101 or 4102 x 4102, depending on the line
+        # 8th layer: FC (4101 x 4101 or 4103 x 4103, depending on the line
         # parametrization, cf. train.py).
         fc8 = fc(
             dropout_with_geo_info,
@@ -98,8 +98,8 @@ class AlexNet(object):
         """
         As the weights from http://www.cs.toronto.edu/~guerzhoy/tf_alexnet/ come
         as a dict of lists (e.g. weights['conv1'] is a list) and not as dict of
-        dicts (e.g. weights['conv1'] is a dict with keys 'weights' & 'biases') we
-        need a special load function
+        dicts (e.g. weights['conv1'] is a dict with keys 'weights' & 'biases')
+        we need a special load function.
         """
         # NOTE(fmilano): setting trainable=False below has no effect, since
         # variables were previously defined with trainable=True.
