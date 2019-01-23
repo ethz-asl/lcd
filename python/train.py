@@ -280,14 +280,14 @@ def train(read_as_pickle=True):
 
         # Initialize generators for image data.
         train_generator = ImageDataGenerator(
-            train_files,
+            files_list=train_files,
             horizontal_flip=False,
             shuffle=True,
             image_type=image_type,
             mean=train_set_mean,
             read_as_pickle=read_as_pickle)
         val_generator = ImageDataGenerator(
-            val_files,
+            files_list=val_files,
             shuffle=True,
             image_type=image_type,
             mean=train_set_mean,
@@ -345,11 +345,14 @@ def train(read_as_pickle=True):
                          })
                     print_batch_triplets_statistics(
                         triplet_strategy=triplet_strategy,
+                        images=batch_input_img_train,
+                        set_mean=train_set_mean,
                         batch_index=step,
+                        epoch_index=epoch,
+                        write_folder='logs/',
                         instance_labels=instance_labels_for_stats,
                         pairwise_dist=pairwise_dist_for_stats,
-                        valid_triplets=valid_triplets_for_stats,
-                        write_folder='logs/')
+                        valid_triplets=valid_triplets_for_stats)
                 elif (triplet_strategy == 'batch_hard'):
                     (pairwise_dist_for_stats, mask_anchor_positive_for_stats,
                      mask_anchor_negative_for_stats,
@@ -372,7 +375,11 @@ def train(read_as_pickle=True):
                          })
                     print_batch_triplets_statistics(
                         triplet_strategy=triplet_strategy,
+                        images=batch_input_img_train,
+                        set_mean=train_set_mean,
                         batch_index=step,
+                        epoch_index=epoch,
+                        write_folder='logs/',
                         instance_labels=instance_labels_for_stats,
                         pairwise_dist=pairwise_dist_for_stats,
                         mask_anchor_positive=mask_anchor_positive_for_stats,
@@ -382,8 +389,7 @@ def train(read_as_pickle=True):
                         hardest_positive_element=
                         hardest_positive_element_for_stats,
                         hardest_negative_element=
-                        hardest_negative_element_for_stats,
-                        write_folder='logs/')
+                        hardest_negative_element_for_stats)
                 # Run the training operation.
                 sess.run(
                     train_op,
