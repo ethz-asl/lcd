@@ -164,6 +164,12 @@ def write_triplet_image_to_file(
         except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
+    # Make the local variable images copy of the passed arguments, to avoid
+    # modifying them if using +=, /=, etc., which get evaluated to __iadd__,
+    # __itruediv__, etc. methods, which modify the original referenced arrays.
+    image_anchor = np.copy(image_anchor)
+    image_positive = np.copy(image_positive)
+    image_negative = np.copy(image_negative)
     # Since matplotlib requires the images to be RGB and with intensities
     # normalized between 0 and 1, the mean of the dataset - previously
     # subtracted - is added to the images, and the latter are normalized.
