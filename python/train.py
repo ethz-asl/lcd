@@ -187,13 +187,15 @@ def train(read_as_pickle=True):
     # Define loss.
     with tf.name_scope("triplet_loss"):
         if triplet_strategy == "batch_all":
-            loss, fraction, mask, pairwise_dist = batch_all_triplet_loss(
-                labels, embeddings, margin=margin, squared=False)
+            (loss, fraction, valid_triplets,
+             pairwise_dist) = batch_all_triplet_loss(
+                 labels, embeddings, margin=margin, squared=False)
         elif triplet_strategy == "batch_hard":
-            loss, mask_anchor_positive, mask_anchor_negative,  \
-            hardest_positive_dist, hardest_negative_dist, pairwise_dist = \
-                batch_hardest_triplet_loss(
-                    labels, embeddings, margin=margin, squared=False)
+            (loss, mask_anchor_positive, mask_anchor_negative,
+             hardest_positive_dist, hardest_negative_dist,
+             hardest_positive_element, hardest_negative_element,
+             pairwise_dist) = batch_hardest_triplet_loss(
+                 labels, embeddings, margin=margin, squared=False)
         else:
             raise ValueError(
                 "Triplet strategy not recognized: {}".format(triplet_strategy))
@@ -331,37 +333,43 @@ def train(read_as_pickle=True):
                 # Display statistics.
                 instance_labels_for_stats = batch_labels_train
                 if (triplet_strategy == 'batch_all'):
-                    pairwise_dist_for_stats, mask_for_stats = sess.run(
-                        [pairwise_dist, mask],
-                        feed_dict={
-                            input_img: batch_input_img_train,
-                            labels: batch_labels_train,
-                            line_types: batch_line_types_train,
-                            geometric_info: batch_geometric_info_train,
-                            keep_prob: dropout_rate
-                        })
+                    (pairwise_dist_for_stats,
+                     valid_triplets_for_stats) = sess.run(
+                         [pairwise_dist, valid_triplets],
+                         feed_dict={
+                             input_img: batch_input_img_train,
+                             labels: batch_labels_train,
+                             line_types: batch_line_types_train,
+                             geometric_info: batch_geometric_info_train,
+                             keep_prob: dropout_rate
+                         })
                     print_batch_triplets_statistics(
                         triplet_strategy=triplet_strategy,
                         batch_index=step,
                         instance_labels=instance_labels_for_stats,
                         pairwise_dist=pairwise_dist_for_stats,
-                        mask=mask_for_stats,
+                        valid_triplets=valid_triplets_for_stats,
                         write_folder='logs/')
                 elif (triplet_strategy == 'batch_hard'):
-                    pairwise_dist_for_stats, mask_anchor_positive_for_stats, \
-                    mask_anchor_negative_for_stats, \
-                    hardest_positive_dist_for_stats, \
-                    hardest_negative_dist_for_stats = sess.run(
-                        [pairwise_dist, mask_anchor_positive, \
-                        mask_anchor_negative, hardest_positive_dist, \
-                        hardest_negative_dist],
-                        feed_dict={
-                            input_img: batch_input_img_train,
-                            labels: batch_labels_train,
-                            line_types: batch_line_types_train,
-                            geometric_info: batch_geometric_info_train,
-                            keep_prob: dropout_rate
-                        })
+                    (pairwise_dist_for_stats, mask_anchor_positive_for_stats,
+                     mask_anchor_negative_for_stats,
+                     hardest_positive_dist_for_stats,
+                     hardest_negative_dist_for_stats,
+                     hardest_positive_element_for_stats,
+                     hardest_negative_element_for_stats) = sess.run(
+                         [
+                             pairwise_dist, mask_anchor_positive,
+                             mask_anchor_negative, hardest_positive_dist,
+                             hardest_negative_dist, hardest_positive_element,
+                             hardest_negative_element
+                         ],
+                         feed_dict={
+                             input_img: batch_input_img_train,
+                             labels: batch_labels_train,
+                             line_types: batch_line_types_train,
+                             geometric_info: batch_geometric_info_train,
+                             keep_prob: dropout_rate
+                         })
                     print_batch_triplets_statistics(
                         triplet_strategy=triplet_strategy,
                         batch_index=step,
@@ -371,6 +379,10 @@ def train(read_as_pickle=True):
                         mask_anchor_negative=mask_anchor_negative_for_stats,
                         hardest_positive_dist=hardest_positive_dist_for_stats,
                         hardest_negative_dist=hardest_negative_dist_for_stats,
+                        hardest_positive_element=
+                        hardest_positive_element_for_stats,
+                        hardest_negative_element=
+                        hardest_negative_element_for_stats,
                         write_folder='logs/')
                 # Run the training operation.
                 sess.run(

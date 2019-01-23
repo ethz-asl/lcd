@@ -96,9 +96,11 @@ def print_batch_triplets_statistics(triplet_strategy,
                                     pairwise_dist,
                                     mask_anchor_positive=None,
                                     mask_anchor_negative=None,
-                                    mask=None,
+                                    valid_triplets=None,
                                     hardest_positive_dist=None,
                                     hardest_negative_dist=None,
+                                    hardest_positive_element=None,
+                                    hardest_negative_element=None,
                                     write_folder=None):
     """ Print statistics about values extracted from the triplets in a training
         batch.
@@ -124,31 +126,44 @@ def print_batch_triplets_statistics(triplet_strategy,
             anchor-negative pair can be formed by taking the i-th element in the
             batch as anchor and the j-th element in the batch as negative, False
             otherwise. Must be not None if triplet strategy is 'batch_hard'.
-        mask (Numpy array of shape (batch_size, batch_size, batch_size) and
-            dtype bool): mask_anchor_negative[i, j, k] is True if a valid
-            triplet can be formed by taking the i-th element in the
-            batch as anchor, the j-th element in the batch as positive and the
-            k-th element in the batch as negative, False otherwise. Must be not
-            None if triplet strategy is 'batch_all'.
-        hardest_positive_dist (Numpy array of shape (batch_size, ) and dtype
+        valid_triplets (Numpy array of shape (batch_size, batch_size,
+            batch_size) and dtype bool): valid_triplets[i, j, k] is True if a
+            valid triplet can be formed by taking the i-th element in the batch
+            as anchor, the j-th element in the batch as positive and the k-th
+            element in the batch as negative, and the triplet is not an easy
+            one, i.e. d(a, p) - d(a,n) + margin > 0. It is False otherwise. Must
+            be not None if triplet strategy is 'batch_all'.
+        hardest_positive_dist (Numpy array of shape (batch_size, 1) and dtype
             np.float32): hardest_positive_dist[i] contains the distance of the
             element in the batch (WLOG, with index j) that is furthest away from
             the i-th element in the batch, with (i, j) being an anchor-positive
             pair. Must be not None if triplet strategy is 'batch_hard'.
-        hardest_negative_dist (Numpy array of shape (batch_size, ) and dtype
+        hardest_negative_dist (Numpy array of shape (batch_size, 1) and dtype
             np.float32): hardest_negative_dist[i] contains the distance of the
-            element in the batch (WLOG, with index j) that is closestto the i-th
-            element in the batch, with (i, j) being an anchor-negative pair.
-            Must be not None if triplet strategy is 'batch_hard'.
+            element in the batch (WLOG, with index j) that is closest to the
+            i-th element in the batch, with (i, j) being an anchor-negative
+            pair. Must be not None if triplet strategy is 'batch_hard'.
+        hardest_positive_element (Numpy array of shape (batch_size, ) and dtype
+            np.int64): hardest_positive_element[i] contains the index of the
+            element in the batch that is furthest away from the i-th element in
+            the batch, with (i, hardest_positive_element[i]) being an
+            anchor-positive pair. Must be not None if triplet strategy is
+            'batch_hard'.
+        hardest_negative_element (Numpy array of shape (batch_size, ) and dtype
+            np.int64): hardest_negative_element[i] contains the index of the
+            element in the batch that is closest to the i-th element in
+            the batch, with (i, hardest_negative_element[i]) being an
+            anchor-negative pair. Must be not None if triplet strategy is
+            'batch_hard'.
         write_folder (string): Folder where to output the statistics file.
     """
     if (triplet_strategy not in ['batch_all', 'batch_hard']):
         print("Triplet strategy must be either 'batch_all' or 'batch_hard'.")
         return
     elif (triplet_strategy == 'batch_all'):
-        if (mask is None):
-            print("Please pass a valid 'mask' argument when using triplet "
-                  "strategy 'batch_all'")
+        if (valid_triplets is None):
+            print("Please pass a valid 'valid_triplets' argument when using "
+                  "triplet strategy 'batch_all'")
             return
         if (hardest_positive_dist is None or hardest_negative_dist is None):
             print("Please pass valid 'hardest_positive_dist' and " +
@@ -156,8 +171,8 @@ def print_batch_triplets_statistics(triplet_strategy,
                   "strategy 'batch_all'")
             return
         assert(instance_labels.shape[0] == pairwise_dist.shape[0] == \
-               pairwise_dist.shape[1] == mask.shape[0] == mask.shape[1] == \
-               mask.shape[2])
+               pairwise_dist.shape[1] == valid_triplets.shape[0] == \
+               valid_triplets.shape[1] == valid_triplets.shape[2])
 
         with open(
                 os.path.join(write_folder,
@@ -174,10 +189,10 @@ def print_batch_triplets_statistics(triplet_strategy,
             for i in range(batch_size):
                 for j in range(batch_size):
                     for k in range(batch_size):
-                        if (mask[i, j, k] == True):
+                        if (valid_triplets[i, j, k] == True):
                             f.write(
                                 "* Triplet ({0}, {1}, {2}) ".format(i, j, k) +
-                                "is a valid anchor-positive-negative "
+                                "is a valid non-easy anchor-positive-negative "
                                 "triplet.\n")
                             f.write(
                                 "  d(a, p) = {}".format(pairwise_dist[i, j]) +
@@ -191,9 +206,16 @@ def print_batch_triplets_statistics(triplet_strategy,
         assert(instance_labels.shape[0] == pairwise_dist.shape[0] == \
                pairwise_dist.shape[1] == mask_anchor_positive.shape[0] == \
                mask_anchor_positive.shape[1] == \
-               mask_anchor_negative.shape[0] == mask_anchor_negative.shape[1])
+               mask_anchor_negative.shape[0] == \
+               mask_anchor_negative.shape[1] == \
+               hardest_positive_dist.shape[0] == \
+               hardest_negative_dist.shape[0] == \
+               hardest_positive_element.shape[0] == \
+               hardest_negative_element.shape[0])
 
         batch_size = instance_labels.shape[0]
+        hardest_positive_dist = hardest_positive_dist.reshape(-1)
+        hardest_negative_dist = hardest_negative_dist.reshape(-1)
         with open(
                 os.path.join(write_folder,
                              'batch_{}_stats.txt'.format(batch_index)),
@@ -221,5 +243,7 @@ def print_batch_triplets_statistics(triplet_strategy,
             # Print hardest positive and negative distance.
             f.write("***** Hardest positive/negative distance *****\n")
             for i in range(batch_size):
-                f.write("* max d({0}, p) = {1}, min d({0}, n) = {2}\n".format(
-                    i, hardest_positive_dist[i], hardest_negative_dist[i]))
+                f.write("* max_p d({0}, p) = d({0}, {1}) =  {2}, ".format(
+                    i, hardest_positive_element[i], hardest_positive_dist[i]
+                ) + "min_n d({0}, n) = d({0}, {1}) = {2}\n".format(
+                    i, hardest_negative_element[i], hardest_negative_dist[i]))

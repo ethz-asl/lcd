@@ -208,6 +208,7 @@ def batch_hardest_triplet_loss(labels, embeddings, margin, squared=False):
     # Shape (batch_size, 1)
     hardest_positive_dist = tf.reduce_max(
         anchor_positive_dist, axis=1, keepdims=True)
+    hardest_positive_element = tf.argmax(anchor_positive_dist, axis=1)
     tf.summary.scalar("hardest_positive_dist",
                       tf.reduce_mean(hardest_positive_dist))
 
@@ -227,6 +228,7 @@ def batch_hardest_triplet_loss(labels, embeddings, margin, squared=False):
     # Shape (batch_size,).
     hardest_negative_dist = tf.reduce_min(
         anchor_negative_dist, axis=1, keepdims=True)
+    hardest_negative_element = tf.argmin(anchor_negative_dist, axis=1)
     tf.summary.scalar("hardest_negative_dist",
                       tf.reduce_mean(hardest_negative_dist))
 
@@ -238,7 +240,8 @@ def batch_hardest_triplet_loss(labels, embeddings, margin, squared=False):
     triplet_loss = tf.reduce_mean(triplet_loss)
 
     return triplet_loss, mask_anchor_positive_bool, mask_anchor_negative_bool, \
-           hardest_positive_dist, hardest_negative_dist, pairwise_dist
+           hardest_positive_dist, hardest_negative_dist, \
+           hardest_positive_element, hardest_negative_element, pairwise_dist
 
 
 def batch_all_triplet_loss(labels, embeddings, margin, squared=False):
@@ -280,15 +283,15 @@ def batch_all_triplet_loss(labels, embeddings, margin, squared=False):
 
     # Put to zero the invalid triplets (where label(a) != label(p) or
     # label(n) == label(a) or a == p).
-    mask_bool = _get_triplet_mask(labels)
-    mask = tf.to_float(mask_bool)
+    mask = tf.to_float(_get_triplet_mask(labels))
     triplet_loss = tf.multiply(mask, triplet_loss)
 
     # Remove negative losses (i.e. the easy triplets).
     triplet_loss = tf.maximum(triplet_loss, 0.0)
 
     # Count number of positive triplets (where triplet_loss > 0).
-    valid_triplets = tf.to_float(tf.greater(triplet_loss, 1e-16))
+    valid_triplets_bool = tf.greater(triplet_loss, 1e-16)
+    valid_triplets = tf.to_float(valid_triplets_bool)
     num_positive_triplets = tf.reduce_sum(valid_triplets)
     num_valid_triplets = tf.reduce_sum(mask)
     tf.summary.scalar("num_valid_triplets", num_valid_triplets)
@@ -300,4 +303,5 @@ def batch_all_triplet_loss(labels, embeddings, margin, squared=False):
     triplet_loss = tf.reduce_sum(triplet_loss) / \
         (num_positive_triplets + 1e-16)
 
-    return triplet_loss, fraction_positive_triplets, mask_bool, pairwise_dist
+    return (triplet_loss, fraction_positive_triplets, valid_triplets_bool,
+            pairwise_dist)
