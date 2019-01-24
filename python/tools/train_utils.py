@@ -299,11 +299,6 @@ def print_batch_triplets_statistics(triplet_strategy,
             print("Please pass a valid 'valid_triplets' argument when using "
                   "triplet strategy 'batch_all'")
             return
-        if (hardest_positive_dist is None or hardest_negative_dist is None):
-            print("Please pass valid 'hardest_positive_dist' and " +
-                  "'hardest_negative_dist argument' when using triplet " +
-                  "strategy 'batch_all'")
-            return
         assert(images.shape[0] == labels.shape[0] == pairwise_dist.shape[0] == \
                pairwise_dist.shape[1] == valid_triplets.shape[0] == \
                valid_triplets.shape[1] == valid_triplets.shape[2])
@@ -363,6 +358,14 @@ def print_batch_triplets_statistics(triplet_strategy,
             print("Please pass valid 'mask_anchor_positive' and "
                   "'mask_anchor_negative' arguments when using triplet "
                   "'batch_hard'")
+            return
+        if (hardest_positive_dist is None or hardest_negative_dist is None or
+                hardest_positive_element is None or
+                hardest_negative_element is None):
+            print("Please pass valid 'hardest_positive_dist', " +
+                  "'hardest_negative_dist', 'hardest_positive_element', " +
+                  "'hardest_negative_element' arguments when using triplet " +
+                  "strategy 'batch_hard'")
             return
         assert(images.shape[0] == labels.shape[0] == pairwise_dist.shape[0] == \
                pairwise_dist.shape[1] == \
