@@ -213,7 +213,7 @@ def print_batch_triplets_statistics(triplet_strategy,
                                     batch_index,
                                     epoch_index,
                                     write_folder,
-                                    instance_labels,
+                                    labels,
                                     pairwise_dist,
                                     mask_anchor_positive=None,
                                     mask_anchor_negative=None,
@@ -242,9 +242,10 @@ def print_batch_triplets_statistics(triplet_strategy,
         write_folder (string): Folder where to output the statistics file. The
             latter will be created in the subfolder
             'epoch_<epoch_index>/batch_<batch_index>'.
-        instance_labels (numpy array of shape (batch_size, ) and dtype
-            np.float32): Instance labels associated to the elements in the
-            training batch.
+        labels (numpy array of shape (batch_size, 7) and dtype np.float32):
+            Labels associated to the elements in the training batch. The labels
+            are in the format
+                [Start point (3x), End point (3x), Instance label (1x)].
         pairwise_dist (numpy array of shape (batch_size, batch_size) and dtype
             np.float32): Matrix of the pairwise distances between the embeddings
             of the elements in the batch (e.g. pairwise_dist[i, j] contains the
@@ -303,10 +304,10 @@ def print_batch_triplets_statistics(triplet_strategy,
                   "'hardest_negative_dist argument' when using triplet " +
                   "strategy 'batch_all'")
             return
-        assert(images.shape[0] == instance_labels.shape[0] == \
-               pairwise_dist.shape[0] == pairwise_dist.shape[1] == \
-               valid_triplets.shape[0] == valid_triplets.shape[1] == \
-               valid_triplets.shape[2])
+        assert(images.shape[0] == labels.shape[0] == pairwise_dist.shape[0] == \
+               pairwise_dist.shape[1] == valid_triplets.shape[0] == \
+               valid_triplets.shape[1] == valid_triplets.shape[2])
+        assert (labels.shape[1] == 7)
 
         # Create directory if nonexistent (based on
         # https://stackoverflow.com/a/12517490).
@@ -320,13 +321,16 @@ def print_batch_triplets_statistics(triplet_strategy,
                 if e.errno != errno.EEXIST:
                     raise
         with open(file_path, 'w') as f:
-            # Print instance labels.
-            f.write("***** Labels in batch {} ".format(batch_index) +
-                    "[Center point of line (3x), instance label]*****\n")
-            for idx, label in enumerate(instance_labels):
-                f.write("{0}: {1}\n".format(idx, label))
+            # Print coordinates of endpoints and instance labels.
+            f.write("***** Lines in batch {} *****\n".format(batch_index))
+            for idx, label in enumerate(labels):
+                f.write("{0}: Start point {1}\n".format(idx, label[:3]))
+                f.write("{0}End point {1}\n".format(" " * (len(str(idx)) + 2),
+                                                    label[3:6]))
+                f.write("{0}Instance label {1}\n".format(
+                    " " * (len(str(idx)) + 2), label[-1]))
             # Print valid triplets.
-            batch_size = instance_labels.shape[0]
+            batch_size = labels.shape[0]
             f.write("***** Valid triplets *****\n")
             for i in range(batch_size):
                 for j in range(batch_size):
@@ -360,8 +364,8 @@ def print_batch_triplets_statistics(triplet_strategy,
                   "'mask_anchor_negative' arguments when using triplet "
                   "'batch_hard'")
             return
-        assert(images.shape[0] == instance_labels.shape[0] == \
-               pairwise_dist.shape[0] == pairwise_dist.shape[1] == \
+        assert(images.shape[0] == labels.shape[0] == pairwise_dist.shape[0] == \
+               pairwise_dist.shape[1] == \
                mask_anchor_positive.shape[0] == \
                mask_anchor_positive.shape[1] == \
                mask_anchor_negative.shape[0] == \
@@ -370,8 +374,9 @@ def print_batch_triplets_statistics(triplet_strategy,
                hardest_negative_dist.shape[0] == \
                hardest_positive_element.shape[0] == \
                hardest_negative_element.shape[0])
+        assert (labels.shape[1] == 7)
 
-        batch_size = instance_labels.shape[0]
+        batch_size = labels.shape[0]
         hardest_positive_dist = hardest_positive_dist.reshape(-1)
         hardest_negative_dist = hardest_negative_dist.reshape(-1)
 
@@ -387,10 +392,14 @@ def print_batch_triplets_statistics(triplet_strategy,
                 if e.errno != errno.EEXIST:
                     raise
         with open(file_path, 'w') as f:
-            # Print instance labels.
-            f.write("***** Instance labels in the batch *****\n")
-            for idx, label in enumerate(instance_labels):
-                f.write("{0}: {1}\n".format(idx, label))
+            # Print coordinates of endpoints and instance labels.
+            f.write("***** Lines in batch {} *****\n".format(batch_index))
+            for idx, label in enumerate(labels):
+                f.write("{0}: Start point {1}\n".format(idx, label[:3]))
+                f.write("{0}End point {1}\n".format(" " * (len(str(idx)) + 2),
+                                                    label[3:6]))
+                f.write("{0}Instance label {1}\n".format(
+                    " " * (len(str(idx)) + 2), label[-1]))
             # Print valid anchor-positive pairs.
             f.write("***** Valid anchor-positive pairs *****\n")
             for i in range(batch_size):
