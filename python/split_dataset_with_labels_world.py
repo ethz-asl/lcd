@@ -1,5 +1,6 @@
-"""
-Split detected lines of the input trajectory to train, val and test set and label each line with its center in the world frame and the instance label.
+""" Splits the lines detected in the input trajectory into train, val and test
+    set and labels each line with its center point in the world frame and its
+    instance label.
 """
 import os
 import sys
@@ -35,7 +36,9 @@ def split_dataset():
     dataset['train'] = train
     dataset['val'] = val
     dataset['test'] = test
-    dataset['all_lines'] = [i for i in range(start_frame, end_frame + 1, frame_step)]
+    dataset['all_lines'] = [
+        i for i in range(start_frame, end_frame + 1, frame_step)
+    ]
 
     if (dataset_name in ["val"] + ["train_{}".format(i) for i in range(17)]):
         camera_to_world_matrix_retriever = SceneNetCameraToWorldMatrixRetriever(
@@ -58,12 +61,20 @@ def split_dataset():
             except pd.errors.EmptyDataError:
                 lines_count = 0
             # Retrieve camera-to-world matrix.
-            camera_to_world_matrix = camera_to_world_matrix_retriever.get_camera_to_world_matrix(
-                frame_id)
+            camera_to_world_matrix = \
+                camera_to_world_matrix_retriever.get_camera_to_world_matrix(
+                    frame_id)
 
             for i in range(lines_count):
                 path_to_write = path_to_virtualcameraimages + \
                     'frame_{0}/'.format(frame_id) + 'rgb/' + '{0}.png'.format(i)
+                # If the virtual-camera image associated to the line does not
+                # exist (because it does not contain enough nonempty pixels), do
+                # not include the line in the dataset.
+                if (not os.path.isfile(path_to_write)):
+                    print("Virtual-camera image not found for line {} ".format(
+                        i) + "in frame {}.".format(frame_id))
+                    continue
 
                 line = data_lines[i]
                 line_start_point_camera = np.append(line[:3], [1])
@@ -113,10 +124,13 @@ if __name__ == '__main__':
         description='Split frames in the input trajectory in train, test and '
         'validation set.')
     parser.add_argument("-trajectory", help="Trajectory number.")
-    parser.add_argument("-frame_step", type=int, help="Number of frames in one "
-                        "step of the rosbag used to detect lines, i.e., "
-                        "(frame_step - 1) frames were originally skipped after "
-                        "each frame inserted in the rosbag.")
+    parser.add_argument(
+        "-frame_step",
+        type=int,
+        help="Number of frames in one "
+        "step of the rosbag used to detect lines, i.e., "
+        "(frame_step - 1) frames were originally skipped after "
+        "each frame inserted in the rosbag.")
     parser.add_argument(
         "-end_frame",
         type=int,
@@ -149,7 +163,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     if (args.trajectory and args.scenenetscripts_path and args.dataset_name and
-        args.linesandimagesfolder_path and args.output_path):
+            args.linesandimagesfolder_path and args.output_path):
         # All stricly arguments passed.
         trajectory = int(args.trajectory)
         scenenetscripts_path = args.scenenetscripts_path

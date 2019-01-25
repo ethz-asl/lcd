@@ -64,7 +64,7 @@ then
       echo "Bag file for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set already exists. Using bag found.";
   else
       echo -e "\n****  Generating bag for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
-      echo -e "PLEASE NOTE! If an error occurs during the formation of the bag (e.g."
+      echo -e "PLEASE NOTE! If an error occurs during the formation of the bag (e.g. "
       echo -e "early termination by interrupt) the script will not check if the bag "
       echo -e "is valid. Therefore invalid bags should be manually removed.\n"
       rosrun scenenet_ros_tools scenenet_to_rosbag.py -scenenet_path "$SCENENET_DATASET_PATH" -trajectory $TRAJ_NUM -dataset_type ${DATASET_NAME} -output_bag "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenet_traj_${TRAJ_NUM}.bag;
@@ -82,7 +82,7 @@ else
   else
       echo -e "\n****  Generating bag for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
       echo -e "PLEASE NOTE! The process will take a long time. If an error occurs "
-      echo -e "during the formation of the bag (e.g.early termination by interrupt) "
+      echo -e "during the formation of the bag (e.g. early termination by interrupt) "
       echo -e "the script will not check if the bag is valid. Therefore invalid "
       echo -e "bags should be manually removed.\n"
       rosrun scenenn_ros_tools scenenn_to_rosbag.py -scenenn_data_folder "$SCENENN_DATASET_PATH" -frame_step ${FRAME_STEP} -scene_id $TRAJ_NUM -output_bag "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenn_traj_${TRAJ_NUM}.bag;
