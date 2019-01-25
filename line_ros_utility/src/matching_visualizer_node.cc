@@ -11,6 +11,7 @@ int main(int argc, char** argv) {
   unsigned int detector_type_num, descriptor_type_num;
   line_detection::DetectorType detector_type;
   line_description::DescriptorType descriptor_type;
+  std::unique_ptr<line_ros_utility::LineDetectorDescriptorAndMatcher> ls;
   std::istringstream iss;
   if (argc >= 3) {  // Found detector type and descriptor type arguments.
     // Detector type.
@@ -66,11 +67,19 @@ int main(int argc, char** argv) {
       ROS_ERROR("Unable to parse descriptor type argument.");
       return -1;
     }
+    // Initialize node.
+    ros::init(argc, argv, "detect_describe_and_match_lines");
+    ls = std::unique_ptr<line_ros_utility::LineDetectorDescriptorAndMatcher>(
+        new line_ros_utility::LineDetectorDescriptorAndMatcher(
+            detector_type, descriptor_type));
+  } else {
+    // Initialize node. Use default arguments for line detector, descriptor and
+    // matcher.
+    ros::init(argc, argv, "detect_describe_and_match_lines");
+    ls = std::unique_ptr<line_ros_utility::LineDetectorDescriptorAndMatcher>(
+        new line_ros_utility::LineDetectorDescriptorAndMatcher());
   }
-  ros::init(argc, argv, "detect_describe_and_match_lines");
-  line_ros_utility::LineDetectorDescriptorAndMatcher ls(detector_type,
-                                                        descriptor_type);
-  ls.start();
+  ls->start();
   ros::spin();
   return 0;
 }

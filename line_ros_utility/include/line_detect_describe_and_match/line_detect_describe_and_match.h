@@ -162,7 +162,6 @@ class LineDetectorDescriptorAndMatcher {
    //           frame_index:   Index to be assigned to the current frame.
    void detectLines(const sensor_msgs::ImageConstPtr& image_rgb_msg,
                     std::vector<line_detection::KeyLine>* keylines_msgs,
-                    //std::vector<cv::line_descriptor::KeyLine>* keylines,
                     int* frame_index);
 
    // Given a line (both in 2D and 3D, with the inlier planes and type) and RGB

@@ -33,25 +33,25 @@
 #include <image_geometry/pinhole_camera_model.h>
 #include <opencv2/highgui/highgui.hpp>
 
-// Construct the line detector
+// Construct the line detector.
 line_detection::LineDetector line_detector;
-// To store the lines
+// To store the lines.
 std::vector<cv::Vec4f> lines_2D;
 std::vector<cv::Vec4f> lines_2D_fused;
 std::vector<cv::Vec4f> lines_2D_tmp;
 std::vector<line_detection::LineWithPlanes> lines_3D_tmp;
 std::vector<line_detection::LineWithPlanes> lines_3D;
 std::vector<cv::line_descriptor::KeyLine> keylines;
-// To store the image
+// To store the image.
 cv_bridge::CvImageConstPtr image_cv_ptr;
 cv::Mat cv_image_rgb;
 cv::Mat cv_image_gray;
-// To store the point cloud
+// To store the point cloud.
 cv_bridge::CvImageConstPtr cv_cloud_ptr;
 cv::Mat cv_cloud;
-// Projection matrix
+// Projection matrix.
 cv::Mat camera_P;
-// Stores the index of the current frame
+// Stores the index of the current frame.
 int frame_index;
 
 bool detectLinesCallback(line_detection::ExtractLines::Request& req,
