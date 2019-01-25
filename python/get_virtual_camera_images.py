@@ -46,8 +46,21 @@ def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path):
     # Camera from which the images were taken, SceneNetRGBD (pinhole) camera
     # model.
     real_camera = scenenet_utils.get_camera_model()
-    # Distance between virtual camera origin and line's center
+
+    # Distance between virtual camera origin and center of the line.
     distance = 3
+    # Min fraction of nonempty pixels in the associated virtual-camera image for
+    # a line to be considered as valid.
+    min_fraction_nonempty_pixels = 0.1
+
+    # Write in a text file (that will store the histogram of percentages of
+    # nonempty pixels) the distance of the virtual camera from the lines and the
+    # threshold of nonempty pixels to discard lines.
+    with open('hist_percentages.txt', 'w') as f:
+        f.write("distance=%.3f\n" % distance)
+        f.write("fraction_nonempty_pixels_threshold=%.3f\n" %
+                min_fraction_nonempty_pixels)
+
     for frame_id in range(300):
         start_time = timer()
         photo_id = frame_id * 25
@@ -62,7 +75,7 @@ def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path):
 
         # Obtain coloured point cloud from RGB-D image.
         pcl = real_camera.rgbd_to_pcl(
-            rgb_image=rgb_image, depth_image=depth_image, visualize_cloud=True)
+            rgb_image=rgb_image, depth_image=depth_image, visualize_cloud=False)
         path_to_lines = os.path.join(
             path_to_lines_root, 'lines_with_labels_{0}.txt'.format(frame_id))
 
@@ -76,6 +89,11 @@ def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path):
         lines_count = data_lines.shape[0]
 
         average_time_per_line = 0
+        # A line is valid if the corresponding virtual-camera image has enough
+        # nonempty pixels.
+        num_valid_lines = 0
+        # Initialize the histogram of the percentages of nonempty pixels.
+        hist_percentage_nonempty_pixels = []
         for i in range(lines_count):
             start_time_line = timer()
             # Obtain the pose of the virtual camera for each line.
@@ -99,47 +117,66 @@ def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path):
                 np.vstack([pcl, line_3D]), T)
             # Obtain the RGB and depth virtual camera images by reprojecting the
             # point cloud on the image plane, under the view of the virtual
-            # camera.
-            rgb_image_from_line_view, depth_image_from_line_view = \
-                cloud_utils.project_pcl_to_image(pcl_from_line_view,
-                                                 virtual_camera)
-            if (impainting):
-                # Inpaint the virtual camera image.
-                reds = rgb_image_from_line_view[:, :, 2]
-                greens = rgb_image_from_line_view[:, :, 1]
-                blues = rgb_image_from_line_view[:, :, 0]
+            # camera. Also obtain the number of nonempty pixels.
+            (rgb_image_from_line_view, depth_image_from_line_view,
+             num_nonempty_pixels) = cloud_utils.project_pcl_to_image(
+                 pcl_from_line_view, virtual_camera)
+            # Discard lines that have less than the specified fraction of
+            # nonempty pixels.
+            fraction_nonempty_pixels = num_nonempty_pixels / float(
+                rgb_image_from_line_view.shape[0] * rgb_image_from_line_view.
+                shape[1])
+            # Add the percentage of nonempty pixels to the histogram.
+            percentage_nonempty_pixels = 100. * fraction_nonempty_pixels
+            hist_percentage_nonempty_pixels.append(percentage_nonempty_pixels)
+            if (fraction_nonempty_pixels > min_fraction_nonempty_pixels):
+                num_valid_lines += 1
+                if (impainting):
+                    # Inpaint the virtual camera image.
+                    reds = rgb_image_from_line_view[:, :, 2]
+                    greens = rgb_image_from_line_view[:, :, 1]
+                    blues = rgb_image_from_line_view[:, :, 0]
 
-                mask = ((greens != 0) | (reds != 0) | (blues != 0)) * 1
-                mask = np.array(mask, dtype=np.uint8)
-                kernel = np.ones((5, 5), np.uint8)
-                dilated_mask = cv2.dilate(mask, kernel, iterations=1) - mask
+                    mask = ((greens != 0) | (reds != 0) | (blues != 0)) * 1
+                    mask = np.array(mask, dtype=np.uint8)
+                    kernel = np.ones((5, 5), np.uint8)
+                    dilated_mask = cv2.dilate(mask, kernel, iterations=1) - mask
 
-                rgb_image_from_line_view = cv2.inpaint(rgb_image_from_line_view,
-                                                       dilated_mask, 10,
-                                                       cv2.INPAINT_TELEA)
-                depth_image_from_line_view = cv2.inpaint(
-                    depth_image_from_line_view, dilated_mask, 10,
-                    cv2.INPAINT_TELEA)
-            end_time_line = timer()
-            average_time_per_line += ((
-                end_time_line - start_time_line) / lines_count)
+                    rgb_image_from_line_view = cv2.inpaint(
+                        rgb_image_from_line_view, dilated_mask, 10,
+                        cv2.INPAINT_TELEA)
+                    depth_image_from_line_view = cv2.inpaint(
+                        depth_image_from_line_view, dilated_mask, 10,
+                        cv2.INPAINT_TELEA)
+                end_time_line = timer()
+                average_time_per_line += (end_time_line - start_time_line)
 
-            # Print images to file.
-            cv2.imwrite(
-                os.path.join(
-                    output_path, 'traj_{0}/frame_{1}/rgb/{2}.png'.format(
-                        trajectory, frame_id, i)), rgb_image_from_line_view)
-            cv2.imwrite(
-                os.path.join(output_path,
-                             'traj_{0}/frame_{1}/depth/{2}.png'.format(
-                                 trajectory, frame_id, i)),
-                depth_image_from_line_view.astype(np.uint16))
+                # Print images to file.
+                cv2.imwrite(
+                    os.path.join(
+                        output_path, 'traj_{0}/frame_{1}/rgb/{2}.png'.format(
+                            trajectory, frame_id, i)), rgb_image_from_line_view)
+                cv2.imwrite(
+                    os.path.join(output_path,
+                                 'traj_{0}/frame_{1}/depth/{2}.png'.format(
+                                     trajectory, frame_id, i)),
+                    depth_image_from_line_view.astype(np.uint16))
 
         end_time = timer()
+        average_time_per_line /= num_valid_lines
+
+        # Append the histogram for the frame to the output text file.
+        with open('hist_percentages.txt', 'aw') as f:
+            for item in hist_percentage_nonempty_pixels:
+                f.write("%s\n" % item)
 
         print('Generated virtual camera images for frame {0}'.format(frame_id))
-        print('Time elapsed: %.3f seconds' % (end_time - start_time))
-        print('Average time per line: %.3f seconds' % average_time_per_line)
+        print('Time elapsed: {:.3f} seconds'.format(end_time - start_time))
+        print('Average time per line: {:.3f} seconds'.format(
+            average_time_per_line))
+        print('Number of lines discarded (minimum fraction of required ' +
+              'nonempty pixels = {0:.3f}) is {1}'.format(
+                  min_fraction_nonempty_pixels, lines_count - num_valid_lines))
 
 
 def get_virtual_camera_images_scenenn(trajectory, dataset_path):
@@ -158,8 +195,20 @@ def get_virtual_camera_images_scenenn(trajectory, dataset_path):
     # Camera from which the images were taken, SceneNN (pinhole) camera model.
     real_camera = scenenn_utils.get_camera_model()
 
-    # Distance between virtual camera origin and line's center.
+    # Distance between virtual camera origin and center of the line.
     distance = 3
+    # Min fraction of nonempty pixels in the associated virtual-camera image for
+    # a line to be considered as valid.
+    min_fraction_nonempty_pixels = 0.1
+
+    # Write in a text file (that will store the histogram of percentages of
+    # nonempty pixels) the distance of the virtual camera from the lines and the
+    # threshold of nonempty pixels to discard lines.
+    with open('hist_percentages.txt', 'w') as f:
+        f.write("distance=%.3f\n" % distance)
+        f.write("fraction_nonempty_pixels_threshold=%.3f\n" %
+                min_fraction_nonempty_pixels)
+
     for frame_id in range(2, end_frame + 1, frame_step):
         start_time = timer()
         photo_id = frame_id
@@ -176,7 +225,7 @@ def get_virtual_camera_images_scenenn(trajectory, dataset_path):
 
         # Obtain coloured point cloud from RGB-D image.
         pcl = real_camera.rgbd_to_pcl(
-            rgb_image=rgb_image, depth_image=depth_image, visualize_cloud=True)
+            rgb_image=rgb_image, depth_image=depth_image, visualize_cloud=False)
         path_to_lines = os.path.join(
             path_to_lines_root, 'lines_with_labels_{0}.txt'.format(frame_id))
 
@@ -190,6 +239,11 @@ def get_virtual_camera_images_scenenn(trajectory, dataset_path):
         lines_count = data_lines.shape[0]
 
         average_time_per_line = 0
+        # A line is valid if the corresponding virtual-camera image has enough
+        # nonempty pixels.
+        num_valid_lines = 0
+        # Initialize the histogram of the percentages of nonempty pixels.
+        hist_percentage_nonempty_pixels = []
         for i in range(lines_count):
             start_time_line = timer()
             # Obtain the pose of the virtual camera for each line.
@@ -213,47 +267,66 @@ def get_virtual_camera_images_scenenn(trajectory, dataset_path):
                 np.vstack([pcl, line_3D]), T)
             # Obtain the RGB and depth virtual camera images by reprojecting the
             # point cloud on the image plane, under the view of the virtual
-            # camera.
-            rgb_image_from_line_view, depth_image_from_line_view = \
-                cloud_utils.project_pcl_to_image(pcl_from_line_view,
-                                                 virtual_camera)
-            if (impainting):
-                # Inpaint the virtual camera image.
-                reds = rgb_image_from_line_view[:, :, 2]
-                greens = rgb_image_from_line_view[:, :, 1]
-                blues = rgb_image_from_line_view[:, :, 0]
+            # camera. Also obtain the number of nonempty pixels.
+            (rgb_image_from_line_view, depth_image_from_line_view,
+             num_nonempty_pixels) = cloud_utils.project_pcl_to_image(
+                 pcl_from_line_view, virtual_camera)
+            # Discard lines that have less than the specified fraction of
+            # nonempty pixels.
+            fraction_nonempty_pixels = num_nonempty_pixels / float(
+                rgb_image_from_line_view.shape[0] * rgb_image_from_line_view.
+                shape[1])
+            # Add the percentage of nonempty pixels to the histogram.
+            percentage_nonempty_pixels = 100. * fraction_nonempty_pixels
+            hist_percentage_nonempty_pixels.append(percentage_nonempty_pixels)
+            if (fraction_nonempty_pixels > min_fraction_nonempty_pixels):
+                num_valid_lines += 1
+                if (impainting):
+                    # Inpaint the virtual camera image.
+                    reds = rgb_image_from_line_view[:, :, 2]
+                    greens = rgb_image_from_line_view[:, :, 1]
+                    blues = rgb_image_from_line_view[:, :, 0]
 
-                mask = ((greens != 0) | (reds != 0) | (blues != 0)) * 1
-                mask = np.array(mask, dtype=np.uint8)
-                kernel = np.ones((5, 5), np.uint8)
-                dilated_mask = cv2.dilate(mask, kernel, iterations=1) - mask
+                    mask = ((greens != 0) | (reds != 0) | (blues != 0)) * 1
+                    mask = np.array(mask, dtype=np.uint8)
+                    kernel = np.ones((5, 5), np.uint8)
+                    dilated_mask = cv2.dilate(mask, kernel, iterations=1) - mask
 
-                rgb_image_from_line_view = cv2.inpaint(rgb_image_from_line_view,
-                                                       dilated_mask, 10,
-                                                       cv2.INPAINT_TELEA)
-                depth_image_from_line_view = cv2.inpaint(
-                    depth_image_from_line_view, dilated_mask, 10,
-                    cv2.INPAINT_TELEA)
-            end_time_line = timer()
-            average_time_per_line += ((
-                end_time_line - start_time_line) / lines_count)
+                    rgb_image_from_line_view = cv2.inpaint(
+                        rgb_image_from_line_view, dilated_mask, 10,
+                        cv2.INPAINT_TELEA)
+                    depth_image_from_line_view = cv2.inpaint(
+                        depth_image_from_line_view, dilated_mask, 10,
+                        cv2.INPAINT_TELEA)
+                end_time_line = timer()
+                average_time_per_line += (end_time_line - start_time_line)
 
-            # Print images to file.
-            cv2.imwrite(
-                os.path.join(
-                    output_path, 'traj_{0}/frame_{1}/rgb/{2}.png'.format(
-                        trajectory, frame_id, i)), rgb_image_from_line_view)
-            cv2.imwrite(
-                os.path.join(output_path,
-                             'traj_{0}/frame_{1}/depth/{2}.png'.format(
-                                 trajectory, frame_id, i)),
-                depth_image_from_line_view.astype(np.uint16))
+                # Print images to file.
+                cv2.imwrite(
+                    os.path.join(
+                        output_path, 'traj_{0}/frame_{1}/rgb/{2}.png'.format(
+                            trajectory, frame_id, i)), rgb_image_from_line_view)
+                cv2.imwrite(
+                    os.path.join(output_path,
+                                 'traj_{0}/frame_{1}/depth/{2}.png'.format(
+                                     trajectory, frame_id, i)),
+                    depth_image_from_line_view.astype(np.uint16))
 
         end_time = timer()
+        average_time_per_line /= num_valid_lines
+
+        # Append the histogram for the frame to the output text file.
+        with open('hist_percentages.txt', 'aw') as f:
+            for item in hist_percentage_nonempty_pixels:
+                f.write("%s\n" % item)
 
         print('Generated virtual camera images for frame {0}'.format(frame_id))
-        print('Time elapsed: %.3f seconds' % (end_time - start_time))
-        print('Average time per line: %.3f seconds' % average_time_per_line)
+        print('Time elapsed: {:.3f} seconds'.format(end_time - start_time))
+        print('Average time per line: {:.3f} seconds'.format(
+            average_time_per_line))
+        print('Number of lines discarded (minimum fraction of required ' +
+              'nonempty pixels = {0:.3f}) is {1}'.format(
+                  min_fraction_nonempty_pixels, lines_count - num_valid_lines))
 
 
 if __name__ == '__main__':
@@ -316,7 +389,7 @@ if __name__ == '__main__':
         print("get_virtual_camera_images.py: Some arguments are missing. Using "
               "default ones in config_paths_and_variables.sh. In particular, "
               "please note that I am using dataset SceneNetRGBD.")
-        # Obtain paths and variables
+        # Obtain paths and variables.
         scenenetscripts_path = pathconfig.obtain_paths_and_variables(
             "SCENENET_SCRIPTS_PATH")
         linesandimagesfolder_path = pathconfig.obtain_paths_and_variables(

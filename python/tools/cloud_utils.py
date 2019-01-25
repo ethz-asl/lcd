@@ -33,9 +33,14 @@ def project_pcl_to_image(pointcloud,
             dtype=np.uint8): RGB image.
         depth_image (numpy array of shape (image_height, image_width),
             dtype=np.float32): Depth image, with depth in mm.
+        num_nonempty_pixels (int): Number of pixels that are not empty in the
+            image obtained by reprojecting the point cloud.
     """
     rgb_image = np.zeros((image_height, image_width, 3), dtype=np.uint8)
     depth_image = np.zeros((image_height, image_width), dtype=np.float32)
+    pixel_is_empty = np.full((image_height, image_width), fill_value=True)
+
+    num_nonempty_pixels = 0
 
     pcl_inside_view = pointcloud[pointcloud[:, 2] > 0, :]
     pcl_inside_view_xyz = np.hstack((pcl_inside_view[:, :3],
@@ -60,4 +65,9 @@ def project_pcl_to_image(pointcloud,
     rgb_image[pixel[1], pixel[0]] = pcl_inside_view[:, 3:]
     depth_image[pixel[1], pixel[0]] = pcl_inside_view[:, 2] * 1000.0  # m to mm
 
-    return rgb_image, depth_image
+    for idx in range(len(pixel[0])):
+        if pixel_is_empty[pixel[1, idx], pixel[0, idx]] == True:
+            pixel_is_empty[pixel[1, idx], pixel[0, idx]] = False
+            num_nonempty_pixels += 1
+
+    return rgb_image, depth_image, num_nonempty_pixels
