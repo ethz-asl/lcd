@@ -35,6 +35,8 @@ class LineDescriber {
    void describeLines(const std::vector<cv::line_descriptor::KeyLine>& keylines,
                       const cv::Mat& image,
                       std::vector<Descriptor>* descriptors);
+   //TODO: Create Python bindings to use the neural-network embeddings desciber
+   // also from here.
  protected:
 
  private:

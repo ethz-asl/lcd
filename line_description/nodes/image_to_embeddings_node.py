@@ -7,8 +7,7 @@ import os
 import rospy
 from embeddings_retriever import EmbeddingsRetriever
 from line_description.srv import ImageToEmbeddings, ImageToEmbeddingsResponse, \
-                                 EmbeddingsRetrieverReady, \
-                                 EmbeddingsRetrieverReadyResponse
+                                 EmbeddingsRetrieverReady
 from cv_bridge import CvBridge, CvBridgeError
 
 

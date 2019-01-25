@@ -14,6 +14,14 @@ cs_add_library(line_detect_describe_and_match
   src/line_detect_describe_and_match.cc
 )
 
+cs_add_library(histogram_line_lengths_builder
+  src/histogram_line_lengths_builder.cc
+)
+
+catkin_install_python(PROGRAMS
+  nodes/histogram_line_lengths_builder_node.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
 add_executable(detect_and_save_lines src/detect_and_save_lines_node.cc)
 target_link_libraries(detect_and_save_lines ${PROJECT_NAME})
 
@@ -28,6 +36,9 @@ target_link_libraries(freiburg_to_line_tools ${PROJECT_NAME})
 
 add_executable(matching_visualizer_node src/matching_visualizer_node.cc)
 target_link_libraries(matching_visualizer_node line_detect_describe_and_match)
+
+add_executable(histogram_line_lengths_node src/histogram_line_lengths_node.cc)
+target_link_libraries(histogram_line_lengths_node histogram_line_lengths_builder)
 
 cs_install()
 cs_export()
