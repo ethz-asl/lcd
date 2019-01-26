@@ -35,10 +35,9 @@ class SceneNetCameraToWorldMatrixRetriever:
             with open(protobuf_path, 'rb') as f:
                 trajectories.ParseFromString(f.read())
         except IOError:
-            print('camera_utils.py: Scenenet protobuf data not found at '
-                  'location:{0}'.format(protobuf_path))
-            print('Please ensure you have copied the pb file to the data '
-                  'directory.')
+            sys.exit('camera_utils.py: Scenenet protobuf data not found at '
+                     'location: {}.\n'.format(protobuf_path) + 'Please ensure '
+                     'you have copied the pb file to the data directory.')
 
         self.views = trajectories.trajectories[trajectory].views
 
@@ -51,7 +50,8 @@ class SceneNetCameraToWorldMatrixRetriever:
         Returns:
             camera_to_world_matrix: Camera-to-world matrix.
         """
-        from camera_pose_and_intrinsics_example import camera_to_world_with_pose, interpolate_poses
+        from camera_pose_and_intrinsics_example import \
+            camera_to_world_with_pose, interpolate_poses
 
         view = self.views[frame_id]
         ground_truth_pose = interpolate_poses(view.shutter_open,

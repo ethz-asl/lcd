@@ -47,9 +47,9 @@ def get_lines_world_coordinates_with_instances(dataset_name, trajectory,
         with open(protobuf_path, 'rb') as f:
             trajectories.ParseFromString(f.read())
     except IOError:
-        print('visualization.py: Scenenet protobuf data not found at location:'
-              '{0}'.format(protobuf_path))
-        print('Please ensure you have copied the pb file to the data directory')
+        sys.exit('visualization.py: Scenenet protobuf data not found at '
+                 'location: {}.\n'.format(protobuf_path) + 'Please ensure you '
+                 'have copied the pb file to the data directory')
 
     frames_with_lines = []
 

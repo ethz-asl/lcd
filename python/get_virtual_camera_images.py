@@ -24,9 +24,9 @@ def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path):
         with open(protobuf_path, 'rb') as f:
             trajectories.ParseFromString(f.read())
     except IOError:
-        print('get_virtual_camera_images.py: Scenenet protobuf data not found '
-              'at location:{0}. '.format(protobuf_path) + 'Please ensure you '
-              'have copied the pb file to the data directory.')
+        sys.exit('get_virtual_camera_images.py: Scenenet protobuf data not '
+                 'found at location:{0}. '.format(protobuf_path) + 'Please '
+                 'ensure you have copied the pb file to the data directory.')
         return
 
     trajectory = int(trajectory)
