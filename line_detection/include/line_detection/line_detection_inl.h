@@ -6,6 +6,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl/octree/octree_search.h>
 
+#include <functional>
 #include <queue>
 #include <set>
 
@@ -320,17 +321,22 @@ class ClusterDistanceFromMean {
    // True if the points form a single connected component, false otherwise.
    bool singleConnectedComponent() {
      if (distances_.size() == 0) {
-       return 0;
+       return false;
      }
      double current_distance;
      // Obtain first element.
      double previous_distance = distances_.top();
      distances_.pop();
+     // If the smallest distance from the mean point is more than 10 cm, then
+     // the points do not form a single connected component.
+     if (previous_distance > 0.1) {
+       return false;
+     }
      while(!distances_.empty()) {
        // Obtains current distance.
        current_distance = distances_.top();
        distances_.pop();
-       if (previous_distance - current_distance > distance_threshold_) {
+       if (current_distance - previous_distance > distance_threshold_) {
          // The difference in distance is such that they identify two separated
          // components.
          return false;
@@ -341,8 +347,9 @@ class ClusterDistanceFromMean {
    }
 
  private:
-   // Stores the pairwise distances in descending order.
-   std::priority_queue<double> distances_;
+   // Stores the pairwise distances in ascending order.
+   std::priority_queue<double, std::vector<double>, std::greater<double>>
+       distances_;
    // Threshold for two distances to still identify the same cluster.
    double distance_threshold_;
 };
