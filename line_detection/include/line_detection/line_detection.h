@@ -110,8 +110,8 @@ struct LineDetectionParams {
   double min_inlier_ransac = 0.1;
   // default = 10: LineDetector::checkIfValidLineBruteForce
   unsigned int min_points_in_line = 10;
-  // default = 0.01: LineDetector::checkIfValidLineWith2DInfo
-  double min_length_line_3D = 0.01;
+  // default = 0.2: LineDetector::checkIfValidLineWith2DInfo
+  double min_length_line_3D = 0.2;
   // default = 2.0: LineDetector::checkIfValidLineWith2DInfo
   double min_pixel_length_line_3D_reprojected = 2.0;
   // default = 0.1: LineDetector::assignEdgeOrIntersectionLineType
