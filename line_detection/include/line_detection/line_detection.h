@@ -104,6 +104,8 @@ struct LineDetectionParams {
   double max_error_inlier_ransac = 0.005;
   // default = 0.8: LineDetector::planeRANSAC
   double inlier_max_ransac = 0.8;
+  // default = 0.05: LineDetector::planeRANSAC
+  double max_distance_connected_components = 0.05;
   // default = 0.1: LineDetector::project2Dto3DwithPlanes
   double min_inlier_ransac = 0.1;
   // default = 10: LineDetector::checkIfValidLineBruteForce
