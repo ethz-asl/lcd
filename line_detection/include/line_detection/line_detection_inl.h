@@ -157,7 +157,7 @@ class ClusterPriorityQueue {
      points_.clear();
    }
 
-   // Adds a point to the union-find data structure.
+   // Adds a point to the queue data structure.
    void addPoint(cv::Vec3f point) {
      size_t point_index = points_.size();
      points_.push_back(point);
@@ -285,6 +285,64 @@ class ClusterOctree {
    pcl::octree::OctreePointCloudSearch<pcl::PointXYZ>* octree_;
    // Stores the points.
    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_;
+   // Threshold for two distances to still identify the same cluster.
+   double distance_threshold_;
+};
+
+// Priority-queue-like structure to cluster the points based on their
+// distances from their mean point.
+class ClusterDistanceFromMean {
+ public:
+   ClusterDistanceFromMean(double distance_threshold) {
+     distance_threshold_ = distance_threshold;
+   }
+   // Clears the entire structure.
+   void clear() {
+     while(!distances_.empty()) {
+       distances_.pop();
+     }
+   }
+
+   // Adds the points to the data structure.
+   void addPoints(std::vector<cv::Vec3f>& points) {
+     // Compute mean point.
+     cv::Vec3f mean = {0.0f, 0.0f, 0.0f};
+     for (auto& point : points) {
+       mean += (point / float(points.size()));
+     }
+     // Compute the distance of all points from the mean point and insert them
+     // in the priority queue.
+     for (auto& point : points) {
+       distances_.push(cv::norm(mean - point));
+     }
+   }
+
+   // True if the points form a single connected component, false otherwise.
+   bool singleConnectedComponent() {
+     if (distances_.size() == 0) {
+       return 0;
+     }
+     double current_distance;
+     // Obtain first element.
+     double previous_distance = distances_.top();
+     distances_.pop();
+     while(!distances_.empty()) {
+       // Obtains current distance.
+       current_distance = distances_.top();
+       distances_.pop();
+       if (previous_distance - current_distance > distance_threshold_) {
+         // The difference in distance is such that they identify two separated
+         // components.
+         return false;
+       }
+       previous_distance = current_distance;
+     }
+     return true;
+   }
+
+ private:
+   // Stores the pairwise distances in descending order.
+   std::priority_queue<double> distances_;
    // Threshold for two distances to still identify the same cluster.
    double distance_threshold_;
 };

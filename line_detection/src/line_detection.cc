@@ -2113,15 +2113,17 @@ void LineDetector::planeRANSAC(const std::vector<cv::Vec3f>& points,
   constexpr int number_of_model_params = 3;
   double max_deviation = params_->max_error_inlier_ransac;
   double inlier_fraction_max = params_->inlier_max_ransac;
-  double max_distance_connected_components =
-      params_->max_distance_connected_components;
+  double max_discont_in_point_to_mean_distance_connected_components =
+      params_->max_discont_in_point_to_mean_distance_connected_components;
   CHECK(N > number_of_model_params) << "Not enough points to use RANSAC.";
   // Declare variables that are used for the RANSAC.
   std::vector<cv::Vec3f> random_points, inlier_candidates;
   cv::Vec3f normal;
   cv::Vec4f hessian_normal_form;
-  // Data structure to find the number of connected components.
-  ClusterOctree octree(max_distance_connected_components);
+  // Data structure to find whether the points form a single connected
+  // component.
+  ClusterDistanceFromMean cluster_distance_from_mean(
+      max_discont_in_point_to_mean_distance_connected_components);
   // Set a random seed.
   unsigned seed = 1;
   std::default_random_engine generator(seed);
@@ -2149,10 +2151,10 @@ void LineDetector::planeRANSAC(const std::vector<cv::Vec3f>& points,
     if (inlier_candidates.size() > inliers->size()) {
       // Clear data structure that retrieves the connected components among the
       // inliers.
-      octree.clear();
-      octree.addPoints(inlier_candidates);
+      cluster_distance_from_mean.clear();
+      cluster_distance_from_mean.addPoints(inlier_candidates);
 
-      if (octree.singleConnectedComponent()) {
+      if (cluster_distance_from_mean.singleConnectedComponent()) {
         *inliers = inlier_candidates;
       }
     }
