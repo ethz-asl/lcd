@@ -2115,6 +2115,7 @@ void LineDetector::planeRANSAC(const std::vector<cv::Vec3f>& points,
   double inlier_fraction_max = params_->inlier_max_ransac;
   double max_discont_in_point_to_mean_distance_connected_components =
       params_->max_discont_in_point_to_mean_distance_connected_components;
+  unsigned int min_num_inliers = params_->min_num_inliers;
   CHECK(N > number_of_model_params) << "Not enough points to use RANSAC.";
   // Declare variables that are used for the RANSAC.
   std::vector<cv::Vec3f> random_points, inlier_candidates;
@@ -2146,9 +2147,11 @@ void LineDetector::planeRANSAC(const std::vector<cv::Vec3f>& points,
       }
     }
 
-    // If we found more inliers than in any previous run and if the inliers form
-    // a single connected component, we store them as global inliers.
-    if (inlier_candidates.size() > inliers->size()) {
+    // If we found more inliers than in any previous run, if the inliers form a
+    // single connected component a if they are at least as many as the defined
+    // threshold, then we store them as global inliers.
+    if (inlier_candidates.size() > inliers->size() &&
+        inlier_candidates.size() >= min_num_inliers) {
       // Clear data structure that retrieves the connected components among the
       // inliers.
       cluster_distance_from_mean.clear();
