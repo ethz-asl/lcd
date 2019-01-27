@@ -361,7 +361,7 @@ inline void directHessianTowardsPoint(const cv::Vec3f& point,
 
 inline bool linesHaveSimilarLength(const cv::Vec4f& line_1,
                                    const cv::Vec4f& line_2) {
-  constexpr double kLengthDifference = 3;
+  constexpr double kLengthDifference = 2;
   double length_1 = cv::norm(cv::Vec2f({line_1[2], line_1[3]}) -
                              cv::Vec2f({line_1[0], line_1[1]}));
   double length_2 = cv::norm(cv::Vec2f({line_2[2], line_2[3]}) -

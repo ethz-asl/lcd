@@ -2406,9 +2406,11 @@ void LineDetector::project2Dto3DwithPlanes(
                   line3D_true.line[2]};
       end_3D = {line3D_true.line[3], line3D_true.line[4], line3D_true.line[5]};
 
-      project3DLineTo2D(start_3D, end_3D, camera_P, &reprojected_line);
-
+      if (!linesHaveSimilarLength(lines3D_cand[i], line3D_true.line)) {
+        continue;
+      }
       if (verbose_mode_on_) {
+        project3DLineTo2D(start_3D, end_3D, camera_P, &reprojected_line);
         LOG(INFO) << "** Candidate line was successfully projected to 3D with "
                   << "index " << num_lines_successfully_projected_to_3D
                   << ":\n   - 2D: (" << lines2D[i][0]  << ", " << lines2D[i][1]
