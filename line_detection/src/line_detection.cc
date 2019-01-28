@@ -94,8 +94,8 @@ bool areLinesEqual2D(const cv::Vec4f line1, const cv::Vec4f line2) {
   // If angle difference and minimum distance are less than the thresholds,
   // return true. Note that since we want angle_difference ~= 0 it must hold
   // that cos(angle_difference) ~= 1 => cos^2(angle_difference) ~= 1.
-  constexpr double kCosSqAngleDifference = 0.95;
   constexpr double kMinDistance = 2;
+  constexpr double kCosSqAngleDifference = 0.98;
   if (cos_sq_angle_difference > kCosSqAngleDifference &&
       min_dist < kMinDistance) {
     return true;
@@ -1594,8 +1594,6 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     //  3.  From all points in the set: Project them on to the line and choose
     //      the combination of start/end point that maximizes the line
     //      distance.
-    cv::Vec3f start_guess;
-    cv::Vec3f end_guess;
 
     const std::vector<cv::Vec3f>* points;
     int idx;
@@ -1610,9 +1608,6 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     // the origin) and do not consider the other plane at all, setting its
     // hessian explicitly to all zeros.
     line->hessians[abs(idx - 1)] = {0.0f, 0.0f, 0.0f, 0.0f};
-
-    cv::Vec3f direction = end_guess - start_guess;
-    normalizeVector3D(&direction);
 
     // Adjust the discontinuity line by forcing that it should be on the plane
     // selected above and that should be close to the inliers that in 2D are
