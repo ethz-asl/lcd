@@ -27,7 +27,9 @@ def train(read_as_pickle=True):
         pickleandsplit_path = pathconfig.obtain_paths_and_variables(
             "PICKLEANDSPLIT_PATH")
         # * Pickle-files version: path of the pickle files to use for training
-        #                         and validation.
+        #       and validation. Note: more than one pickle file at a time can be
+        #       used for both training and validation. Therefore, train_files
+        #       and val_files should both be lists.
         train_files = [
             os.path.join(pickleandsplit_path,
                          'train_0/traj_1/pickled_train.pkl')
@@ -39,13 +41,14 @@ def train(read_as_pickle=True):
         linesandimagesfolder_path = pathconfig.obtain_paths_and_variables(
             "LINESANDIMAGESFOLDER_PATH")
         # * Textfile version: path to the textfiles for the trainings and
-        #                     validation set.
+        #       validation set.
         # TODO: fix to use this non-pickle version. The paths in train_files
         # and val_files below should work, but the current version does not
-        # allow to train on different sets with textfiles. Also, textfiles do
-        # not contain the endpoints of the lines, but only their center point,
-        # making it therefore not possible to use the line direction/orthonormal
-        # representation required by the last version of the network.
+        # allow to train on several sets at a time with textfiles. Also,
+        # textfiles do not contain the endpoints of the lines, but only their
+        # center point, making it therefore not possible to use the line
+        # direction/orthonormal representation required by the last version of
+        # the network.
         train_files = [
             os.path.join(linesandimagesfolder_path, 'train_0/traj_1/train.txt')
         ]
@@ -56,17 +59,16 @@ def train(read_as_pickle=True):
               "files in the old format. Please use pickle files. Exiting.")
         return
 
+    # Either 'bgr' or 'bgr-d': type of the image fed to the network.
     image_type = 'bgr-d'
     # Type of line parametrization can be:
     # * 'direction_and_centerpoint':
-    #      Each line segment is parametrized by its center point and by the
-    #      first two entries of the unit direction vector. The third entry is
-    #      defined automatically by enforcing that the norm should be one, and
-    #      therefore is not fed into the network. To obtain invariance on the
-    #      orientation of the line (i.e., given the two endpoints we do NOT want
-    #      to consider one of them as the start and the other one as the end of
-    #      the line segment), we enforce that the first entry should be
-    #      non-negative. => 5 parameters per line.
+    #      Each line segment is parametrized by its center point and by its unit
+    #      direction vector.  To obtain invariance on the orientation of the
+    #      line (i.e., given the two endpoints we do NOT want to consider one of
+    #      them as the start and the other one as the end of the line segment),
+    #      we enforce that the first entry should be non-negative. => 6
+    #      parameters per line.
     # * 'orthonormal':
     #      A line segment is parametrized with a minimum-DOF parametrization
     #      (4 degrees of freedom) of the infinite line that it belongs to. The
@@ -79,8 +81,10 @@ def train(read_as_pickle=True):
     learning_rate = 0.0001
     num_epochs = 30
     batch_size = 128
+    # Margin of the triplet loss.
     margin = 0.2
-    triplet_strategy = "batch_hard"
+    # Either "batch_all" or "batch_hard". Strategy for triplets selection.
+    triplet_strategy = "batch_all"
 
     # Network parameters.
     dropout_rate = 0.5
@@ -103,6 +107,8 @@ def train(read_as_pickle=True):
     latest_checkpoint = tf.train.latest_checkpoint(checkpoint_path)
 
     # Create model.
+
+    # Input placeholder.
     if image_type == 'bgr':
         input_img = tf.placeholder(
             tf.float32, [None, 227, 227, 3], name="input_img")
@@ -454,9 +460,10 @@ def train(read_as_pickle=True):
                     })
                 loss_val += loss_current
                 val_count += 1
-            loss_val = loss_val / val_count
-            print("{} Average loss for validation set = {:.4f}".format(
-                datetime.now(), loss_val))
+            if val_count != 0:
+                loss_val = loss_val / val_count
+                print("{} Average loss for validation set = {:.4f}".format(
+                    datetime.now(), loss_val))
 
             # Reset the file pointer of the image data generator at the end of
             # each epoch.
