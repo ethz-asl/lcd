@@ -20,13 +20,22 @@ sys.path.append(scenenetscripts_path)
 import scenenet_pb2 as sn
 
 from mpl_toolkits.mplot3d import Axes3D
-from camera_pose_and_intrinsics_example import camera_to_world_with_pose, interpolate_poses
+from camera_pose_and_intrinsics_example import camera_to_world_with_pose, \
+                                               interpolate_poses
 
 
 def get_lines_world_coordinates_with_instances(dataset_name, trajectory,
                                                frames):
-    """For some frames in a trajectory, get lines start and end points world
-       coordinates and the instance labels assigned to lines.
+    """ For some frames in a trajectory from SceneNetRGBD, get the start and end
+        point of the lines in world coordinates, as well as the instance labels
+        assigned to lines. Used only for visualization and when data is not read
+        from pickle files.
+    Args:
+        dataset_name (string): Either 'val' or 'train_NUM', where NUM is an
+            integer between 0 and 16.
+        trajectory (int): Index of the trajectory.
+        frames (list of int): List of frames for which to extract lines and
+            labels.
     """
     lines_world = {}
     frames_count = {}
@@ -37,8 +46,8 @@ def get_lines_world_coordinates_with_instances(dataset_name, trajectory,
     # Find protobuf file associated to dataset_name.
     protobuf_path = get_protobuf_path(dataset_name)
     print(
-        "visualization.py/get_lines_world_coordinates_with_instances: using {} as protobuf_path".
-        format(protobuf_path))
+        "visualization.py/get_lines_world_coordinates_with_instances: using {} "
+        "as protobuf_path".format(protobuf_path))
     if protobuf_path is None:
         sys.exit('visualization.py: Error in retrieving protobuf_path.')
 
@@ -113,17 +122,17 @@ def get_lines_world_coordinates_with_instances(dataset_name, trajectory,
 
 
 def pcl_lines_for_plot(data_lines, lines_color, visualizer):
-    """Get points on the lines for 3D visualization in open3d or matplotlib.
+    """ Get points on the lines for 3D visualization in open3d or matplotlib.
     """
     if visualizer != 'open3d' and visualizer != 'matplotlib':
         print(
             'Invalid visualizer. Valid options are \'open3d\', \'matplotlib\'.')
         return
 
-    lines_number = data_lines.shape[0]
-    pcl_lines = [[] for n in range(lines_number)]
+    num_lines = data_lines.shape[0]
+    pcl_lines = [[] for n in range(num_lines)]
 
-    for i in range(lines_number):
+    for i in range(num_lines):
         line = data_lines[i]
         start = line[:3]
         end = line[3:6]
@@ -132,6 +141,11 @@ def pcl_lines_for_plot(data_lines, lines_color, visualizer):
 
         points = np.vstack((start + n * vector for n in interpolate))
         if np.unique(lines_color).shape[0] > 4:
+            # NOTE: Here it is crucial to note that when initializing the random
+            # number generator everytime immediately before generating the
+            # random number, the latter will always be same if the same seed is
+            # used. Therefore, same lines_color[i] will always correspond to the
+            # same colour.
             np.random.seed(lines_color[i])
             rgb = np.random.randint(255, size=(1, 3)) / 255.0
         else:
@@ -187,9 +201,9 @@ def plot_lines_with_open3d(pcl_lines, window_name="Open3D"):
 
 
 def vis_square(data):
-    """Take an array of shape (n, height, width) or (n, height, width, 3)
-       and visualize each (height, width) element in a grid of size approx.
-       sqrt(n) by sqrt(n).
+    """ Takes an array of shape (n, height, width) or (n, height, width, 3)
+        and visualizes each (height, width) element in a grid of size approx.
+        sqrt(n) by sqrt(n).
     """
     # Normalize data for display.
     data = (data - data.min()) / (data.max() - data.min())

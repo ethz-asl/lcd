@@ -6,14 +6,20 @@ import tensorflow as tf
 
 
 def _pairwise_distances(embeddings, squared=False):
-    """Compute the 2D matrix of distances between all the embeddings.
+    """ Compute the 2D matrix of distances between all the embeddings.
+
     Args:
-        embeddings: Tensor of shape (batch_size, embed_dim).
-        squared: Boolean. If true, output is the pairwise squared euclidean
-                 distance matrix.
-                 If false, output is the pairwise euclidean distance matrix.
+        embeddings (Tensorflow tensor of shape (batch_size, embed_dim) and type
+            tf.float32): embeddings[i] contains the embeddings associated to the
+            i-th line in the batch.
+        squared (bool): If True, the output is the pairwise squared Euclidean
+            distance matrix. If False, the output is the pairwise Euclidean
+            distance matrix.
     Returns:
-        pairwise_distances: Tensor of shape (batch_size, batch_size).
+        pairwise_distances (Tensorflow tensor of shape (batch_size, batch_size)
+            and type tf.float32): pairwise_distances[i, j] contains the pairwise
+            distance (of the type determined by the argument squared) between
+            the i-th and the j-th embeddings in the batch.
     """
     # Get the dot product between all embeddings
     # Shape (batch_size, batch_size)
@@ -52,18 +58,23 @@ def _pairwise_distances(embeddings, squared=False):
 
 
 def _get_anchor_positive_triplet_mask(labels, use_dist=False, max_dist=1.0):
-    """Return a 2D mask where mask[a, p] is True iff a and p are distinct, have
-       same instance label and - if use_dist is set to true - are close in
-       space.
+    """ Return a 2D mask where mask[a, p] is True iff a and p are distinct, have
+        same instance label and - if use_dist is set to true - are close in
+        space.
+
     Args:
-        labels: tf.float32 `Tensor` with shape [batch_size, 4].
-        use_dist: True if two the distance between the center points of the line
-                  should be used to determine whether a pair is an
-                  anchor-positive pair.
-        max_dist: max distance between the centers of the lines for the lines to
-                  be considered as close in space.
+        labels (Tensorflow tensor of shape (batch_size, 4) and type tf.float32):
+            Label associated to the line, in the format:
+                [center point (3x), instance label (1x)]
+        use_dist (bool): True if two the distance between the center points of
+            the line should be used to determine whether a pair is an
+            anchor-positive pair.
+        max_dist (float): max distance in meters between the centers of the
+            lines for the lines to be considered as close in space.
     Returns:
-        mask: tf.bool `Tensor` with shape [batch_size, batch_size].
+        mask (Tensorflow tensor of shape (batch_size, batch_size) and type
+            tf.bool): mask[a, p] is True if (a, p) is a valid anchor-positive
+            pair, False otherwise.
     """
     # Check that i and j are distinct.
     indices_equal = tf.cast(tf.eye(tf.shape(labels)[0]), tf.bool)
@@ -95,17 +106,22 @@ def _get_anchor_positive_triplet_mask(labels, use_dist=False, max_dist=1.0):
 
 
 def _get_anchor_negative_triplet_mask(labels, use_dist=False, max_dist=1.0):
-    """Return a 2D mask where mask[a, n] is True if a and n have distinct labels
-       or - if use_dist is set to true - a and n are far away in space.
+    """ Return a 2D mask where mask[a, n] is True if a and n have distinct
+        labels or - if use_dist is set to true - a and n are far away in space.
+
     Args:
-        labels: tf.float32 `Tensor` with shape [batch_size, 4].
-        use_dist: True if two the distance between the center points of the line
-                  should be used to determine whether a pair is an
-                  anchor-negative pair.
-        max_dist: max distance between the centers of the lines for the lines to
-                  be considered as close in space.
+        labels (Tensorflow tensor of shape (batch_size, 4) and type tf.float32):
+            Label associated to the line, in the format:
+                [center point (3x), instance label (1x)]
+        use_dist (bool): True if two the distance between the center points of
+            the line should be used to determine whether a pair is an
+            anchor-positive pair.
+        max_dist (float): max distance in meters between the centers of the
+            lines for the lines to be considered as close in space.
     Returns:
-        mask: tf.bool `Tensor` with shape [batch_size, batch_size].
+        mask (Tensorflow tensor of shape (batch_size, batch_size) and type
+            tf.bool): mask[a, n] is True if (a, n) is a valid anchor-negative
+            pair, False otherwise.
     """
     # Check if labels[i, -1] != labels[k, -1]
     # Use broadcasting where the 1st argument has shape (1, batch_size) and the
@@ -134,18 +150,25 @@ def _get_anchor_negative_triplet_mask(labels, use_dist=False, max_dist=1.0):
 
 
 def _get_triplet_mask(labels, use_dist=False, max_dist=1.0):
-    """Return a 3D mask where mask[a, p, n] is True iff the triplet (a, p, n) is
-    valid.
-    A triplet (i, j, k) is valid if:
-        1. i, j, k are distinct
-        2. (i, j) positive, (i, k) negative
+    """ Return a 3D mask where mask[a, p, n] is True iff the triplet (a, p, n)
+        is valid.
+        A triplet (i, j, k) is valid if:
+            1. i, j, k are distinct
+            2. (i, j) positive, (i, k) negative
+
     Args:
-        labels: tf.float32 `Tensor` with shape [batch_size, 4].
-        use_dist: True if two the distance between the center points of the
-                  lines should be used to determine a pair whether an
-                  anchor-positive/anchor-negative pair.
-        max_dist: max distance between the centers of the lines for the lines to
-                  be considered as close in space.
+        labels (Tensorflow tensor of shape (batch_size, 4) and type tf.float32):
+            Label associated to the line, in the format:
+                [center point (3x), instance label (1x)]
+        use_dist (bool): True if two the distance between the center points of
+            the line should be used to determine whether a pair is an
+            anchor-positive pair.
+        max_dist (float): max distance in meters between the centers of the
+            lines for the lines to be considered as close in space.
+    Returns:
+        mask (Tensorflow tensor of shape (batch_size, batch_size) and type
+            tf.bool): mask[a, p, n] is True if (a, p, n) is a valid
+            anchor-positive-negative triplet, False otherwise.
     """
     # Check that i, j and k are distinct.
     indices_equal = tf.cast(tf.eye(tf.shape(labels)[0]), tf.bool)
