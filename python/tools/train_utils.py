@@ -207,21 +207,27 @@ def write_triplet_image_to_file(
     plt.close()
 
 
-def print_batch_triplets_statistics(triplet_strategy,
-                                    images,
-                                    set_mean,
-                                    batch_index,
-                                    epoch_index,
-                                    write_folder,
-                                    labels,
-                                    pairwise_dist,
-                                    mask_anchor_positive=None,
-                                    mask_anchor_negative=None,
-                                    valid_triplets=None,
-                                    hardest_positive_dist=None,
-                                    hardest_negative_dist=None,
-                                    hardest_positive_element=None,
-                                    hardest_negative_element=None):
+def print_batch_triplets_statistics(
+        triplet_strategy,
+        images,
+        set_mean,
+        batch_index,
+        epoch_index,
+        write_folder,
+        labels,
+        pairwise_dist,
+        loss,
+        mask_anchor_positive=None,
+        mask_anchor_negative=None,
+        valid_positive_triplets=None,
+        sum_valid_positive_triplets_anchor_positive_dist=None,
+        num_anchor_positive_pairs_with_valid_positive_triplets=None,
+        lambda_regularization=None,
+        regularization_term=None,
+        hardest_positive_dist=None,
+        hardest_negative_dist=None,
+        hardest_positive_element=None,
+        hardest_negative_element=None):
     """ Print statistics about values extracted from the triplets in a training
         batch and writes to file images containing the virtual images of the
         lines in the triplets selected.
@@ -251,6 +257,7 @@ def print_batch_triplets_statistics(triplet_strategy,
             of the elements in the batch (e.g. pairwise_dist[i, j] contains the
             distance between the embedding of the i-th element and the embedding
             of the j-th element in the batch).
+        loss (float): Loss obtained for the batch.
         mask_anchor_positive (numpy array of shape (batch_size, batch_size) and
             dtype bool): mask_anchor_positive[i, j] is True if a valid
             anchor-positive pair can be formed by taking the i-th element in the
@@ -261,13 +268,28 @@ def print_batch_triplets_statistics(triplet_strategy,
             anchor-negative pair can be formed by taking the i-th element in the
             batch as anchor and the j-th element in the batch as negative, False
             otherwise. Must be not None if triplet strategy is 'batch_hard'.
-        valid_triplets (numpy array of shape (batch_size, batch_size,
-            batch_size) and dtype bool): valid_triplets[i, j, k] is True if a
-            valid triplet can be formed by taking the i-th element in the batch
-            as anchor, the j-th element in the batch as positive and the k-th
-            element in the batch as negative, and the triplet is not an easy
-            one, i.e. d(a, p) - d(a,n) + margin > 0. It is False otherwise. Must
-            be not None if triplet strategy is 'batch_all'.
+        valid_positive_triplets (numpy array of shape (batch_size, batch_size,
+            batch_size) and dtype bool): valid_positive_triplets[i, j, k] is
+            True if a valid triplet can be formed by taking the i-th element in
+            the batch as anchor, the j-th element in the batch as positive and
+            the k-th element in the batch as negative, and the triplet is not an
+            easy one, i.e. d(a, p) - d(a,n) + margin is not less than 0. It is
+            False otherwise. Must be not None if triplet strategy is
+            'batch_all'.
+        sum_valid_positive_triplets_anchor_positive_dist (float): Sum of the
+            anchor-positive distances d(a, p) over all anchor-positive pairs
+            such that there exists at least one element n such that (a, p, n) is
+            a valid positive (i.e., non-easy) triplet. Must be not None if
+            triplet strategy is 'batch_all'.
+        num_anchor_positive_pairs_with_valid_positive_triplets (float): Number
+            of anchor-positive pairs (a, p) such that there exists at least one
+            element n such that (a, p, n) is a valid positive (i.e., non-easy)
+            triplet. Must be not None if triplet strategy is 'batch_all'.
+        lambda_regularization (float): Regularization parameter in the
+            'batch-all' loss. Must be not None if triplet strategy is
+            'batch_all'.
+        regularization_term (float): Regularization term in the loss for the
+            current batch. Must be not None if triplet strategy is 'batch_all'.
         hardest_positive_dist (numpy array of shape (batch_size, 1) and dtype
             np.float32): hardest_positive_dist[i] contains the distance of the
             element in the batch (WLOG, with index j) that is furthest away from
@@ -295,13 +317,29 @@ def print_batch_triplets_statistics(triplet_strategy,
         print("Triplet strategy must be either 'batch_all' or 'batch_hard'.")
         return
     elif (triplet_strategy == 'batch_all'):
-        if (valid_triplets is None):
-            print("Please pass a valid 'valid_triplets' argument when using "
-                  "triplet strategy 'batch_all'")
+        if (valid_positive_triplets is None):
+            print("Please pass a valid 'valid_positive_triplets' argument when "
+                  "using triplet strategy 'batch_all'")
+            return
+        if (sum_valid_positive_triplets_anchor_positive_dist is None):
+            print("Please pass a valid "
+                  "'sum_valid_positive_triplets_anchor_positive_dist' argument "
+                  "when using triplet strategy 'batch_all'")
+            return
+        if (num_anchor_positive_pairs_with_valid_positive_triplets is None):
+            print("Please pass a valid "
+                  "'num_anchor_positive_pairs_with_valid_positive_triplets' "
+                  "argument when using triplet strategy 'batch_all'")
+            return
+        if (lambda_regularization is None or regularization_term is None):
+            print("Please pass valid 'lambda_regularization' and "
+                  "'regularization_term' arguments when using triplet strategy "
+                  "'batch_all'")
             return
         assert(images.shape[0] == labels.shape[0] == pairwise_dist.shape[0] == \
-               pairwise_dist.shape[1] == valid_triplets.shape[0] == \
-               valid_triplets.shape[1] == valid_triplets.shape[2])
+               pairwise_dist.shape[1] == valid_positive_triplets.shape[0] == \
+               valid_positive_triplets.shape[1] == \
+               valid_positive_triplets.shape[2])
         assert (labels.shape[1] == 7)
 
         # Create directory if nonexistent (based on
@@ -324,13 +362,30 @@ def print_batch_triplets_statistics(triplet_strategy,
                                                     label[3:6]))
                 f.write("{0}Instance label {1}\n".format(
                     " " * (len(str(idx)) + 2), label[-1]))
+            # Print loss and auxiliary information.
+            f.write("***** Loss *****\n")
+            f.write("The loss obtained for the batch is {}.\n".format(loss))
+            f.write("The regularization term for the loss, with a ")
+            f.write("regularization hyperparameter of {}, is ".format(
+                lambda_regularization))
+            f.write("{}.\n".format(regularization_term))
+            f.write("The sum of all anchor-positive distances d(a, p) over ")
+            f.write("all the anchor-positive pairs (a, p) such that there ")
+            f.write("exists at least one element n such that (a, p, n) is a ")
+            f.write("valid positive (i.e., non-easy) triplet is {}.\n".format(
+                sum_valid_positive_triplets_anchor_positive_dist))
+            f.write("The number of anchor-positive pairs (a, p) such that ")
+            f.write("there exists at least one element n such that (a, p, n) ")
+            f.write("is a valid positive (i.e., non-easy) triplet is ")
+            f.write("{}.\n".format(
+                int(num_anchor_positive_pairs_with_valid_positive_triplets)))
             # Print valid triplets.
             batch_size = labels.shape[0]
             f.write("***** Valid triplets *****\n")
             for i in range(batch_size):
                 for j in range(batch_size):
                     for k in range(batch_size):
-                        if (valid_triplets[i, j, k] == True):
+                        if (valid_positive_triplets[i, j, k] == True):
                             f.write(
                                 "* Triplet ({0}, {1}, {2}) ".format(i, j, k) +
                                 "is a valid non-easy anchor-positive-negative "
@@ -403,6 +458,9 @@ def print_batch_triplets_statistics(triplet_strategy,
                                                     label[3:6]))
                 f.write("{0}Instance label {1}\n".format(
                     " " * (len(str(idx)) + 2), label[-1]))
+            # Print loss.
+            f.write("***** Loss *****\n")
+            f.write("The loss obtained for the batch is {}".format(loss))
             # Print valid anchor-positive pairs.
             f.write("***** Valid anchor-positive pairs *****\n")
             for i in range(batch_size):

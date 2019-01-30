@@ -83,6 +83,10 @@ def train(read_as_pickle=True):
     batch_size = 128
     # Margin of the triplet loss.
     margin = 0.2
+    # Regularization hyperparameter required when using the loss based on
+    # 'batch_all' triplet selection strategy.
+    lambda_regularization = 0.1
+
     # Either "batch_all" or "batch_hard". Strategy for triplets selection.
     triplet_strategy = "batch_all"
 
@@ -193,13 +197,16 @@ def train(read_as_pickle=True):
     # Define loss.
     with tf.name_scope("triplet_loss"):
         if triplet_strategy == "batch_all":
-            (loss, fraction, valid_triplets,
-             pairwise_dist) = batch_all_triplet_loss(
-                 labels,
-                 embeddings,
-                 margin=margin,
-                 lambda_regularization=0.1,
-                 squared=False)
+            (loss, fraction, valid_positive_triplets, pairwise_dist,
+             sum_valid_positive_triplets_anchor_positive_dist,
+             num_anchor_positive_pairs_with_valid_positive_triplets,
+             regularization_term
+            ) = batch_all_triplet_loss(
+                labels,
+                embeddings,
+                margin=margin,
+                lambda_regularization=lambda_regularization,
+                squared=False)
         elif triplet_strategy == "batch_hard":
             (loss, mask_anchor_positive, mask_anchor_negative,
              hardest_positive_dist, hardest_negative_dist,
@@ -353,15 +360,24 @@ def train(read_as_pickle=True):
                 if (epoch % 10 < 2 and step < 30):
                     if (triplet_strategy == 'batch_all'):
                         (pairwise_dist_for_stats,
-                         valid_triplets_for_stats) = sess.run(
-                             [pairwise_dist, valid_triplets],
-                             feed_dict={
-                                 input_img: batch_input_img_train,
-                                 labels: batch_labels_train,
-                                 line_types: batch_line_types_train,
-                                 geometric_info: batch_geometric_info_train,
-                                 keep_prob: dropout_rate
-                             })
+                         valid_positive_triplets_for_stats,
+                         sum_valid_positive_triplets_anchor_positive_dist_for_stats,
+                         num_anchor_positive_pairs_with_valid_positive_triplets_for_stats,
+                         loss_for_stats, regularization_term_for_stats
+                        ) = sess.run(
+                            [
+                                pairwise_dist, valid_positive_triplets,
+                                sum_valid_positive_triplets_anchor_positive_dist,
+                                num_anchor_positive_pairs_with_valid_positive_triplets,
+                                loss, regularization_term
+                            ],
+                            feed_dict={
+                                input_img: batch_input_img_train,
+                                labels: batch_labels_train,
+                                line_types: batch_line_types_train,
+                                geometric_info: batch_geometric_info_train,
+                                keep_prob: dropout_rate
+                            })
                         print_batch_triplets_statistics(
                             triplet_strategy=triplet_strategy,
                             images=batch_input_img_train,
@@ -371,7 +387,15 @@ def train(read_as_pickle=True):
                             write_folder='{}_logs/'.format(job_name),
                             labels=labels_for_stats,
                             pairwise_dist=pairwise_dist_for_stats,
-                            valid_triplets=valid_triplets_for_stats)
+                            valid_positive_triplets=
+                            valid_positive_triplets_for_stats,
+                            sum_valid_positive_triplets_anchor_positive_dist=
+                            sum_valid_positive_triplets_anchor_positive_dist_for_stats,
+                            num_anchor_positive_pairs_with_valid_positive_triplets
+                            =num_anchor_positive_pairs_with_valid_positive_triplets_for_stats,
+                            loss=loss_for_stats,
+                            lambda_regularization=lambda_regularization,
+                            regularization_term=regularization_term_for_stats)
                     elif (triplet_strategy == 'batch_hard'):
                         (pairwise_dist_for_stats,
                          mask_anchor_positive_for_stats,
@@ -379,13 +403,14 @@ def train(read_as_pickle=True):
                          hardest_positive_dist_for_stats,
                          hardest_negative_dist_for_stats,
                          hardest_positive_element_for_stats,
-                         hardest_negative_element_for_stats) = sess.run(
+                         hardest_negative_element_for_stats,
+                         loss_for_stats) = sess.run(
                              [
                                  pairwise_dist, mask_anchor_positive,
                                  mask_anchor_negative, hardest_positive_dist,
                                  hardest_negative_dist,
                                  hardest_positive_element,
-                                 hardest_negative_element
+                                 hardest_negative_element, loss
                              ],
                              feed_dict={
                                  input_img: batch_input_img_train,
@@ -412,7 +437,8 @@ def train(read_as_pickle=True):
                             hardest_positive_element=
                             hardest_positive_element_for_stats,
                             hardest_negative_element=
-                            hardest_negative_element_for_stats)
+                            hardest_negative_element_for_stats,
+                            loss=loss_for_stats)
                 # Run the training operation.
                 sess.run(
                     train_op,

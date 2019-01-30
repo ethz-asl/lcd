@@ -321,24 +321,22 @@ def batch_all_triplet_loss(labels,
     triplet_loss = tf.maximum(triplet_loss, 0.0)
 
     # Count number of positive triplets (where triplet_loss > 0).
-    valid_triplets_bool = tf.greater(triplet_loss, 1e-16)
-    valid_triplets = tf.to_float(valid_triplets_bool)
-    num_positive_triplets = tf.reduce_sum(valid_triplets)
+    valid_positive_triplets_bool = tf.greater(triplet_loss, 1e-16)
+    valid_positive_triplets = tf.to_float(valid_positive_triplets_bool)
+    num_valid_positive_triplets = tf.reduce_sum(valid_positive_triplets)
     num_valid_triplets = tf.reduce_sum(mask)
     tf.summary.scalar("num_valid_triplets", num_valid_triplets)
 
-    fraction_positive_triplets = num_positive_triplets / \
+    fraction_positive_triplets = num_valid_positive_triplets / \
         (num_valid_triplets + 1e-16)
 
-    # Get final mean triplet loss over the positive valid triplets.
+    # Get final average triplet loss over the valid positive triplets.
     triplet_loss = tf.reduce_sum(triplet_loss) / \
-        (num_positive_triplets + 1e-16)
+        (num_valid_positive_triplets + 1e-16)
 
     # Add regularization term to the final loss.
     # Get mask for triplets that are valid (i.e., (a, p, n)) and positive (i.e.,
     # either hard or semi-hard).
-    valid_positive_triplets_bool = tf.logical_and(
-        _get_triplet_mask(labels), valid_triplets_bool)
     valid_positive_triplets_mask = tf.to_float(valid_positive_triplets_bool)
     # Compute anchor-positive distances for the valid positive triplets.
     valid_positive_triplets_anchor_positive_dist = tf.multiply(
@@ -384,5 +382,7 @@ def batch_all_triplet_loss(labels,
     # term.
     loss = triplet_loss + regularization_term
 
-    return (loss, fraction_positive_triplets, valid_triplets_bool,
-            pairwise_dist)
+    return (loss, fraction_positive_triplets, valid_positive_triplets_bool,
+            pairwise_dist, sum_valid_positive_triplets_anchor_positive_dist,
+            num_anchor_positive_pairs_with_valid_positive_triplets,
+            regularization_term)
