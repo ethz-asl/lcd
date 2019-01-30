@@ -200,13 +200,12 @@ def train(read_as_pickle=True):
             (loss, fraction, valid_positive_triplets, pairwise_dist,
              sum_valid_positive_triplets_anchor_positive_dist,
              num_anchor_positive_pairs_with_valid_positive_triplets,
-             regularization_term
-            ) = batch_all_triplet_loss(
-                labels,
-                embeddings,
-                margin=margin,
-                lambda_regularization=lambda_regularization,
-                squared=False)
+             regularization_term) = batch_all_triplet_loss(
+                 labels,
+                 embeddings,
+                 margin=margin,
+                 lambda_regularization=lambda_regularization,
+                 squared=False)
         elif triplet_strategy == "batch_hard":
             (loss, mask_anchor_positive, mask_anchor_negative,
              hardest_positive_dist, hardest_negative_dist,
@@ -241,6 +240,9 @@ def train(read_as_pickle=True):
     embedding_mean_norm = tf.reduce_mean(tf.norm(embeddings, axis=1))
     tf.summary.scalar("embedding_mean_norm", embedding_mean_norm)
 
+    if triplet_strategy == "batch_all":
+        tf.summary.scalar('fraction_positive_triplets', fraction)
+
     # NOTE: the merged summary does not include the losses, since we want to
     # output both the training and validation loss, but the two losses should
     # obviously be computed on different data (this practically means that we
@@ -248,13 +250,8 @@ def train(read_as_pickle=True):
     merged_summary = tf.summary.merge_all()
 
     # Add the loss to summary.
-    if triplet_strategy == "batch_all":
-        training_loss_summary = tf.summary.scalar('training_loss', loss)
-        validation_loss_summary = tf.summary.scalar('validation_loss', loss)
-        tf.summary.scalar('fraction_positive_triplets', fraction)
-    elif triplet_strategy == "batch_hard":
-        training_loss_summary = tf.summary.scalar('training_loss', loss)
-        validation_loss_summary = tf.summary.scalar('validation_loss', loss)
+    training_loss_summary = tf.summary.scalar('training_loss', loss)
+    validation_loss_summary = tf.summary.scalar('validation_loss', loss)
 
     # Initialize the FileWriter.
     writer = tf.summary.FileWriter(filewriter_path)
@@ -321,6 +318,11 @@ def train(read_as_pickle=True):
             train_generator.data_size / batch_size).astype(np.int16)
         val_batches_per_epoch = np.floor(
             val_generator.data_size / batch_size).astype(np.int16)
+
+        print("Number of training batches per epoch = {}".format(
+            train_batches_per_epoch))
+        print("Number of validation batches per epoch = {}".format(
+            val_batches_per_epoch))
 
         # Add the model graph to TensorBoard.
         writer.add_graph(sess.graph)
