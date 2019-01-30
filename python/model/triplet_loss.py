@@ -175,18 +175,21 @@ def _get_triplet_mask(labels, use_dist=False, max_dist=1.0):
 
 
 def batch_hardest_triplet_loss(labels, embeddings, margin, squared=False):
-    """Build the triplet loss over a batch of embeddings.
-    For each anchor, we get the hardest positive and hardest negative to form a
-    triplet.
+    """ Build the triplet loss over a batch of embeddings.
+        For each anchor, we get the hardest positive and hardest negative to
+        form a triplet.
+
     Args:
-        labels: Labels of the batch, of size (batch_size, 4).
-        embeddings: Tensor of shape (batch_size, embed_dim).
-        margin: Margin for triplet loss.
-        squared: Boolean. If true, output is the pairwise squared euclidean
-                 distance matrix. If false, output is the pairwise euclidean
-                 distance matrix.
+        labels (Tensorflow tensor): Labels of the batch, of size
+            (batch_size, 4).
+        embeddings (Tensorflow tensor): Embeddings outputted by the network, of
+            shape (batch_size, embed_dim).
+        margin (float): Margin for triplet loss.
+        squared (bool): If True, output is the pairwise squared Euclidean
+            distance matrix. If False, output is the pairwise Euclidean distance
+            matrix.
     Returns:
-        triplet_loss: Scalar tensor containing the triplet loss.
+        triplet_loss (scalar Tensorflow tensor): Triplet loss.
     """
     # The label for each line must be of shape 4: 3 values for the center of the
     # line and one for the instance.
@@ -244,19 +247,47 @@ def batch_hardest_triplet_loss(labels, embeddings, margin, squared=False):
            hardest_positive_element, hardest_negative_element, pairwise_dist
 
 
-def batch_all_triplet_loss(labels, embeddings, margin, squared=False):
-    """Build the triplet loss over a batch of embeddings.
-    We generate all the valid triplets and average the loss over the positive
-    ones.
+def batch_all_triplet_loss(labels,
+                           embeddings,
+                           margin,
+                           lambda_regularization,
+                           squared=False):
+    """ Build the loss over a batch of embeddings. The loss is composed of two
+        terms:
+
+            loss = triplet_loss + regularization_term
+
+        * The triplet loss is computed by generating all the valid triplets and
+          averaging the loss over the positive (i.e., hard or semi-hard) ones.
+          This triplet selection strategy is called 'batch-all'.
+        * The regularization term is obtained by considering all anchor-positive
+          pairs (a, p) such that there exists at least a valid positive (where
+          'positive' has the meaning defined above) triplet (a, p, n). In
+          particular, the regularization term is obtained by taking the average
+          anchor-positive distance d(a, p) over all such pairs (a, p) and
+          multiplying the average distance obtained by a regularization
+          hyperparameter lambda_regularization. The regularization term can
+          therefore be written as:
+
+            regularization_term =  lambda_regularization * 1 / N *
+                sum_{(a, p) s.t. there exists (a, p, n) valid positive} d(a, p),
+
+            where N = #{(a, p) s.t. there exists (a, p, n) valid positive}.
+
     Args:
-        labels: Labels of the batch, of size (batch_size, 4)
-        embeddings: Tensor of shape (batch_size, embed_dim)
-        margin: Margin for triplet loss
-        squared: Boolean. If true, output is the pairwise squared euclidean
-                 distance matrix. If false, output is the pairwise euclidean
-                 distance matrix.
+        labels (Tensorflow tensor): Labels of the batch, of size
+            (batch_size, 4).
+        embeddings (Tensorflow tensor): Embeddings outputted by the network, of
+            shape (batch_size, embed_dim).
+        margin (float): Margin for triplet loss.
+        lambda_regularization (float): Regularization hyperparameter for the
+            loss defined above.
+        squared (bool): If True, output is the pairwise squared Euclidean
+            distance matrix. If False, output is the pairwise Euclidean distance
+            matrix.
     Returns:
-        triplet_loss: Scalar tensor containing the triplet loss.
+        loss (scalar Tensorflow tensor): Output loss, computed as described
+            above.
     """
     # The label for each line must be of shape 4: 3 values for the center of the
     # line and one for the instance.
@@ -303,5 +334,55 @@ def batch_all_triplet_loss(labels, embeddings, margin, squared=False):
     triplet_loss = tf.reduce_sum(triplet_loss) / \
         (num_positive_triplets + 1e-16)
 
-    return (triplet_loss, fraction_positive_triplets, valid_triplets_bool,
+    # Add regularization term to the final loss.
+    # Get mask for triplets that are valid (i.e., (a, p, n)) and positive (i.e.,
+    # either hard or semi-hard).
+    valid_positive_triplets_bool = tf.logical_and(
+        _get_triplet_mask(labels), valid_triplets_bool)
+    valid_positive_triplets_mask = tf.to_float(valid_positive_triplets_bool)
+    # Compute anchor-positive distances for the valid positive triplets.
+    valid_positive_triplets_anchor_positive_dist = tf.multiply(
+        valid_positive_triplets_mask, anchor_positive_dist)
+    # Sum all distances (anchor, positive) for the valid positive triplets. Only
+    # consider each (anchor, positive) pair once, i.e., if for a certain pair
+    # (a, p) there are several negative elements n such that (a, p, n) is a
+    # valid positive triplet, only consider the distance d(a, p) once.
+    # * Due to broadcasting, valid_positive_triplets_anchor_positive_dist is a
+    #   tensor of shape (batch_size, batch_size, batch_size), with
+    #   valid_positive_triplets_anchor_positive_dist[i, j, k] being d(a=i, p=j)
+    #   if (a=i, p=j, n=k) is a valid positive triplet and 0 otherwise.
+    #   Therefore, to find d(a=i, p=j) for a certain pair (a=i, p=j) such that
+    #   there exists at least one valid positive triplet (a=i, p=j, n) it is
+    #   enough to take the max over n of
+    #   valid_positive_triplets_anchor_positive_dist[i, j, n]. This will be
+    #   equal to d(a=i, p=j) if there exists at least one valid positive triplet
+    #   (a=i, p=j, n) (because
+    #   valid_positive_triplets_anchor_positive_dist[i, j, n] = d(a=i, p=j) for
+    #   all n's such that (a=i, p=j, n) is a valid positive triplet) and 0
+    #   otherwise.
+    anchor_positive_distances_with_valid_positive_triplets = tf.reduce_max(
+        valid_positive_triplets_anchor_positive_dist[:, :], axis=2)
+    # * Computing the sum of the above over all the anchor-positive pairs (a, p)
+    #   gives us the answer, i.e., the sum of all distances d(a=i, p=j) such
+    #   that there exists at least one valid positive triplet (a=i, p=j, n).
+    sum_valid_positive_triplets_anchor_positive_dist = tf.reduce_sum(
+        anchor_positive_distances_with_valid_positive_triplets)
+    # Average the sum above over the number of anchor-positive pairs (a=i, p=j)
+    # such that there exists at least on valid positive triplet (a=i, p=j, n)
+    # and multiply by the regularization hyperparameter to obtain the
+    # regularization term.
+    num_anchor_positive_pairs_with_valid_positive_triplets = tf.reduce_sum(
+        tf.to_float(
+            tf.greater(anchor_positive_distances_with_valid_positive_triplets,
+                       1e-16)))
+
+    regularization_term = lambda_regularization * \
+        sum_valid_positive_triplets_anchor_positive_dist / \
+        (num_anchor_positive_pairs_with_valid_positive_triplets + 1e-16)
+
+    # Compute the total loss by summing the triplet loss and the regularization
+    # term.
+    loss = triplet_loss + regularization_term
+
+    return (loss, fraction_positive_triplets, valid_triplets_bool,
             pairwise_dist)

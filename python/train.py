@@ -195,7 +195,11 @@ def train(read_as_pickle=True):
         if triplet_strategy == "batch_all":
             (loss, fraction, valid_triplets,
              pairwise_dist) = batch_all_triplet_loss(
-                 labels, embeddings, margin=margin, squared=False)
+                 labels,
+                 embeddings,
+                 margin=margin,
+                 lambda_regularization=0.1,
+                 squared=False)
         elif triplet_strategy == "batch_hard":
             (loss, mask_anchor_positive, mask_anchor_negative,
              hardest_positive_dist, hardest_negative_dist,
