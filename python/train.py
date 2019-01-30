@@ -226,24 +226,30 @@ def train(read_as_pickle=True):
     for var in var_list:
         tf.summary.histogram(var.name, var)
 
-    # Add the loss to summary.
-    if triplet_strategy == "batch_all":
-        tf.summary.scalar('triplet_loss', loss)
-        tf.summary.scalar('fraction_positive_triplets', fraction)
-    elif triplet_strategy == "batch_hard":
-        tf.summary.scalar('triplet_loss', loss)
-
     # Add embedding_mean_norm (should always be 1) to summary.
     embedding_mean_norm = tf.reduce_mean(tf.norm(embeddings, axis=1))
     tf.summary.scalar("embedding_mean_norm", embedding_mean_norm)
 
+    # NOTE: the merged summary does not include the losses, since we want to
+    # output both the training and validation loss, but the two losses should
+    # obviously be computed on different data (this practically means that we
+    # have to manually use add_summary rather than using merge_all).
     merged_summary = tf.summary.merge_all()
+
+    # Add the loss to summary.
+    if triplet_strategy == "batch_all":
+        training_loss_summary = tf.summary.scalar('training_loss', loss)
+        validation_loss_summary = tf.summary.scalar('validation_loss', loss)
+        tf.summary.scalar('fraction_positive_triplets', fraction)
+    elif triplet_strategy == "batch_hard":
+        training_loss_summary = tf.summary.scalar('training_loss', loss)
+        validation_loss_summary = tf.summary.scalar('validation_loss', loss)
 
     # Initialize the FileWriter.
     writer = tf.summary.FileWriter(filewriter_path)
 
     # Initialize an saver to store model checkpoints.
-    saver = tf.train.Saver()
+    saver = tf.train.Saver(max_to_keep=3)
 
     # Run model.
     with tf.Session() as sess:
@@ -320,7 +326,7 @@ def train(read_as_pickle=True):
             print("{} Epoch number: {}".format(datetime.now(), epoch + 1))
             step = 1
 
-            while step < train_batches_per_epoch:
+            while step <= train_batches_per_epoch:
                 # Get a batch of images and labels.
                 (batch_input_img_train, batch_labels_train,
                  batch_line_types_train
@@ -416,8 +422,8 @@ def train(read_as_pickle=True):
                 # Generate summary with the current batch of data and write it
                 # to file.
                 if step % display_step == 0:
-                    s = sess.run(
-                        merged_summary,
+                    (merged_s, training_s) = sess.run(
+                        [merged_summary, training_loss_summary],
                         feed_dict={
                             input_img: batch_input_img_train,
                             labels: batch_labels_train,
@@ -425,7 +431,9 @@ def train(read_as_pickle=True):
                             geometric_info: batch_geometric_info_train,
                             keep_prob: 1.
                         })
-                    writer.add_summary(s,
+                    writer.add_summary(merged_s,
+                                       epoch * train_batches_per_epoch + step)
+                    writer.add_summary(training_s,
                                        epoch * train_batches_per_epoch + step)
 
                 step += 1
@@ -434,7 +442,7 @@ def train(read_as_pickle=True):
             print("{} Start validation".format(datetime.now()))
             loss_val = 0.
             val_count = 0
-            for _ in range(val_batches_per_epoch):
+            for val_step in range(val_batches_per_epoch):
                 (batch_input_img_val, batch_labels_val,
                  batch_line_types_val) = val_generator.next_batch(batch_size)
                 # Pickled files have labels in the endpoints format -> convert
@@ -449,8 +457,8 @@ def train(read_as_pickle=True):
                     batch_labels_val = get_label_with_line_center(
                         labels_batch=batch_labels_val)
                 # Obtain validation loss.
-                loss_current = sess.run(
-                    loss,
+                (loss_current, validation_s) = sess.run(
+                    [loss, validation_loss_summary],
                     feed_dict={
                         input_img: batch_input_img_val,
                         labels: batch_labels_val,
@@ -460,6 +468,9 @@ def train(read_as_pickle=True):
                     })
                 loss_val += loss_current
                 val_count += 1
+                # Add validation loss to summary.
+                writer.add_summary(validation_s,
+                                   epoch * val_batches_per_epoch + val_step)
             if val_count != 0:
                 loss_val = loss_val / val_count
                 print("{} Average loss for validation set = {:.4f}".format(
