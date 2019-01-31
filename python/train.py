@@ -242,6 +242,7 @@ def train(read_as_pickle=True):
 
     if triplet_strategy == "batch_all":
         tf.summary.scalar('fraction_positive_triplets', fraction)
+        tf.summary.scalar('regularization_term', regularization_term)
 
     # NOTE: the merged summary does not include the losses, since we want to
     # output both the training and validation loss, but the two losses should

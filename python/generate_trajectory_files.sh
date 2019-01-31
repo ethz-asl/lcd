@@ -106,7 +106,10 @@ then
 else
   while
     # Delete any previous line textfile associated to that trajectory.
-    rm "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/traj_${TRAJ_NUM}/*
+    if [ -d "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/traj_${TRAJ_NUM}/ ]
+    then
+      rm "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/traj_${TRAJ_NUM}/*
+    fi
     # Play bag and record data.
     echo -e "\n**** Playing bag and recording data for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
     roslaunch line_ros_utility detect_and_save_lines.launch trajectory:=${TRAJ_NUM} write_path:="$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/ scenenet_true_scenenn_false:=$SCENENET_TRUE_SCENENN_FALSE start_frame:=${START_FRAME} frame_step:=${FRAME_STEP} &
