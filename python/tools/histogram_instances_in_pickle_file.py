@@ -4,6 +4,7 @@
 import argparse
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 import sys
 
 from sklearn.externals import joblib
@@ -38,7 +39,6 @@ def compute_histogram(picklefile_path):
                     image_type_dict = frame_number_dict[image_type]
                     for line_number in image_type_dict.keys():
                         line_number_dict = image_type_dict[line_number]
-                        # Append image.
                         if image_type == 'rgb':
                             # Append label.
                             hist_instance_labels.append(
@@ -56,12 +56,17 @@ def compute_histogram(picklefile_path):
     return histogram
 
 
-def display_histogram(picklefile_path):
+def display_histogram(picklefile_path, save_data=False, save_data_path=None):
     """ Displays the histogram with the distribution of the instance labels in
-        the input pickle file.
+        the input pickle file. If specified, saves the data in a statistics
+        file.
 
     Args:
         picklefile_path (string): Path of the pickle file.
+        save_data (bool): If True the histogram statistics are printed to the
+            file save_data_path.
+        save_data_path (string): Path where to store the histogram statistics
+            if save_data is True.
     """
     # Compute histogram.
     histogram = compute_histogram(picklefile_path)
@@ -87,6 +92,28 @@ def display_histogram(picklefile_path):
 
     plt.show()
 
+    # Save histogram if required.
+    if (save_data):
+        if (save_data_path is None):
+            print("Please specify a folder where to print the histogram "
+                  "statistics.")
+        else:
+            if not os.path.exists(os.path.dirname(save_data_path)):
+                try:
+                    os.makedirs(os.path.dirname(save_data_path))
+                except OSError as e:
+                    if e.errno != errno.EEXIST:
+                        raise
+            with open(save_data_path, 'w') as f:
+                # Print occurrences for each instance label.
+                f.write("The pickle file '{0}' contains {1} lines ".format(
+                    picklefile_path, np.sum(occurrences)) + "with the "
+                    "following instance labels:\n")
+                for _, (instance_label, occurrence) in enumerate(
+                        histogram.items()):
+                    f.write("- {0}: {1} occurrences\n".format(
+                        instance_label, occurrence))
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -94,10 +121,21 @@ if __name__ == '__main__':
         'labels in a pickle file.')
     parser.add_argument(
         "-picklefile_path", help="Path of the pickle file.", required=True)
+    parser.add_argument(
+        "-save_data_path",
+        help="Path where to save the histogram statistics file.")
     try:
         args = parser.parse_args()
         if (args.picklefile_path):
             picklefile_path = args.picklefile_path
-            display_histogram(picklefile_path=picklefile_path)
+            if (args.save_data_path):
+                print("Found save data path")
+                display_histogram(
+                    picklefile_path=picklefile_path,
+                    save_data=True,
+                    save_data_path=args.save_data_path)
+            else:
+                display_histogram(picklefile_path=picklefile_path)
+
     except:
         pass
