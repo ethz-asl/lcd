@@ -79,16 +79,30 @@ def display_histogram(picklefile_path, save_data=False, save_data_path=None):
     plt.bar(x=instance_labels, height=occurrences)
     plt.gca().set_xticklabels(
         ['{}'.format(int(x)) for x in plt.gca().get_xticks()])
-    plt.xlabel("Instance labels")
+    plt.xlabel("Instance label")
     plt.ylabel("Occurrences in pickle file")
     # Compute average number of occurrences.
     num_instances = len(instance_labels)
-    average_num_occurrences = np.sum(occurrences) / num_instances
+    average_num_occurrences = np.mean(occurrences)
+    # Compute standard deviation of the number of occurrences.
+    std_num_occurrences = np.std(occurrences)
     plt.axhline(
         y=average_num_occurrences, color='k', linestyle='dashed', linewidth=1)
+    plt.axhline(
+        y=average_num_occurrences + std_num_occurrences,
+        color='k',
+        linestyle='dotted',
+        linewidth=1)
+    if (average_num_occurrences - std_num_occurrences > 0):
+        plt.axhline(
+            y=average_num_occurrences - std_num_occurrences,
+            color='k',
+            linestyle='dotted',
+            linewidth=1)
     plt.title(
-        "Histogram of instance labels (mean number of occurrences = {:.2f})".
-        format(average_num_occurrences))
+        "Histogram of instance labels (mean number of occurrences = {:.2f}, ".
+        format(average_num_occurrences) +
+        "standard deviation = {:.2f})".format(std_num_occurrences))
 
     plt.show()
 
@@ -108,11 +122,18 @@ def display_histogram(picklefile_path, save_data=False, save_data_path=None):
                 # Print occurrences for each instance label.
                 f.write("The pickle file '{0}' contains {1} lines ".format(
                     picklefile_path, np.sum(occurrences)) + "with the "
-                    "following instance labels:\n")
+                        "following instance labels:\n")
                 for _, (instance_label, occurrence) in enumerate(
                         histogram.items()):
                     f.write("- {0}: {1} occurrences\n".format(
                         instance_label, occurrence))
+                # Print mean and standard deviation of the number of
+                # occurrences.
+                f.write("\nThe mean of the number of occurrences is {:.3f}.\n".
+                        format(average_num_occurrences))
+                f.write(
+                    "The standard deviation of the number of occurrences is "
+                    "{:.3f}.\n".format(std_num_occurrences))
 
 
 if __name__ == '__main__':
@@ -129,7 +150,6 @@ if __name__ == '__main__':
         if (args.picklefile_path):
             picklefile_path = args.picklefile_path
             if (args.save_data_path):
-                print("Found save data path")
                 display_histogram(
                     picklefile_path=picklefile_path,
                     save_data=True,
