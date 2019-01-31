@@ -3,9 +3,9 @@ import numpy as np
 
 def get_origin_virtual_camera(start3D, end3D, hessian_left, hessian_right,
                               line_type, distance):
-    """ Get the origin of virtual camera for the line. The origin candidates are
-        determined by the surfaces normals of the line. The virtual camera
-        origin is chosen as the nearest point to real camera origin.
+    """ Gets the origin of virtual camera for the line. The origin candidates
+        are determined based on the surfaces normals of the line. The origin of
+        the virtual camera is chosen as the point closest to real camera origin.
 
     Args:
         start3D/end3D (numpy array of shape (3, 1)): Endpoints of the line in
@@ -18,6 +18,8 @@ def get_origin_virtual_camera(start3D, end3D, hessian_left, hessian_right,
             meters).
 
     Returns:
+        origin_virtual_camera (numpy array of shape(3,1)): Origin of the virtual
+            camera.
     """
     # X axis is taken as the direction of the line.
     x = (end3D - start3D) / np.linalg.norm(end3D - start3D)
@@ -78,7 +80,7 @@ def get_origin_virtual_camera(start3D, end3D, hessian_left, hessian_right,
 
 
 def get_origin_virtual_camera_from_line(line, distance):
-    """ Get the origin of virtual camera for a line read from a file_line.
+    """ Gets the origin of virtual camera for a line read from a file_line.
 
     Args:
         line: numpy array of shape (22, ). [start point(3, ), end point(3, ),
@@ -103,7 +105,7 @@ def get_origin_virtual_camera_from_line(line, distance):
 
 def virtual_camera_pose(start3D, end3D, hessian_left, hessian_right, line_type,
                         distance):
-    """ Get the pose of the virtual camera according to the line.
+    """ Gets the pose of the virtual camera according to the line.
 
     Args:
         start3D/end3D (numpy array of shape (3, 1)): Endpoints of the line in
@@ -139,7 +141,7 @@ def virtual_camera_pose(start3D, end3D, hessian_left, hessian_right, line_type,
 
 
 def virtual_camera_pose_from_file_line(line, distance):
-    """ Get the pose of the virtual camera according to the line read from a
+    """ Gets the pose of the virtual camera according to the line read from a
         file of lines.
 
     Args:

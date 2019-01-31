@@ -23,19 +23,20 @@ def get_label_with_line_center(labels_batch):
 
 
 def get_geometric_info(start_points, end_points, line_parametrization):
-    """Given a set of lines parametrized by their two endpoints, returns the
-       following geometric info according to the line parametrization type:
-       * 'direction_and_centerpoint':
-             Each line segment is parametrized by its center point and by its
-             unit direction vector. To obtain invariance on the orientation of
-             the line (i.e., given the two endpoints we do NOT want to consider
-             one of them as the start and the other one as the end of the line
-             segment), we enforce that the first entry should be non-negative.
-             => 6 parameters per line.
-       * 'orthonormal':
-             A line segment is parametrized with a minimum-DOF parametrization
-             (4 degrees of freedom) of the infinite line that it belongs to. The
-             representation is called orthonormal. => 4 parameters per line.
+    """ Given a set of lines parametrized by their two endpoints, returns the
+        following geometric info according to the line parametrization type:
+        * 'direction_and_centerpoint':
+              Each line segment is parametrized by its center point and by its
+              unit direction vector. To obtain invariance on the orientation of
+              the line (i.e., given the two endpoints we do NOT want to consider
+              one of them as the start and the other one as the end of the line
+              segment), we enforce that the first entry should be non-negative.
+              => 6 parameters per line.
+        * 'orthonormal':
+              A line segment is parametrized with a minimum-DOF parametrization
+              (4 degrees of freedom) of the infinite line that it belongs to.
+              The representation is called orthonormal. => 4 parameters per
+              line.
     Args:
         start_points: Array of shape (num_lines, 3) containing the start point
                       of each line.

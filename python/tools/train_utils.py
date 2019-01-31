@@ -228,12 +228,13 @@ def print_batch_triplets_statistics(
         hardest_negative_dist=None,
         hardest_positive_element=None,
         hardest_negative_element=None):
-    """ Print statistics about values extracted from the triplets in a training
+    """ Prints statistics about values extracted from the triplets in a training
         batch and writes to file images containing the virtual images of the
         lines in the triplets selected.
     Args:
-        triplet_strategy (string): Either 'batch_all' or 'batch_hard', strategy
-            for the selection of the triplets.
+        triplet_strategy (string): Either 'batch_all', 'batch_hard' or
+            'batch_all_wohlhart_lepetit', strategy for the selection of the
+            triplets.
         images (numpy array of shape (batch_size, scale_size[0], scale_size[1],
             num_channels), where scale_size is defined when the batches are
             generated in model/datagenerator.py and num_channels is either 3 or
@@ -275,21 +276,23 @@ def print_batch_triplets_statistics(
             the k-th element in the batch as negative, and the triplet is not an
             easy one, i.e. d(a, p) - d(a,n) + margin is not less than 0. It is
             False otherwise. Must be not None if triplet strategy is
-            'batch_all'.
+            'batch_all' or 'batch_all_wohlhart_lepetit'.
         sum_valid_positive_triplets_anchor_positive_dist (float): Sum of the
             anchor-positive distances d(a, p) over all anchor-positive pairs
             such that there exists at least one element n such that (a, p, n) is
             a valid positive (i.e., non-easy) triplet. Must be not None if
-            triplet strategy is 'batch_all'.
+            triplet strategy is 'batch_all' or 'batch_all_wohlhart_lepetit'.
         num_anchor_positive_pairs_with_valid_positive_triplets (float): Number
             of anchor-positive pairs (a, p) such that there exists at least one
             element n such that (a, p, n) is a valid positive (i.e., non-easy)
-            triplet. Must be not None if triplet strategy is 'batch_all'.
+            triplet. Must be not None if triplet strategy is 'batch_all' or
+            'batch_all_wohlhart_lepetit'.
         lambda_regularization (float): Regularization parameter in the
             'batch-all' loss. Must be not None if triplet strategy is
-            'batch_all'.
+            'batch_all' or 'batch_all_wohlhart_lepetit'.
         regularization_term (float): Regularization term in the loss for the
-            current batch. Must be not None if triplet strategy is 'batch_all'.
+            current batch. Must be not None if triplet strategy is 'batch_all'
+            or 'batch_all_wohlhart_lepetit'.
         hardest_positive_dist (numpy array of shape (batch_size, 1) and dtype
             np.float32): hardest_positive_dist[i] contains the distance of the
             element in the batch (WLOG, with index j) that is furthest away from
@@ -313,28 +316,35 @@ def print_batch_triplets_statistics(
             anchor-negative pair. Must be not None if triplet strategy is
             'batch_hard'.
     """
-    if (triplet_strategy not in ['batch_all', 'batch_hard']):
-        print("Triplet strategy must be either 'batch_all' or 'batch_hard'.")
+    if (triplet_strategy not in [
+            'batch_all', 'batch_hard', 'batch_all_wohlhart_lepetit'
+    ]):
+        print("Triplet strategy must be either 'batch_all', 'batch_hard' or "
+              "'batch_all_wohlhart_lepetit'.")
         return
-    elif (triplet_strategy == 'batch_all'):
+    elif (triplet_strategy == 'batch_all' or
+          triplet_strategy == 'batch_all_wohlhart_lepetit'):
         if (valid_positive_triplets is None):
             print("Please pass a valid 'valid_positive_triplets' argument when "
-                  "using triplet strategy 'batch_all'")
+                  "using triplet strategy 'batch_all' or "
+                  "'batch_all_wohlhart_lepetit'.")
             return
         if (sum_valid_positive_triplets_anchor_positive_dist is None):
             print("Please pass a valid "
                   "'sum_valid_positive_triplets_anchor_positive_dist' argument "
-                  "when using triplet strategy 'batch_all'")
+                  "when using triplet strategy 'batch_all' or "
+                  "'batch_all_wohlhart_lepetit'.")
             return
         if (num_anchor_positive_pairs_with_valid_positive_triplets is None):
             print("Please pass a valid "
                   "'num_anchor_positive_pairs_with_valid_positive_triplets' "
-                  "argument when using triplet strategy 'batch_all'")
+                  "argument when using triplet strategy 'batch_all' or "
+                  "'batch_all_wohlhart_lepetit'.")
             return
         if (lambda_regularization is None or regularization_term is None):
             print("Please pass valid 'lambda_regularization' and "
                   "'regularization_term' arguments when using triplet strategy "
-                  "'batch_all'")
+                  "'batch_all' or 'batch_all_wohlhart_lepetit'.")
             return
         assert(images.shape[0] == labels.shape[0] == pairwise_dist.shape[0] == \
                pairwise_dist.shape[1] == valid_positive_triplets.shape[0] == \
@@ -412,7 +422,7 @@ def print_batch_triplets_statistics(
         if (mask_anchor_positive is None or mask_anchor_negative is None):
             print("Please pass valid 'mask_anchor_positive' and "
                   "'mask_anchor_negative' arguments when using triplet "
-                  "'batch_hard'")
+                  "'batch_hard'.")
             return
         if (hardest_positive_dist is None or hardest_negative_dist is None or
                 hardest_positive_element is None or
@@ -420,7 +430,7 @@ def print_batch_triplets_statistics(
             print("Please pass valid 'hardest_positive_dist', " +
                   "'hardest_negative_dist', 'hardest_positive_element', " +
                   "'hardest_negative_element' arguments when using triplet " +
-                  "strategy 'batch_hard'")
+                  "strategy 'batch_hard'.")
             return
         assert(images.shape[0] == labels.shape[0] == pairwise_dist.shape[0] == \
                pairwise_dist.shape[1] == \

@@ -15,7 +15,7 @@ class SceneNNCameraModel:
         self.fy = camera_intrinsics[1, 1]
 
     def rgbd_to_pcl(self, rgb_image, depth_image, visualize_cloud=False):
-        """ Convert the RGB-D image to a pointcloud. Adapted from
+        """ Converts the RGB-D image to a pointcloud. Adapted from
             https://github.com/ethz-asl/scenenn_ros_tools/blob/master/nodes/scenenn_to_rosbag.py
         """
         center_x = self.cx

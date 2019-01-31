@@ -8,7 +8,8 @@ from datetime import datetime
 from model.datagenerator import ImageDataGenerator
 from model.alexnet import AlexNet
 from model.triplet_loss import batch_all_triplet_loss, \
-                               batch_hardest_triplet_loss
+                               batch_hardest_triplet_loss, \
+                               batch_all_wohlhart_lepetit_loss
 from tools.train_utils import get_train_set_mean, \
                               print_batch_triplets_statistics
 from tools.lines_utils import get_label_with_line_center, get_geometric_info
@@ -84,11 +85,12 @@ def train(read_as_pickle=True):
     # Margin of the triplet loss.
     margin = 0.2
     # Regularization hyperparameter required when using the loss based on
-    # 'batch_all' triplet selection strategy.
+    # 'batch_all'/'batch_all_wohlhart_lepetit' triplet selection strategy.
     lambda_regularization = 0.1
 
-    # Either "batch_all" or "batch_hard". Strategy for triplets selection.
-    triplet_strategy = "batch_all"
+    # Either "batch_all", "batch_hard" or "batch_all_wohlhart_lepetit". Strategy
+    # for triplets selection.
+    triplet_strategy = "batch_all_wohlhart_lepetit"
 
     # Network parameters.
     dropout_rate = 0.5
@@ -212,6 +214,16 @@ def train(read_as_pickle=True):
              hardest_positive_element, hardest_negative_element,
              pairwise_dist) = batch_hardest_triplet_loss(
                  labels, embeddings, margin=margin, squared=False)
+        elif triplet_strategy == "batch_all_wohlhart_lepetit":
+            (loss, fraction, valid_positive_triplets, pairwise_dist,
+             sum_valid_positive_triplets_anchor_positive_dist,
+             num_anchor_positive_pairs_with_valid_positive_triplets,
+             regularization_term) = batch_all_wohlhart_lepetit_loss(
+                 labels,
+                 embeddings,
+                 margin=margin,
+                 lambda_regularization=lambda_regularization,
+                 squared=False)
         else:
             raise ValueError(
                 "Triplet strategy not recognized: {}".format(triplet_strategy))
@@ -240,7 +252,8 @@ def train(read_as_pickle=True):
     embedding_mean_norm = tf.reduce_mean(tf.norm(embeddings, axis=1))
     tf.summary.scalar("embedding_mean_norm", embedding_mean_norm)
 
-    if triplet_strategy == "batch_all":
+    if (triplet_strategy == "batch_all" or
+            triplet_strategy == "batch_all_wohlhart_lepetit"):
         tf.summary.scalar('fraction_positive_triplets', fraction)
         tf.summary.scalar('regularization_term', regularization_term)
 
@@ -361,7 +374,8 @@ def train(read_as_pickle=True):
                 # Display statistics about triplets (for only a few epochs and
                 # batches).
                 if (epoch % 10 < 2 and step < 30):
-                    if (triplet_strategy == 'batch_all'):
+                    if (triplet_strategy == 'batch_all' or
+                            triplet_strategy == 'batch_all_wohlhart_lepetit'):
                         (pairwise_dist_for_stats,
                          valid_positive_triplets_for_stats,
                          sum_valid_positive_triplets_anchor_positive_dist_for_stats,

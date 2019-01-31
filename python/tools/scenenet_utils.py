@@ -29,7 +29,7 @@ class SceneNetCameraModel:
         self.fy = camera_intrinsics[1, 1]
 
     def project3dToPixel(self, point_3d):
-        """ Project 3d point to pixel.
+        """ Projects 3D point to pixel.
         Args:
             point_3d: numpy array of shape (3, ). [x, y, z].
 
@@ -43,7 +43,7 @@ class SceneNetCameraModel:
         return pixel
 
     def rgbd_to_pcl(self, rgb_image, depth_image, visualize_cloud=False):
-        """ Convert RGB-D image to pointcloud. Adapted from
+        """ Converts RGB-D image to pointcloud. Adapted from
             https://github.com/ethz-asl/scenenet_ros_tools/blob/master/nodes/scenenet_to_rosbag.py
         """
         center_x = self.cx
@@ -96,7 +96,8 @@ def camera_intrinsic_transform(vfov=45,
                                hfov=60,
                                pixel_width=320,
                                pixel_height=240):
-    """Get camera intrinsics matrix for SceneNetRGBD dataset"""
+    """ Gets camera intrinsics matrix for SceneNetRGBD dataset.
+    """
     camera_intrinsics = np.zeros((3, 4))
     camera_intrinsics[2, 2] = 1
     camera_intrinsics[0, 0] = (

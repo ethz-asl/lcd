@@ -26,10 +26,10 @@ from camera_pose_and_intrinsics_example import camera_to_world_with_pose, \
 
 def get_lines_world_coordinates_with_instances(dataset_name, trajectory,
                                                frames):
-    """ For some frames in a trajectory from SceneNetRGBD, get the start and end
-        point of the lines in world coordinates, as well as the instance labels
-        assigned to lines. Used only for visualization and when data is not read
-        from pickle files.
+    """ For some frames in a trajectory from SceneNetRGBD, gets the start and
+        end point of the lines in world coordinates, as well as the instance
+        labels assigned to lines. Used only for visualization and when data is
+        not read from pickle files.
     Args:
         dataset_name (string): Either 'val' or 'train_NUM', where NUM is an
             integer between 0 and 16.
@@ -122,7 +122,7 @@ def get_lines_world_coordinates_with_instances(dataset_name, trajectory,
 
 
 def pcl_lines_for_plot(data_lines, lines_color, visualizer):
-    """ Get points on the lines for 3D visualization in open3d or matplotlib.
+    """ Gets points on the lines for 3D visualization in open3d or matplotlib.
     """
     if visualizer != 'open3d' and visualizer != 'matplotlib':
         print(

@@ -108,7 +108,7 @@ def pickle_images(input_text_file, output_pickle_file, dataset_name):
 
 
 def merge_pickled_dictionaries(dict_to_update, dict_to_add):
-    """ Merge pickled dictionary dict_to_add in pickled dictionary
+    """ Merges pickled dictionary dict_to_add in pickled dictionary
         dict_to_update, therefore modifying dict_to_update. Values from
         dict_to_update are overwritten only if dict_to_add contains an entry
         which  has same dataset_name, trajectory_number and frame_number, i.e.,
