@@ -429,15 +429,21 @@ def batch_all_triplet_loss(labels,
                            embeddings,
                            margin,
                            lambda_regularization,
+                           really_all=False,
                            squared=False):
     """ Build the loss over a batch of embeddings. The loss is composed of two
         terms:
 
             loss = triplet_loss + regularization_term
 
-        * The triplet loss is computed by generating all the valid triplets and
-          averaging the loss over the positive (i.e., hard or semi-hard) ones.
-          This triplet selection strategy is called 'batch-all'.
+        * If really_all is False, the triplet loss is computed by generating all
+          the valid triplets and averaging the loss over the positive (i.e.,
+          hard or semi-hard) ones. This triplet selection strategy is called
+          'batch-all'.
+          If really_all is True, the triplet loss is computed by generating all
+          the valid triplets and averaging the loss over all of them, i.e.,
+          easy, hard and semi-hard. We refer to this triplet selection strategy
+          as 'batch-really-all' :).
         * The regularization term is obtained by considering all anchor-positive
           pairs (a, p) such that there exists at least a valid positive (where
           'positive' has the meaning defined above) triplet (a, p, n). In
@@ -460,6 +466,10 @@ def batch_all_triplet_loss(labels,
         margin (float): Margin for triplet loss.
         lambda_regularization (float): Regularization hyperparameter for the
             loss defined above.
+        really_all (bool): If True, the loss is averaged over all valid triplets
+            in the batch, (i.e., easy, semi-hard and hard). If False (original
+            batch_all strategy), the loss is only averaged on the semi-hard and
+            hard triplets in the batch.
         squared (bool): If True, output is the pairwise squared Euclidean
             distance matrix. If False, output is the pairwise Euclidean distance
             matrix.
@@ -495,8 +505,9 @@ def batch_all_triplet_loss(labels,
     mask = tf.to_float(_get_triplet_mask(labels))
     triplet_loss = tf.multiply(mask, triplet_loss)
 
-    # Remove negative losses (i.e. the easy triplets).
-    triplet_loss = tf.maximum(triplet_loss, 0.0)
+    if (not really_all):
+        # Remove negative losses (i.e. the easy triplets).
+        triplet_loss = tf.maximum(triplet_loss, 0.0)
 
     # Count number of positive triplets (where triplet_loss > 0).
     valid_positive_triplets_bool = tf.greater(triplet_loss, 1e-16)
