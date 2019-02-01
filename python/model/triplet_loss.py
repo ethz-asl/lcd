@@ -505,9 +505,8 @@ def batch_all_triplet_loss(labels,
     mask = tf.to_float(_get_triplet_mask(labels))
     triplet_loss = tf.multiply(mask, triplet_loss)
 
-    if (not really_all):
-        # Remove negative losses (i.e. the easy triplets).
-        triplet_loss = tf.maximum(triplet_loss, 0.0)
+    # Remove negative losses (i.e. set the loss for the easy triplets to 0).
+    triplet_loss = tf.maximum(triplet_loss, 0.0)
 
     # Count number of positive triplets (where triplet_loss > 0).
     valid_positive_triplets_bool = tf.greater(triplet_loss, 1e-16)
@@ -520,52 +519,106 @@ def batch_all_triplet_loss(labels,
         (num_valid_triplets + 1e-16)
 
     # Get final average triplet loss over the valid positive triplets.
-    triplet_loss = tf.reduce_sum(triplet_loss) / \
-        (num_valid_positive_triplets + 1e-16)
+    if (really_all):
+        # Average on all the valid triplets.
+        triplet_loss = tf.reduce_sum(triplet_loss) / \
+            (num_valid_triplets + 1e-16)
+    else:
+        # Average only on the valid positive triplets.
+        triplet_loss = tf.reduce_sum(triplet_loss) / \
+            (num_valid_positive_triplets + 1e-16)
 
     # Add regularization term to the final loss.
-    # Get mask for triplets that are valid (i.e., (a, p, n)) and positive (i.e.,
-    # either hard or semi-hard).
-    valid_positive_triplets_mask = tf.to_float(valid_positive_triplets_bool)
-    # Compute anchor-positive distances for the valid positive triplets.
-    valid_positive_triplets_anchor_positive_dist = tf.multiply(
-        valid_positive_triplets_mask, anchor_positive_dist)
-    # Sum all distances (anchor, positive) for the valid positive triplets. Only
-    # consider each (anchor, positive) pair once, i.e., if for a certain pair
-    # (a, p) there are several negative elements n such that (a, p, n) is a
-    # valid positive triplet, only consider the distance d(a, p) once.
-    # * Due to broadcasting, valid_positive_triplets_anchor_positive_dist is a
-    #   tensor of shape (batch_size, batch_size, batch_size), with
-    #   valid_positive_triplets_anchor_positive_dist[i, j, k] being d(a=i, p=j)
-    #   if (a=i, p=j, n=k) is a valid positive triplet and 0 otherwise.
-    #   Therefore, to find d(a=i, p=j) for a certain pair (a=i, p=j) such that
-    #   there exists at least one valid positive triplet (a=i, p=j, n) it is
-    #   enough to take the max over n of
-    #   valid_positive_triplets_anchor_positive_dist[i, j, n]. This will be
-    #   equal to d(a=i, p=j) if there exists at least one valid positive triplet
-    #   (a=i, p=j, n) (because
-    #   valid_positive_triplets_anchor_positive_dist[i, j, n] = d(a=i, p=j) for
-    #   all n's such that (a=i, p=j, n) is a valid positive triplet) and 0
-    #   otherwise.
-    anchor_positive_distances_with_valid_positive_triplets = tf.reduce_max(
-        valid_positive_triplets_anchor_positive_dist[:, :], axis=2)
-    # * Computing the sum of the above over all the anchor-positive pairs (a, p)
-    #   gives us the answer, i.e., the sum of all distances d(a=i, p=j) such
-    #   that there exists at least one valid positive triplet (a=i, p=j, n).
-    sum_valid_positive_triplets_anchor_positive_dist = tf.reduce_sum(
-        anchor_positive_distances_with_valid_positive_triplets)
-    # Average the sum above over the number of anchor-positive pairs (a=i, p=j)
-    # such that there exists at least on valid positive triplet (a=i, p=j, n)
-    # and multiply by the regularization hyperparameter to obtain the
-    # regularization term.
-    num_anchor_positive_pairs_with_valid_positive_triplets = tf.reduce_sum(
-        tf.to_float(
-            tf.greater(anchor_positive_distances_with_valid_positive_triplets,
-                       1e-16)))
+    if (really_all):
+        # Get mask for triplets that are valid (i.e., (a, p, n)). [It is already
+        # defined above as mask].
+        valid_triplets_mask = mask
+        # Compute anchor-positive distances for the valid triplets.
+        valid_triplets_anchor_positive_dist = tf.multiply(
+            valid_triplets_mask, anchor_positive_dist)
+        # Sum all distances (anchor, positive) for the valid triplets.
+        # Only consider each (anchor, positive) pair once, i.e., if for a
+        # certain pair (a, p) there are several negative elements n such that
+        # (a, p, n) is a valid triplet, only consider the distance d(a, p) once.
+        # * Due to broadcasting, valid_triplets_anchor_positive_dist is
+        #   a tensor of shape (batch_size, batch_size, batch_size), with
+        #   valid_triplets_anchor_positive_dist[i, j, k] being
+        #   d(a=i, p=j) if (a=i, p=j, n=k) is a valid triplet and 0 otherwise.
+        #   Therefore, to find d(a=i, p=j) for a certain pair (a=i, p=j) such
+        #   that there exists at least one valid triplet (a=i, p=j, n) it is
+        #   enough to take the max over n of
+        #   valid_triplets_anchor_positive_dist[i, j, n]. This will be equal to
+        #   d(a=i, p=j) if there exists at least one valid triplet (a=i, p=j, n)
+        #   (because valid_triplets_anchor_positive_dist[i, j, n] = d(a=i, p=j)
+        #   for all n's such that (a=i, p=j, n) is a valid triplet) and 0
+        #   otherwise.
+        anchor_positive_distances_with_valid_triplets = tf.reduce_max(
+            valid_triplets_anchor_positive_dist[:, :], axis=2)
+        # * Computing the sum of the above over all the anchor-positive pairs
+        #   (a, p) gives us the answer, i.e., the sum of all distances
+        #   d(a=i, p=j) such that there exists at least one valid triplet
+        #   (a=i, p=j, n).
+        sum_valid_triplets_anchor_positive_dist = tf.reduce_sum(
+            anchor_positive_distances_with_valid_triplets)
+        # Average the sum above over the number of anchor-positive pairs
+        # (a=i, p=j) such that there exists at least one valid triplet
+        # (a=i, p=j, n) and multiply by the regularization hyperparameter to
+        # obtain the regularization term.
+        num_anchor_positive_pairs_with_valid_triplets = tf.reduce_sum(
+            tf.to_float(
+                tf.greater(anchor_positive_distances_with_valid_triplets,
+                           1e-16)))
 
-    regularization_term = lambda_regularization * \
-        sum_valid_positive_triplets_anchor_positive_dist / \
-        (num_anchor_positive_pairs_with_valid_positive_triplets + 1e-16)
+        regularization_term = lambda_regularization * \
+            sum_valid_triplets_anchor_positive_dist / \
+            (num_anchor_positive_pairs_with_valid_triplets + 1e-16)
+    else:
+        # Get mask for triplets that are valid (i.e., (a, p, n)) and positive
+        # (i.e., either hard or semi-hard).
+        valid_positive_triplets_mask = tf.to_float(valid_positive_triplets_bool)
+        # Compute anchor-positive distances for the valid positive triplets.
+        valid_positive_triplets_anchor_positive_dist = tf.multiply(
+            valid_positive_triplets_mask, anchor_positive_dist)
+        # Sum all distances (anchor, positive) for the valid positive triplets.
+        # Only consider each (anchor, positive) pair once, i.e., if for a
+        # certain pair (a, p) there are several negative elements n such that
+        # (a, p, n) is a valid positive triplet, only consider the distance
+        # d(a, p) once.
+        # * Due to broadcasting, valid_positive_triplets_anchor_positive_dist is
+        #   a tensor of shape (batch_size, batch_size, batch_size), with
+        #   valid_positive_triplets_anchor_positive_dist[i, j, k] being
+        #   d(a=i, p=j) if (a=i, p=j, n=k) is a valid positive triplet and 0
+        #   otherwise.
+        #   Therefore, to find d(a=i, p=j) for a certain pair (a=i, p=j) such
+        #   that there exists at least one valid positive triplet (a=i, p=j, n)
+        #   it is enough to take the max over n of
+        #   valid_positive_triplets_anchor_positive_dist[i, j, n]. This will be
+        #   equal to d(a=i, p=j) if there exists at least one valid positive
+        #   triplet (a=i, p=j, n) (because
+        #   valid_positive_triplets_anchor_positive_dist[i, j, n] = d(a=i, p=j)
+        #   for all n's such that (a=i, p=j, n) is a valid positive triplet) and
+        #   0 otherwise.
+        anchor_positive_distances_with_valid_positive_triplets = tf.reduce_max(
+            valid_positive_triplets_anchor_positive_dist[:, :], axis=2)
+        # * Computing the sum of the above over all the anchor-positive pairs
+        #   (a, p) gives us the answer, i.e., the sum of all distances
+        #   d(a=i, p=j) such that there exists at least one valid positive
+        #   triplet (a=i, p=j, n).
+        sum_valid_positive_triplets_anchor_positive_dist = tf.reduce_sum(
+            anchor_positive_distances_with_valid_positive_triplets)
+        # Average the sum above over the number of anchor-positive pairs
+        # (a=i, p=j) such that there exists at least one valid positive triplet
+        # (a=i, p=j, n) and multiply by the regularization hyperparameter to
+        # obtain the regularization term.
+        num_anchor_positive_pairs_with_valid_positive_triplets = tf.reduce_sum(
+            tf.to_float(
+                tf.greater(
+                    anchor_positive_distances_with_valid_positive_triplets,
+                    1e-16)))
+
+        regularization_term = lambda_regularization * \
+            sum_valid_positive_triplets_anchor_positive_dist / \
+            (num_anchor_positive_pairs_with_valid_positive_triplets + 1e-16)
 
     # Compute the total loss by summing the triplet loss and the regularization
     # term.
