@@ -624,7 +624,13 @@ def batch_all_triplet_loss(labels,
     # term.
     loss = triplet_loss + regularization_term
 
-    return (loss, fraction_positive_triplets, valid_positive_triplets_bool,
-            pairwise_dist, sum_valid_positive_triplets_anchor_positive_dist,
-            num_anchor_positive_pairs_with_valid_positive_triplets,
-            regularization_term)
+    if (really_all):
+        return (loss, fraction_positive_triplets, valid_positive_triplets_bool,
+                pairwise_dist, sum_valid_triplets_anchor_positive_dist,
+                num_anchor_positive_pairs_with_valid_triplets,
+                regularization_term)
+    else:
+        return (loss, fraction_positive_triplets, valid_positive_triplets_bool,
+                pairwise_dist, sum_valid_positive_triplets_anchor_positive_dist,
+                num_anchor_positive_pairs_with_valid_positive_triplets,
+                regularization_term)

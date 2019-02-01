@@ -91,6 +91,8 @@ def train(read_as_pickle=True):
     # Either "batch_all", "batch_hard" or "batch_all_wohlhart_lepetit". Strategy
     # for triplets selection.
     triplet_strategy = "batch_all_wohlhart_lepetit"
+    # Only considered if triplet selection strategy is "batch_all".
+    really_all = False
 
     # Network parameters.
     dropout_rate = 0.5
@@ -199,6 +201,14 @@ def train(read_as_pickle=True):
     # Define loss.
     with tf.name_scope("triplet_loss"):
         if triplet_strategy == "batch_all":
+            # TODO: for the purpose of the printing of the statistics, when
+            # using "batch_all" with really_all=True, the tensors
+            # sum_valid_positive_triplets_anchor_positive_dist and
+            # num_anchor_positive_pairs_with_valid_positive_triplets are
+            # substituted respectively with
+            # sum_valid_triplets_anchor_positive_dist and
+            # num_anchor_positive_pairs_with_valid_triplets. The statistics
+            # should therefore be modified accordingly.
             (loss, fraction, valid_positive_triplets, pairwise_dist,
              sum_valid_positive_triplets_anchor_positive_dist,
              num_anchor_positive_pairs_with_valid_positive_triplets,
@@ -207,6 +217,7 @@ def train(read_as_pickle=True):
                  embeddings,
                  margin=margin,
                  lambda_regularization=lambda_regularization,
+                 really_all=really_all,
                  squared=False)
         elif triplet_strategy == "batch_hard":
             (loss, mask_anchor_positive, mask_anchor_negative,
