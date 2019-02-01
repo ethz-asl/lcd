@@ -7,10 +7,53 @@ from sklearn.externals import joblib
 from histogram_instances_in_pickle_file import compute_histogram
 
 
-def repickle_file(input_pickle_file,
-                  output_pickle_file,
-                  min_num_occurrences=50,
-                  max_num_occurrences=None):
+def repickle_file_with_blank_images(input_pickle_file, output_pickle_file):
+    """ Repickles a pickle file, by making all the virtual-camera images blank
+        (all zeros for the intensities, all zeros for the depth image).
+
+    Args:
+        input_pickle_file (string): Path of the input pickle file.
+        output_pickle_file (string): Path of the output pickle file.
+    """
+    # Load input pickle file.
+    try:
+        input_pickled_dict = joblib.load(input_pickle_file)
+    except IOError:
+        print("Input pickle file not found at location {}.".format(
+            input_pickle_file))
+        return
+
+    # Create output pickled dict as a copy of the input pickled dict.
+    output_pickled_dict = input_pickled_dict
+
+    for dataset_name in input_pickled_dict.keys():
+        dataset_name_dict = input_pickled_dict[dataset_name]
+        for trajectory_number in dataset_name_dict.keys():
+            trajectory_number_dict = dataset_name_dict[trajectory_number]
+            for frame_number in trajectory_number_dict.keys():
+                frame_number_dict = trajectory_number_dict[frame_number]
+                for image_type in frame_number_dict.keys():
+                    image_type_dict = frame_number_dict[image_type]
+                    for line_number in image_type_dict.keys():
+                        # Substitute the images with blank images.
+                        output_pickled_dict[dataset_name][trajectory_number][
+                            frame_number][image_type][line_number][
+                                'img'] = np.zeros(
+                                    shape=input_pickled_dict[dataset_name]
+                                    [trajectory_number][frame_number][
+                                        image_type][line_number]['img'].shape,
+                                    dtype=input_pickled_dict[dataset_name]
+                                    [trajectory_number][frame_number][
+                                        image_type][line_number]['img'].dtype)
+
+    # Write output pickle file.
+    joblib.dump(output_pickled_dict, output_pickle_file, compress=3)
+
+
+def repickle_file_by_instances_occurrences(input_pickle_file,
+                                           output_pickle_file,
+                                           min_num_occurrences=50,
+                                           max_num_occurrences=None):
     """ Repickles a pickle file, by only keeping the lines with an instance
         label that has a number of occurrences within a defined range in the
         file.
