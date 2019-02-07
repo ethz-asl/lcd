@@ -11,7 +11,7 @@ from model.triplet_loss import batch_all_triplet_loss, \
                                batch_hardest_triplet_loss, \
                                batch_all_wohlhart_lepetit_loss
 from tools.train_utils import get_train_set_mean, \
-                              print_batch_triplets_statistics
+                              output_batch_triplets_statistics
 from tools.lines_utils import get_label_with_line_center, get_geometric_info
 from tools import pathconfig
 
@@ -440,7 +440,7 @@ def train(read_as_pickle=True):
                                 keep_prob: dropout_rate
                             })
                         # Output the statistics about the triplets.
-                        print_batch_triplets_statistics(
+                        output_batch_triplets_statistics(
                             triplet_strategy=triplet_strategy,
                             images=batch_input_img_train,
                             set_mean=train_set_mean,
@@ -484,7 +484,7 @@ def train(read_as_pickle=True):
                                  keep_prob: dropout_rate
                              })
                         # Output the statistics about the triplets.
-                        print_batch_triplets_statistics(
+                        output_batch_triplets_statistics(
                             triplet_strategy=triplet_strategy,
                             images=batch_input_img_train,
                             set_mean=train_set_mean,

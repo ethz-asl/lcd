@@ -207,7 +207,7 @@ def write_triplet_image_to_file(
     plt.close()
 
 
-def print_batch_triplets_statistics(
+def output_batch_triplets_statistics(
         triplet_strategy,
         images,
         set_mean,
@@ -227,7 +227,8 @@ def print_batch_triplets_statistics(
         hardest_positive_dist=None,
         hardest_negative_dist=None,
         hardest_positive_element=None,
-        hardest_negative_element=None):
+        hardest_negative_element=None,
+        max_num_triplets_to_output=2000):
     """ Prints statistics about values extracted from the triplets in a training
         batch and writes to file images containing the virtual images of the
         lines in the triplets selected.
@@ -315,6 +316,9 @@ def print_batch_triplets_statistics(
             the batch, with (i, hardest_negative_element[i]) being an
             anchor-negative pair. Must be not None if triplet strategy is
             'batch_hard'.
+        max_num_triplets_to_output (int): Maximum number of triplets for which
+            to output statistics. Used with 'batch_all' and
+            'batch_all_wohlhart_lepetit'.
     """
     if (triplet_strategy not in [
             'batch_all', 'batch_hard', 'batch_all_wohlhart_lepetit'
@@ -392,9 +396,13 @@ def print_batch_triplets_statistics(
             # Print valid triplets.
             batch_size = labels.shape[0]
             f.write("***** Valid triplets *****\n")
+            num_triplets_outputted = 0
             for i in range(batch_size):
                 for j in range(batch_size):
                     for k in range(batch_size):
+                        if (num_triplets_outputted >
+                                max_num_triplets_to_output):
+                            break
                         if (valid_positive_triplets[i, j, k] == True):
                             f.write(
                                 "* Triplet ({0}, {1}, {2}) ".format(i, j, k) +
@@ -418,6 +426,17 @@ def print_batch_triplets_statistics(
                                 batch_index=batch_index,
                                 epoch_index=epoch_index,
                                 write_folder=write_folder)
+
+                            # Increment number of triplets outputted.
+                            num_triplets_outputted += 1
+                            if (num_triplets_outputted >
+                                    max_num_triplets_to_output):
+                                f.write(
+                                    "< Not printing statistics for the "
+                                    "subsequent triplets because the maximum number of "
+                                    "{} have already been printed. >\n".format(
+                                        max_num_triplets_to_output))
+                                break
     elif (triplet_strategy == 'batch_hard'):
         if (mask_anchor_positive is None or mask_anchor_negative is None):
             print("Please pass valid 'mask_anchor_positive' and "
