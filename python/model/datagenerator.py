@@ -133,7 +133,7 @@ class ImageDataGenerator:
         # Store total number of data of lines in the dataset.
         self.data_size = len(self.pickled_labels)
         self.access_indices = np.array(range(self.data_size))
-        print('Just set data_size to be {0}'.format(self.data_size))
+        print('The dataset contains {0} elements'.format(self.data_size))
 
     def read_files_list_as_path_and_labels(self, files_list):
         """ Old version of the data loader, kept here for backcompatibility.

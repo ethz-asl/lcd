@@ -1,3 +1,10 @@
+""" Obtain embeddings for a test dataset, given checkpoints and meta graph from
+    a previously trained model. The embeddings can then be clustered and the
+    result of the clustering is displayed, followed by ground-truth instances.
+    Finally, a checkpoint with the retrieved embeddings can be saved, so that it
+    can later be used for visualization with TensorBoard's Projector.
+"""
+
 import numpy as np
 import os
 import sys
@@ -6,29 +13,38 @@ from tensorflow.contrib import tensorboard
 from timeit import default_timer as timer
 
 from model.datagenerator import ImageDataGenerator
-from tools.cluster_lines import cluster_lines_affinity_propagation, cluster_lines_kmeans
+from tools.cluster_lines import cluster_lines_affinity_propagation, \
+                                cluster_lines_kmeans, \
+                                cluster_lines_aggr_clustering
 from tools.lines_utils import get_label_with_line_center, get_geometric_info
 from tools.visualization import pcl_lines_for_plot
 
 python_root = '../'
 sys.path.insert(0, python_root)
 
-log_files_folder = '/media/francesco/line tools data/logs/15112018_0824/'
+# Configuration.
+# Cluster strategy. One of "kmeans", "aggr_clustering" and
+# "affinity_propagation".
+cluster_strategy = "aggr_clustering"
+
+# Whether or not the test dataset should be read as a pickle file.
+# NOTE: non-pickle mode is currently deprecated and not fully supported.
+read_as_pickle = True
+
+# Folder where the checkpoints and meta graph for the test are stored.
+log_files_folder = '/media/francesco/line_tools_data/logs/300119_1312/'
 
 sess = tf.InteractiveSession()
 saver = tf.train.import_meta_graph(
     os.path.join(log_files_folder,
-                 'triplet_loss_batch_all_ckpt/bgr-d_model_epoch10.ckpt.meta')
-)
+                 'triplet_loss_batch_all_ckpt/bgr-d_model_epoch60.ckpt.meta'))
 saver.restore(
     sess,
     os.path.join(log_files_folder,
-                 'triplet_loss_batch_all_ckpt/bgr-d_model_epoch10.ckpt')
-)
+                 'triplet_loss_batch_all_ckpt/bgr-d_model_epoch60.ckpt'))
 
-read_as_pickle = True
-
-test_files = '/media/francesco/line_tools_data/pickle files/train_0/traj_1/pickled_test.pkl'
+# Test dataset.
+test_files = '/media/francesco/line_tools_data/pickle files/train_0/traj_1/pickled_val.pkl'
 
 # Retrieve mean of the training set.
 train_set_mean = sess.run('train_set_mean:0')
@@ -41,8 +57,9 @@ test_generator = ImageDataGenerator(
     mean=train_set_mean,
     read_as_pickle=read_as_pickle)
 
-# Check if embeddings have already been generated. If not, generate them.
-embeddings_path = os.path.join(log_files_folder, 'embeddings.npy')
+# Check if embeddings have already been generated (look for them at the path
+# embeddings_path). If not, generate them.
+embeddings_path = os.path.join(log_files_folder, 'embeddings_.npy')
 if os.path.isfile(embeddings_path):
     print("Using embeddings found at {}".format(embeddings_path))
     test_embeddings_all = np.load(embeddings_path)
@@ -73,7 +90,6 @@ else:
         test_set_size = len(test_generator.pickled_labels)
     else:
         # TODO: fix so that test frames can be written directly
-        # # Embeddings learned for test set
         # According to ../split_dataset_with_labels_world.py
         test = []
         traj = 1
@@ -103,7 +119,6 @@ else:
     # embeddings will not be obtained. These lines without embeddings will be
     # different in the two reading modes for the reasons explained above and
     # therefore some lines might be visualized in one case but not in the other.
-
     for i in range(test_set_size / batch_size):
         batch_input_img, batch_labels, batch_line_types = test_generator.next_batch(
             batch_size)
@@ -170,7 +185,6 @@ num_lines_with_embeddings = len(test_embeddings_all)
 # Retrieve true instances.
 if read_as_pickle:
     data_lines_world = np.array(test_generator.pickled_labels, dtype=np.float32)
-    print('Shape of data_lines_world is {}'.format(data_lines_world.shape))
 else:
     from tools.visualization import get_lines_world_coordinates_with_instances
     data_lines_world = get_lines_world_coordinates_with_instances(
@@ -183,10 +197,26 @@ data_lines_world = data_lines_world[:num_lines_with_embeddings]
 instance_labels = data_lines_world[:, -1]
 
 # Cluster lines.
-cluster_labels, num_clusters = cluster_lines_affinity_propagation(
-    embeddings=test_embeddings_all)
-
-print("Found {} clusters.".format(num_clusters))
+if cluster_strategy == "kmeans":
+    num_clusters = 32
+    print("Clustering using K-means with {} clusters".format(num_clusters))
+    cluster_labels = cluster_lines_kmeans(
+        embeddings=test_embeddings_all, num_clusters=num_clusters)
+elif cluster_strategy == "aggr_clustering":
+    num_clusters = 32
+    print("Clustering using Agglomerative Clustering with {} clusters".format(
+        num_clusters))
+    cluster_labels = cluster_lines_aggr_clustering(
+        embeddings=test_embeddings_all, num_clusters=num_clusters)
+elif cluster_strategy == "affinity_propagation":
+    print("Clustering using Affinity Propagation")
+    cluster_labels, num_clusters = cluster_lines_affinity_propagation(
+        embeddings=test_embeddings_all)
+    print("Found {} clusters.".format(num_clusters))
+else:
+    print("Invalid clustering strategy. Please use one of: 'kmeans', "
+          "'aggr_clustering', 'affinity_propagation'.")
+    sys.exit()
 
 # To display frequencies.
 count_map_cluster_labels_to_instance_labels = np.zeros(
