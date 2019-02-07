@@ -92,9 +92,12 @@ namespace line_ros_utility {
     // Make line matcher display matches of current frame with previous frame.
     //line_matcher_.displayMatches(current_frame_index - 1, current_frame_index,
     //                             line_matching::MatchingMethod::EUCLIDEAN);
-    line_matcher_.displayNBestMatchesPerLine(
+    //line_matcher_.displayNBestMatchesPerLine(
+    //    current_frame_index - 1, current_frame_index,
+    //    line_matching::MatchingMethod::EUCLIDEAN, 5);
+    line_matcher_.displayBestMatchPerLine(
         current_frame_index - 1, current_frame_index,
-        line_matching::MatchingMethod::EUCLIDEAN, 5);
+        line_matching::MatchingMethod::EUCLIDEAN);
   }
 
   void LineDetectorDescriptorAndMatcher::saveLinesWithNNEmbeddings(

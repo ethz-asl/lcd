@@ -30,6 +30,8 @@ class FixedSizePriorityQueue {
    T front();
    // Clears the queue.
    void clear();
+   // Returns the size of the queue.
+   unsigned int size();
    // True if the queue is empty.
    bool empty();
  protected:
@@ -115,6 +117,11 @@ T FixedSizePriorityQueue<T>::front() {
 template <class T>
 void FixedSizePriorityQueue<T>::clear() {
   queue_->clear();
+}
+
+template <class T>
+unsigned int FixedSizePriorityQueue<T>::size() {
+  return queue_->size();
 }
 
 template <class T>

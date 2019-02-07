@@ -89,7 +89,7 @@ class LineMatcher {
  public:
    LineMatcher();
 
-   // Add the input frame with the given frame index to the set of frames
+   // Adds the input frame with the given frame index to the set of frames
    // received if no other frame with that frame index was received.
    // Input: frame_to_add: Frame to add to the set of frames received.
    //
@@ -99,7 +99,7 @@ class LineMatcher {
    //         frames received, true otherwise.
    bool addFrame(const Frame& frame_to_add, unsigned int frame_index);
 
-   // Display the matches between two frames with the given indices, if frames
+   // Displays the matches between two frames with the given indices, if frames
    // with those indices were received.
    // Input: frame_index_1/2:      Indices of the frame between which to display
    //                              matches.
@@ -117,7 +117,7 @@ class LineMatcher {
                        MatchingMethod matching_method,
                        unsigned int magnification_factor=2);
 
-   // Display the best num_matches_per_line matches for each line in the frame
+   // Displays the best num_matches_per_line matches for each line in the frame
    // with frame index frame_index_1.
    // Input: frame_index_1/2:      Index of the frame between which to match
    //                              lines.
@@ -135,6 +135,23 @@ class LineMatcher {
                                    MatchingMethod matching_method,
                                    unsigned int num_matches_per_line,
                                    unsigned int magnification_factor=2);
+  // Displays the best match for each line in the frame with frame index
+  // frame_index_1, if the match is a valid. A match is considered valid if
+  // the ratio between its rating and the rating of the second-best candidate
+  // match is below a certain threshold.
+  // Input: frame_index_1/2:      Index of the frame between which to match
+  //                              lines.
+  //
+  //        matching_method:      Method (distance) to use to match lines.
+  //
+  // Output: return:         True if matching was possible, i.e., if frames
+  //                         with both input frame indices were received; false
+  //                         otherwise.
+  bool displayBestMatchPerLine(unsigned int frame_index_1,
+                               unsigned int frame_index_2,
+                               MatchingMethod matching_method,
+                               unsigned int magnification_factor=2);
+
 
  private:
    // Matches the two frames with the given indices, if frame with those indices
@@ -195,6 +212,41 @@ class LineMatcher {
    bool matchFramesNBestMatchesPerLine(
        unsigned int frame_index_1, unsigned int frame_index_2,
        MatchingMethod matching_method, unsigned int num_matches_per_line,
+       std::vector<MatchWithRating>* matches_with_ratings_vec);
+   // Matches each line in the frame with frame index frame_index_1 to the
+   // line that best matches it in the other frame (with frame index
+   // frame_index_2), if the match is a valid. A match is considered valid if
+   // the ratio between its rating and the rating of the second-best candidate
+   // match is below a certain threshold. This is motivated by the fact that,
+   // due to e.g. the high-dimensionality of the descriptor space, it is likely
+   // that there are false matches which have descriptors at a similar distance
+   // from the reference one in the descriptor space, and therefore have similar
+   // ratings. Correct matches should instead have descriptors much closer to
+   // reference descriptor than the descriptors of the false matches.
+   // If the best candidate match found for a certain line in the first frame is
+   // not a valid match, then the line will not be matched to any line in the
+   // second frame.
+   // NOTE: It is possible that some lines in the frame with frame index
+   // frame_index_2 are assigned to more than one line in the frame with frame
+   // index frame_index_1, i.e., the assignment is not injective.
+   // Input: frame_index_1/2:      Index of the frame between which to match
+   //                              lines.
+   //
+   //        matching_method:      Method (distance) to use to match lines.
+   //
+   //        num_matches_per_line: (Maximum) number of matches to find per each
+   //                              line in the first frame.
+   //
+   // Output: matches_with_ratings_vec: Vector of all matches found for all
+   //                                   lines, with the matching rating and the
+   //                                   indices of the pair of lines matched.
+   //
+   //         return:                   True if matching was possible, i.e., if
+   //                                   frames with both input frame indices
+   //                                   were received; false otherwise.
+   bool matchFramesBestMatchPerLine(
+       unsigned int frame_index_1, unsigned int frame_index_2,
+       MatchingMethod matching_method,
        std::vector<MatchWithRating>* matches_with_ratings_vec);
 
   // Frames received: key = frame_index, value = frame.
