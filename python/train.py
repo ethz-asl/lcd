@@ -77,6 +77,23 @@ def train(read_as_pickle=True):
     line_parametrization = 'direction_and_centerpoint'
 
     log_files_folder = "./logs/"
+    # True to output statistics and print images about the triplets formed (in
+    # the folder <job_name>_logs/). NOTE: due to dropout, the loss and
+    # regularization term in the statistics log file will not perfectly match
+    # the values shown in the summary in TensorBoard (unless the dropout rate is
+    # 1.0). This is because, although executed feeding the same batch data, the
+    # train operation and the statistics-retrieval operations need to be
+    # executed separately and therefore the weights in the dropout layer can
+    # happen to be selected differently. Use dropout rate equal to 1.0 to obtain
+    # a perfect match.
+    output_triplets_statistics = False
+    # Number of epochs between each new set of outputs of the triplets
+    # statistics. Only considered if output_triplets_statistics is True.
+    epoch_step_triplets_statistics = 10
+    # Number of batches between each new output of the triplets statistics (the
+    # epoch also needs to be one of those in which statistics are outputted).
+    # Only considered if output_triplets_statistics is True.
+    batch_step_triplets_statistics = 10
 
     # Learning parameters.
     learning_rate = 0.0001
@@ -382,11 +399,27 @@ def train(read_as_pickle=True):
                     batch_labels_train = get_label_with_line_center(
                         labels_batch=batch_labels_train)
 
-                # Display statistics about triplets (for only a few epochs and
-                # batches).
-                if (epoch % 10 < 2 and step < 30):
+                # Run the training operation.
+                sess.run(
+                    train_op,
+                    feed_dict={
+                        input_img: batch_input_img_train,
+                        labels: batch_labels_train,
+                        line_types: batch_line_types_train,
+                        geometric_info: batch_geometric_info_train,
+                        keep_prob: dropout_rate
+                    })
+
+                # Display statistics about triplets (if epoch and batch match
+                # the steps set above and if the statistics were set to be
+                # outputted).
+                if (output_triplets_statistics and
+                        epoch % epoch_step_triplets_statistics == 0 and
+                        step % batch_step_triplets_statistics == 0):
                     if (triplet_strategy == 'batch_all' or
                             triplet_strategy == 'batch_all_wohlhart_lepetit'):
+                        # Run both the operations for the retrieval of the
+                        # statistics.
                         (pairwise_dist_for_stats,
                          valid_positive_triplets_for_stats,
                          sum_valid_positive_triplets_anchor_positive_dist_for_stats,
@@ -406,6 +439,7 @@ def train(read_as_pickle=True):
                                 geometric_info: batch_geometric_info_train,
                                 keep_prob: dropout_rate
                             })
+                        # Output the statistics about the triplets.
                         print_batch_triplets_statistics(
                             triplet_strategy=triplet_strategy,
                             images=batch_input_img_train,
@@ -425,6 +459,8 @@ def train(read_as_pickle=True):
                             lambda_regularization=lambda_regularization,
                             regularization_term=regularization_term_for_stats)
                     elif (triplet_strategy == 'batch_hard'):
+                        # Run the operations for the retrieval of the
+                        # statistics.
                         (pairwise_dist_for_stats,
                          mask_anchor_positive_for_stats,
                          mask_anchor_negative_for_stats,
@@ -447,6 +483,7 @@ def train(read_as_pickle=True):
                                  geometric_info: batch_geometric_info_train,
                                  keep_prob: dropout_rate
                              })
+                        # Output the statistics about the triplets.
                         print_batch_triplets_statistics(
                             triplet_strategy=triplet_strategy,
                             images=batch_input_img_train,
@@ -467,16 +504,7 @@ def train(read_as_pickle=True):
                             hardest_negative_element=
                             hardest_negative_element_for_stats,
                             loss=loss_for_stats)
-                # Run the training operation.
-                sess.run(
-                    train_op,
-                    feed_dict={
-                        input_img: batch_input_img_train,
-                        labels: batch_labels_train,
-                        line_types: batch_line_types_train,
-                        geometric_info: batch_geometric_info_train,
-                        keep_prob: dropout_rate
-                    })
+
                 # Generate summary with the current batch of data and write it
                 # to file.
                 if step % display_step == 0:
