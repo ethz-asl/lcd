@@ -27,9 +27,28 @@ sys.path.insert(0, python_root)
 # "affinity_propagation".
 cluster_strategy = "aggr_clustering"
 
+# Visualizer of the lines coloured with the instances from clustering. Possible
+# values: 'open3d', 'matplotlib'.
+visualizer = 'open3d'
+
 # Whether or not the test dataset should be read as a pickle file.
 # NOTE: non-pickle mode is currently deprecated and not fully supported.
 read_as_pickle = True
+
+# If True, the ground-truth instance labels are read from the input dataset (in
+# pickle-file format, each line has a 7-dimensional entry called 'labels' in the
+# format [start point (3x)] [end point (3x)] [instance label]. The instance
+# label is read as the last of these values). The ground-truth instance labels
+# are later used to display-ground truth labels and to assign each embedding
+# in the checkpoint for TensorBoard's Projector a label (that can be used, e.g.,
+# to colour the points by instance label).
+# NOTE: in principle, for a generic test dataset it might be the case that
+# ground-truth instance labels are not available (e.g., when testing on a real
+# set without ground-truth labelling), and it therefore makes sense to set
+# use_ground_truth_instance_labels to False. In this case, it is still expected
+# that the pickle files contain an entry called 'labels', with the first six
+# entries corresponding to [start point (3x)] [end point (3x)].
+use_ground_truth_instance_labels = False
 
 # Folder where the checkpoints and meta graph for the test are stored.
 log_files_folder = '/media/francesco/line_tools_data/logs/300119_1312/'
@@ -59,7 +78,7 @@ test_generator = ImageDataGenerator(
 
 # Check if embeddings have already been generated (look for them at the path
 # embeddings_path). If not, generate them.
-embeddings_path = os.path.join(log_files_folder, 'embeddings_.npy')
+embeddings_path = os.path.join(log_files_folder, 'embeddings.npy')
 if os.path.isfile(embeddings_path):
     print("Using embeddings found at {}".format(embeddings_path))
     test_embeddings_all = np.load(embeddings_path)
@@ -80,6 +99,9 @@ else:
         geometric_info_found = False
     else:
         geometric_info_found = True
+
+    if (use_ground_truth_instance_labels):
+        labels = graph.get_tensor_by_name('labels:0')
 
     batch_size = 128
     test_embeddings_all = np.empty(
@@ -120,8 +142,9 @@ else:
     # different in the two reading modes for the reasons explained above and
     # therefore some lines might be visualized in one case but not in the other.
     for i in range(test_set_size / batch_size):
-        batch_input_img, batch_labels, batch_line_types = test_generator.next_batch(
-            batch_size)
+        print("Batch no. {}".format(i))
+        (batch_input_img, batch_labels,
+         batch_line_types) = test_generator.next_batch(batch_size)
         # Create dictionary of the values to feed to the tensors to run the
         # operation.
         feed_dict = {
@@ -194,7 +217,14 @@ else:
 # in batches only for a number of lines multiple of the batch size the embedding
 # is computed, cf. above).
 data_lines_world = data_lines_world[:num_lines_with_embeddings]
-instance_labels = data_lines_world[:, -1]
+if (use_ground_truth_instance_labels):
+    if (data_lines_world.shape[1] != 7):
+        print("Ground-truth instance labels not found: entry 'labels' of the "
+              "lines in the pickle file has not dimension 7. Please set "
+              "'use_ground_truth_instance_labels' to False.")
+        sys.exit()
+    else:
+        instance_labels = data_lines_world[:, -1]
 
 # Cluster lines.
 if cluster_strategy == "kmeans":
@@ -219,48 +249,48 @@ else:
     sys.exit()
 
 # To display frequencies.
-count_map_cluster_labels_to_instance_labels = np.zeros(
-    [max(cluster_labels) + 1,
-     int(max(instance_labels)) + 1])
-for label_index in range(len(cluster_labels)):
-    cluster_label = cluster_labels[label_index]
-    corresponding_instance_label = int(instance_labels[label_index])
-    count_map_cluster_labels_to_instance_labels[
-        cluster_label, corresponding_instance_label] += 1
+if (use_ground_truth_instance_labels):
+    count_map_cluster_labels_to_instance_labels = np.zeros(
+        [max(cluster_labels) + 1,
+         int(max(instance_labels)) + 1])
+    for label_index in range(len(cluster_labels)):
+        cluster_label = cluster_labels[label_index]
+        corresponding_instance_label = int(instance_labels[label_index])
+        count_map_cluster_labels_to_instance_labels[
+            cluster_label, corresponding_instance_label] += 1
 
 # Map real instances and instances from clustering and display lines with
 # colours. Lines with the same colour belong to the same cluster.
-# Possible values for visualizer: 'open3d', 'matplotlib'.
-visualizer = 'open3d'
-
 if visualizer == 'open3d':
     from tools.visualization import plot_lines_with_open3d
     pcl_lines_open3d_cluster = pcl_lines_for_plot(
         data_lines_world, lines_color=cluster_labels, visualizer='open3d')
-    pcl_lines_open3d_ground_truth = pcl_lines_for_plot(
-        data_lines_world,
-        lines_color=np.int32(instance_labels),
-        visualizer='open3d')
     print("Displaying scene with obtained instances")
     plot_lines_with_open3d(pcl_lines_open3d_cluster, "Clusterized instances")
-    print("Displaying scene with ground-truth instances")
-    plot_lines_with_open3d(pcl_lines_open3d_ground_truth,
-                           "Ground-truth instances")
+    if (use_ground_truth_instance_labels):
+        pcl_lines_open3d_ground_truth = pcl_lines_for_plot(
+            data_lines_world,
+            lines_color=np.int32(instance_labels),
+            visualizer='open3d')
+        print("Displaying scene with ground-truth instances")
+        plot_lines_with_open3d(pcl_lines_open3d_ground_truth,
+                               "Ground-truth instances")
 
 elif visualizer == 'matplotlib':
     from tools.visualization import plot_lines_with_matplotlib
     pcl_lines_matplotlib_cluster = pcl_lines_for_plot(
         data_lines_world, lines_color=cluster_labels, visualizer='matplotlib')
-    pcl_lines_matplotlib_ground_truth = pcl_lines_for_plot(
-        data_lines_world,
-        lines_color=np.int32(instance_labels),
-        visualizer='matplotlib')
     print("Displaying scene with obtained instances")
     plot_lines_with_matplotlib(pcl_lines_matplotlib_cluster,
                                "Clusterized instances")
-    print("Displaying scene with ground-truth instances")
-    plot_lines_with_matplotlib(pcl_lines_matplotlib_ground_truth,
-                               "Ground-truth instances")
+    if (use_ground_truth_instance_labels):
+        pcl_lines_matplotlib_ground_truth = pcl_lines_for_plot(
+            data_lines_world,
+            lines_color=np.int32(instance_labels),
+            visualizer='matplotlib')
+        print("Displaying scene with ground-truth instances")
+        plot_lines_with_matplotlib(pcl_lines_matplotlib_ground_truth,
+                                   "Ground-truth instances")
 
 # Display embeddings in the feature space, coloured with instance label.
 LOG_DIR = os.path.join(log_files_folder, 'embedding_logs')
@@ -269,8 +299,15 @@ metadata = os.path.join(LOG_DIR, 'embedding_metadata.tsv')
 test_embeddings = tf.Variable(test_embeddings_all, name='test_embeddings')
 
 with open(metadata, 'w') as metadata_file:
-    for label in instance_labels:
-        metadata_file.write('%d\n' % label)
+    if (use_ground_truth_instance_labels):
+        for label in instance_labels:
+            metadata_file.write('%d\n' % label)
+    else:
+        print("Flag 'use_ground_truth_instance_labels' is set to False, "
+              "saving the embeddings all with the same label (0). Colouring "
+              "in TensorBoard's Projector will therefore not be possible.")
+        for _ in range(data_lines_world.shape[0]):
+            metadata_file.write('0\n')
 
 with tf.Session() as sess:
     saver = tf.train.Saver([test_embeddings])
