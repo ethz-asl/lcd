@@ -55,11 +55,11 @@ class MatchRatingComputer {
    // descriptors).
    // Input: embedding_1/2: Descriptors of the candidate matches.
    //
-   // Output: rating_out:   Rating of the candidate match.
+   // Output: rating_out: Rating of the candidate match.
    //
-   //         return:       True if the rating of the match is above the
-   //                       threshold defined by
-   //                       max_difference_between_matches_, false otherwise.
+   //         return:     True if the rating of the match is above the threshold
+   //                     defined by max_difference_between_matches_, false
+   //                     otherwise.
    virtual bool computeMatchRating(const std::vector<float>& embedding_1,
                                    const std::vector<float>& embedding_2,
                                    float* rating_out) = 0;
@@ -110,9 +110,8 @@ class LineMatcher {
    //                              many times the images should be enlarged for
    //                              visualization.
    //
-   // Output: return:         True if matching was possible, i.e., if frames
-   //                         with both input frame indices were received; false
-   //                         otherwise.
+   // Output: return: True if matching was possible, i.e., if frames with both
+   //                 input frame indices were received; false otherwise.
    bool displayMatches(unsigned int frame_index_1, unsigned int frame_index_2,
                        MatchingMethod matching_method,
                        unsigned int magnification_factor=2);
@@ -127,9 +126,8 @@ class LineMatcher {
    //        num_matches_per_line: (Maximum) number of matches to find per each
    //                              line in the first frame.
    //
-   // Output: return:         True if matching was possible, i.e., if frames
-   //                         with both input frame indices were received; false
-   //                         otherwise.
+   // Output: return: True if matching was possible, i.e., if frames with both
+   //                 input frame indices were received; false otherwise.
    bool displayNBestMatchesPerLine(unsigned int frame_index_1,
                                    unsigned int frame_index_2,
                                    MatchingMethod matching_method,
@@ -139,14 +137,12 @@ class LineMatcher {
   // frame_index_1, if the match is a valid. A match is considered valid if
   // the ratio between its rating and the rating of the second-best candidate
   // match is below a certain threshold.
-  // Input: frame_index_1/2:      Index of the frame between which to match
-  //                              lines.
+  // Input: frame_index_1/2: Index of the frame between which to match lines.
   //
-  //        matching_method:      Method (distance) to use to match lines.
+  //        matching_method: Method (distance) to use to match lines.
   //
-  // Output: return:         True if matching was possible, i.e., if frames
-  //                         with both input frame indices were received; false
-  //                         otherwise.
+  // Output: return: True if matching was possible, i.e., if frames with both
+  //                 input frame indices were received; false otherwise.
   bool displayBestMatchPerLine(unsigned int frame_index_1,
                                unsigned int frame_index_2,
                                MatchingMethod matching_method,
@@ -157,9 +153,9 @@ class LineMatcher {
    // Matches the two frames with the given indices, if frame with those indices
    // were received. Returns two vectors of indices with the same length,
    // that encode the correspondences between the lines from the two frames.
-   // Input: frame_index_1/2:   Index of the frame between which to match lines.
+   // Input: frame_index_1/2: Index of the frame between which to match lines.
    //
-   //        matching_method:   Method (distance) to use to match lines.
+   //        matching_method: Method (distance) to use to match lines.
    //
    // Output: line_indices_1/2: Paired indices of lines from the two frames that
    //                           are matches. The line with index

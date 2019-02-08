@@ -1,14 +1,20 @@
 import numpy as np
 
+
 def pcl_transform(pointcloud, T):
     """ Transforms a pointcloud according to the transformation matrix.
+
     Args:
-        pointcloud: numpy array of shape (points_number, 6). [x, y, z, r, g, b].
-        T: numpy array of shape (4, 4). Transformation matrix.
+        pointcloud (numpy array of shape (points_number, 6)): pointcloud[i, :]
+            contains the information about the i-th point in the point cloud, in
+            the following format:
+                [x, y, z, r, g, b].
+        T (numpy array of shape (4, 4)): Transformation matrix.
 
     Returns:
-        pcl_new: numpy array of shape (points_number, 6). The pointcloud
-            expressed in the new coordinate frame. [x, y, z, r, g, b].
+        pcl_new (numpy array of shape (points_number, 6)): The pointcloud
+            expressed in the new coordinate frame, in the same format as the
+            input point cloud ([x, y, z, r, g, b]).
     """
     pcl_xyz = np.hstack((pointcloud[:, :3], np.ones((pointcloud.shape[0], 1))))
     pcl_new_xyz = T.dot(pcl_xyz.T).T
@@ -21,12 +27,14 @@ def project_pcl_to_image(pointcloud,
                          image_width=320,
                          image_height=240):
     """ Projects a pointcloud to camera image.
+
     Args:
         pointcloud (numpy array of shape (num_points, 6)):
             Point cloud in the format [x, y, z, r, g, b] for each point.
-        camera_model: Camera model class.
-        image_width: Image width.
-        image_height: Image height.
+        camera_model (Instance of a camera model class): Camera model to use to
+            reproject the point cloud on the virtual-camera image plane.
+        image_width (int): Image width.
+        image_height (int): Image height.
 
     Returns:
         rbg_image (numpy array of shape (image_height, image_width, 3),
@@ -52,7 +60,7 @@ def project_pcl_to_image(pointcloud,
     pcl_inside_view = pcl_inside_view[index_bool, :]
 
     # Considering occlusion, we need to be careful with the order of assignment
-    # descending order according to the z coordinate
+    # descending order according to the z coordinate.
     index_sort = pcl_inside_view[:, 2].argsort()[::-1]
     pixel = pixel[:, index_sort]
     pcl_inside_view = pcl_inside_view[index_sort, :]

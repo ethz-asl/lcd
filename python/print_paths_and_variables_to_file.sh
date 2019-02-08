@@ -11,7 +11,7 @@ then
   exit 1
 fi
 
-# Go to root of line_tools
+# Go to root of line_tools.
 cd $LINE_TOOLS_ROOT
 if [ -f paths_and_variables.txt ]
 then

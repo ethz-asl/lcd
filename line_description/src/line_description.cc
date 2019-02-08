@@ -28,7 +28,8 @@ namespace line_description {
     std::vector<cv::line_descriptor::KeyLine> keyline_vec;
     keyline_vec.push_back(keyline);
     binary_descriptor_->compute(image, keyline_vec, cv_descriptor);
-    LOG(INFO) << "cv_descriptor.size().height is " << cv_descriptor.size().height;
+    LOG(INFO) << "cv_descriptor.size().height is "
+              << cv_descriptor.size().height;
     LOG(INFO) << "cv_descriptor.size().width is " << cv_descriptor.size().width;
     CHECK(cv_descriptor.size().height == 1 && cv_descriptor.size().width == 32);
     // Transform binary descriptor to a Descriptor object.

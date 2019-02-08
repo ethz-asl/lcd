@@ -52,3 +52,7 @@ __pycache__/
 
 # Logs
 logs/
+
+# Auxiliary files for scripts
+line_with_points_and_planes.yaml
+paths_and_variables.txt

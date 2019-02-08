@@ -7,7 +7,7 @@ class SceneNNCameraModel:
     """
 
     def __init__(self, camera_intrinsics):
-        # Camera projection matrix of shape (3,4).
+        # Camera projection matrix of shape (3, 4).
         self.P = camera_intrinsics
         self.cx = camera_intrinsics[0, 2]
         self.cy = camera_intrinsics[1, 2]

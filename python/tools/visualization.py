@@ -1,12 +1,12 @@
-import os
-import open3d
 import numpy as np
+import open3d
+import os
 import pandas as pd
 import sys
 import matplotlib.pyplot as plt
 
-import pathconfig
 from get_protobuf_paths import get_protobuf_path
+import pathconfig
 
 # Retrieve scenenetscripts_path and protobuf path from config file.
 print('visualization.py: Using values in config_paths_and_variables.sh '
@@ -30,6 +30,7 @@ def get_lines_world_coordinates_with_instances(dataset_name, trajectory,
         end point of the lines in world coordinates, as well as the instance
         labels assigned to lines. Used only for visualization and when data is
         not read from pickle files.
+
     Args:
         dataset_name (string): Either 'val' or 'train_NUM', where NUM is an
             integer between 0 and 16.

@@ -10,6 +10,7 @@ from pickle_dataset import merge_pickled_dictionaries
 
 def get_train_set_mean(file_path, image_type, read_as_pickle):
     """ Gets the mean of the training set.
+
     Args:
         file_path (string):
             * If read_as_pickle == True: List of the paths of the pickle files
@@ -23,7 +24,7 @@ def get_train_set_mean(file_path, image_type, read_as_pickle):
             based on the locations specified in files_list.
 
     Returns:
-        image_mean (numpy array of shape (num_channels, ) and dtype=np.float32,
+        image_mean (numpy array of shape (num_channels, ) and dtype np.float32,
             where num_channels is 3 if image_type is 'bgr' and 4 if image_type
             is 'bgr-d'): Channelwise mean of the images in the dataset.
     """
@@ -114,6 +115,7 @@ def write_triplet_image_to_file(
         anchor_negative_dist, set_mean, batch_index, epoch_index, write_folder):
     """ Writes to file an image showing the virtual camera images of the lines
         in the triplet selected and short statistics about the triplet.
+
     Args:
         image_anchor (numpy array of shape (scale_size[0], scale_size[1],
             num_channels), where scale_size is defined when the batches are
@@ -232,6 +234,7 @@ def output_batch_triplets_statistics(
     """ Prints statistics about values extracted from the triplets in a training
         batch and writes to file images containing the virtual images of the
         lines in the triplets selected.
+
     Args:
         triplet_strategy (string): Either 'batch_all', 'batch_hard' or
             'batch_all_wohlhart_lepetit', strategy for the selection of the

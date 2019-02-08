@@ -39,14 +39,14 @@ if __name__ == '__main__':
     else:
         print("pickle_files.py: some arguments are missing. Using default ones "
               "in config_paths_and_variables.sh.")
-        # Obtain paths and variables
+        # Obtain paths and variables.
         linesandimagesfolder_path = pathconfig.obtain_paths_and_variables(
             "LINESANDIMAGESFOLDER_PATH")
         pickleandsplit_path = pathconfig.obtain_paths_and_variables(
             "PICKLEANDSPLIT_PATH")
         trajectory = pathconfig.obtain_paths_and_variables("TRAJ_NUM")
         dataset_name = pathconfig.obtain_paths_and_variables("DATASET_NAME")
-        # Compose script arguments if necessary
+        # Compose script arguments if necessary.
         splittingfiles_path = linesandimagesfolder_path
         output_path = os.path.join(pickleandsplit_path, dataset_name,
                                    'traj_{}'.format(trajectory))

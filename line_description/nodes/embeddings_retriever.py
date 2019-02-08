@@ -1,6 +1,6 @@
-"""The following module allows to retrieve descriptors one line at a time (i.e.,
-   it feeds the trained network with the corresponding virtual camera image to
-   obtain the embeddings for the line, one line at a time).
+""" The following module allows to retrieve descriptors one line at a time
+    (i.e., it feeds the trained network with the corresponding virtual-camera
+    image to obtain the embeddings for the line, one line at a time).
 """
 import cv2
 import numpy as np
@@ -10,7 +10,7 @@ from tools.lines_utils import get_geometric_info
 
 
 class EmbeddingsRetriever:
-    """ Retrieves embeddings for lines, given a virtual camera image and the
+    """ Retrieves embeddings for lines, given a virtual-camera image and the
         line type.
 
     Args:

@@ -1,5 +1,5 @@
-"""
-The following module contains functions to cluster lines given their embeddings.
+""" The following module contains functions to cluster lines given their
+    embeddings.
 """
 from sklearn.cluster import AffinityPropagation, KMeans, AgglomerativeClustering
 

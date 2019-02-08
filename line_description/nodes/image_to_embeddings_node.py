@@ -13,26 +13,26 @@ from cv_bridge import CvBridge, CvBridgeError
 
 class ImageToEmbeddingsConverter:
     """ Server for the service ImageToEmbeddings. Returns embeddings given a
-        virtual camera image and a line type.
+        virtual-camera image and a line type.
 
     Args:
         None.
 
     Attributes:
         embeddings_retriever (EmbeddingsRetriever): Instance of the class of the
-            EmbeddingsRetriever to retrieve the embeddings given a virtual
-            camera image.
+            EmbeddingsRetriever to retrieve the embeddings given a
+            virtual-camera image.
     """
 
     def __init__(self):
-        log_files_folder = '/media/francesco/line_tools_data/logs/30122018_0852/'
+        log_files_folder = '/media/francesco/line_tools_data/logs/150119_1612/'
         self.embeddings_retriever = EmbeddingsRetriever(
             meta_file=os.path.join(log_files_folder,
-                                   'triplet_loss_batch_all_ckpt/'
-                                   'bgr-d_model_epoch1.ckpt.meta'),
+                                   'triplet_loss_batch_hard_ckpt/'
+                                   'bgr-d_model_epoch90.ckpt.meta'),
             checkpoint_file=os.path.join(
                 log_files_folder,
-                'triplet_loss_batch_all_ckpt/bgr-d_model_epoch1.ckpt'))
+                'triplet_loss_batch_hard_ckpt/bgr-d_model_epoch90.ckpt'))
         self.bridge = CvBridge()
 
     def handle_image_to_embeddings(self, req):

@@ -1,5 +1,4 @@
-"""
-To config path variables.
+""" To configure path variables.
 """
 import sys
 import os
@@ -12,7 +11,7 @@ def obtain_paths_and_variables(name, verbose=False):
     """ Reads the current paths and variables from the package and returns the
         value of the path/variable 'name' if present.
     """
-    # Execute script that produces the paths_and_variables.txt file
+    # Execute script that produces the paths_and_variables.txt file.
     subprocess.call(
         os.path.abspath(
             os.path.join(file_dir, '../print_paths_and_variables_to_file.sh')))

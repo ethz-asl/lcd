@@ -128,7 +128,7 @@ else:
 
     print("Test set has {} lines ".format(test_set_size))
 
-    # Obtain embeddings for lines test set.
+    # Obtain embeddings for the lines in the test set.
 
     # NOTE: Pickle files might store lines images in a different 'order' than
     # the one corresponding to the list of images in the text file. This means
@@ -319,7 +319,7 @@ with tf.Session() as sess:
     # One can add multiple embeddings.
     embedding = config.embeddings.add()
     embedding.tensor_name = test_embeddings.name
-    # Link this tensor to its metadata file (e.g. labels).
+    # Link this tensor to its metadata file (i.e., labels).
     embedding.metadata_path = metadata
     # Saves a config file that TensorBoard will read during startup.
     tensorboard.plugins.projector.visualize_embeddings(

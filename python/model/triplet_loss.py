@@ -6,7 +6,7 @@ import tensorflow as tf
 
 
 def _pairwise_distances(embeddings, squared=False):
-    """ Compute the 2D matrix of distances between all the embeddings.
+    """ Computes the 2D matrix of distances between all the embeddings.
 
     Args:
         embeddings (Tensorflow tensor of shape (batch_size, embed_dim) and type
@@ -15,25 +15,26 @@ def _pairwise_distances(embeddings, squared=False):
         squared (bool): If True, the output is the pairwise squared Euclidean
             distance matrix. If False, the output is the pairwise Euclidean
             distance matrix.
+
     Returns:
         pairwise_distances (Tensorflow tensor of shape (batch_size, batch_size)
             and type tf.float32): pairwise_distances[i, j] contains the pairwise
             distance (of the type determined by the argument squared) between
             the i-th and the j-th embeddings in the batch.
     """
-    # Get the dot product between all embeddings
-    # Shape (batch_size, batch_size)
+    # Get the dot product between all embeddings.
+    # Shape (batch_size, batch_size).
     dot_product = tf.matmul(embeddings, tf.transpose(embeddings))
 
     # Get squared L2 norm for each embedding. We can just take the diagonal of
     # `dot_product`. This also provides more numerical stability (the diagonal
     # of the result will be exactly 0).
-    # shape (batch_size,)
+    # Shape (batch_size, ).
     square_norm = tf.diag_part(dot_product)
 
     # Compute the pairwise distance matrix as we have:
     # ||a - b||^2 = ||a||^2  - 2 <a, b> + ||b||^2
-    # Shape (batch_size, batch_size)
+    # Shape (batch_size, batch_size).
     distances = tf.expand_dims(square_norm, 1) - 2.0 * \
         dot_product + tf.expand_dims(square_norm, 0)
 
@@ -42,9 +43,9 @@ def _pairwise_distances(embeddings, squared=False):
     distances = tf.maximum(distances, 0.0)
 
     if not squared:
-        # Because the gradient of sqrt is infinite when distances == 0.0 (ex: on
-        # the diagonal)
-        # we need to add a small epsilon where distances == 0.0
+        # Because the gradient of sqrt is infinite when distances == 0.0 (e.g.,
+        # on the diagonal) we need to add a small epsilon where
+        # distances == 0.0.
         mask = tf.to_float(tf.equal(distances, 0.0))
         distances = distances + mask * 1e-16
 
@@ -58,8 +59,8 @@ def _pairwise_distances(embeddings, squared=False):
 
 
 def _get_anchor_positive_triplet_mask(labels, use_dist=False, max_dist=1.0):
-    """ Return a 2D mask where mask[a, p] is True iff a and p are distinct, have
-        same instance label and - if use_dist is set to true - are close in
+    """ Returns a 2D mask where mask[a, p] is True iff a and p are distinct,
+        have same instance label and - if use_dist is set to true - are close in
         space.
 
     Args:
@@ -71,6 +72,7 @@ def _get_anchor_positive_triplet_mask(labels, use_dist=False, max_dist=1.0):
             anchor-positive pair.
         max_dist (float): max distance in meters between the centers of the
             lines for the lines to be considered as close in space.
+
     Returns:
         mask (Tensorflow tensor of shape (batch_size, batch_size) and type
             tf.bool): mask[a, p] is True if (a, p) is a valid anchor-positive
@@ -106,7 +108,7 @@ def _get_anchor_positive_triplet_mask(labels, use_dist=False, max_dist=1.0):
 
 
 def _get_anchor_negative_triplet_mask(labels, use_dist=False, max_dist=1.0):
-    """ Return a 2D mask where mask[a, n] is True if a and n have distinct
+    """ Returns a 2D mask where mask[a, n] is True if a and n have distinct
         labels or - if use_dist is set to true - a and n are far away in space.
 
     Args:
@@ -118,6 +120,7 @@ def _get_anchor_negative_triplet_mask(labels, use_dist=False, max_dist=1.0):
             anchor-positive pair.
         max_dist (float): max distance in meters between the centers of the
             lines for the lines to be considered as close in space.
+
     Returns:
         mask (Tensorflow tensor of shape (batch_size, batch_size) and type
             tf.bool): mask[a, n] is True if (a, n) is a valid anchor-negative
@@ -150,7 +153,7 @@ def _get_anchor_negative_triplet_mask(labels, use_dist=False, max_dist=1.0):
 
 
 def _get_triplet_mask(labels, use_dist=False, max_dist=1.0):
-    """ Return a 3D mask where mask[a, p, n] is True iff the triplet (a, p, n)
+    """ Returns a 3D mask where mask[a, p, n] is True iff the triplet (a, p, n)
         is valid.
         A triplet (i, j, k) is valid if:
             1. i, j, k are distinct
@@ -165,6 +168,7 @@ def _get_triplet_mask(labels, use_dist=False, max_dist=1.0):
             anchor-positive pair.
         max_dist (float): max distance in meters between the centers of the
             lines for the lines to be considered as close in space.
+
     Returns:
         mask (Tensorflow tensor of shape (batch_size, batch_size) and type
             tf.bool): mask[a, p, n] is True if (a, p, n) is a valid
@@ -198,7 +202,7 @@ def _get_triplet_mask(labels, use_dist=False, max_dist=1.0):
 
 
 def batch_hardest_triplet_loss(labels, embeddings, margin, squared=False):
-    """ Build the triplet loss over a batch of embeddings.
+    """ Builds the triplet loss over a batch of embeddings.
         For each anchor, we get the hardest positive and hardest negative to
         form a triplet.
 
@@ -211,6 +215,7 @@ def batch_hardest_triplet_loss(labels, embeddings, margin, squared=False):
         squared (bool): If True, output is the pairwise squared Euclidean
             distance matrix. If False, output is the pairwise Euclidean distance
             matrix.
+
     Returns:
         triplet_loss (scalar Tensorflow tensor): Triplet loss.
     """
@@ -275,8 +280,8 @@ def batch_all_wohlhart_lepetit_loss(labels,
                                     margin,
                                     lambda_regularization,
                                     squared=False):
-    """ Build a loss partially based on [1] over a batch of embeddings. The loss
-        is composed of two terms:
+    """ Builds a loss partially based on [1] over a batch of embeddings. The
+        loss is composed of two terms:
 
             loss = modified_triplet_loss + regularization_term
 
@@ -321,6 +326,7 @@ def batch_all_wohlhart_lepetit_loss(labels,
         squared (bool): If True, output is the pairwise squared Euclidean
             distance matrix. If False, output is the pairwise Euclidean distance
             matrix.
+
     Returns:
         loss (scalar Tensorflow tensor): Output loss, computed as described
             above.
@@ -431,7 +437,7 @@ def batch_all_triplet_loss(labels,
                            lambda_regularization,
                            really_all=False,
                            squared=False):
-    """ Build the loss over a batch of embeddings. The loss is composed of two
+    """ Builds the loss over a batch of embeddings. The loss is composed of two
         terms:
 
             loss = triplet_loss + regularization_term
@@ -473,6 +479,7 @@ def batch_all_triplet_loss(labels,
         squared (bool): If True, output is the pairwise squared Euclidean
             distance matrix. If False, output is the pairwise Euclidean distance
             matrix.
+
     Returns:
         loss (scalar Tensorflow tensor): Output loss, computed as described
             above.

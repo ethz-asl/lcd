@@ -8,13 +8,14 @@ from get_protobuf_paths import get_protobuf_path
 class SceneNetCameraToWorldMatrixRetriever:
     """ Retrieves a camera-to-world matrix from a frame in a trajectory in
         SceneNetRGBD.
+
     Args:
-        trajectory: Number of the trajectory in the dataset dataset_name from
-            SceneNetRGBD.
-        dataset_name: Either 'val' or 'train_NUM', where 'NUM' is a number
-            between 0 and 16.
-        scenenetscripts_path: Path to the scripts from pySceneNetRGBD (e.g.
-            '../pySceneNetRGBD/'.
+        trajectory (int): Number of the trajectory in the dataset dataset_name
+            from SceneNetRGBD.
+        dataset_name (string): Either 'val' or 'train_NUM', where 'NUM' is a
+            number between 0 and 16.
+        scenenetscripts_path (string): Path to the scripts from pySceneNetRGBD
+            (e.g. '../pySceneNetRGBD/').
 
     Attributes:
         views: Set of views of the camera for each frame in the trajectory.
@@ -44,11 +45,12 @@ class SceneNetCameraToWorldMatrixRetriever:
     def get_camera_to_world_matrix(self, frame_id):
         """ Given a frame ID of a frame in the trajectory, returns the
             camera-to-world matrix.
+
         Args:
-            frame_id: Frame ID of the frame in the input trajectory.
+            frame_id (int): Frame ID of the frame in the input trajectory.
 
         Returns:
-            camera_to_world_matrix: Camera-to-world matrix.
+            camera_to_world_matrix (numpy array): Camera-to-world matrix.
         """
         from camera_pose_and_intrinsics_example import \
             camera_to_world_with_pose, interpolate_poses
@@ -64,13 +66,14 @@ class SceneNetCameraToWorldMatrixRetriever:
 class SceneNNCameraToWorldMatrixRetriever:
     """ Retrieves a camera-to-world matrix from a frame in a trajectory in
         SceneNN.
+
     Args:
-        trajectory: Number of the trajectory (scene) in SceneNN.
-        dataset_path: Path containing the different image files from the
-            dataset. In particular this path should contain a subfolder XYZ for
-            each scene (where XYZ is a three-digit ID associated to the scene,
-            e.g. 005) and a subfolder 'intrinsic'. It is required here because
-            the file with the trajectory poses are contained in there.
+        trajectory (int): Number of the trajectory (scene) in SceneNN.
+        dataset_path (string): Path containing the different image files from
+            the dataset. In particular, this path should contain a subfolder XYZ
+            for each scene (where XYZ is a three-digit ID associated to the
+            scene, e.g. 005) and a subfolder 'intrinsic'. It is required here
+            because the file with the trajectory poses is contained in there.
 
     Attributes:
         matrices: Set of camera-to-world matrices.
@@ -99,11 +102,12 @@ class SceneNNCameraToWorldMatrixRetriever:
     def get_camera_to_world_matrix(self, frame_id):
         """ Given a frame ID of a frame in the trajectory, returns the
             camera-to-world matrix.
+
         Args:
-            frame_id: Frame ID of the frame in the input trajectory.
+            frame_id (int): Frame ID of the frame in the input trajectory.
 
         Returns:
-            camera_to_world_matrix: Camera-to-world matrix.
+            camera_to_world_matrix (numpy array): Camera-to-world matrix.
         """
         try:
             camera_to_world_matrix = self.matrices[frame_id]

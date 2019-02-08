@@ -1,4 +1,4 @@
-""" Splits the lines detected in the input trajectory into train, val and test
+""" Split the lines detected in the input trajectory into train, val and test
     set and labels each line with its center point in the world frame and its
     instance label.
 """
@@ -173,7 +173,7 @@ if __name__ == '__main__':
     else:
         print("split_dataset_with_labels_world.py: Some arguments are missing. "
               "Using default ones in config_paths_and_variables.sh.")
-        # Obtain paths and variables
+        # Obtain paths and variables.
         scenenetscripts_path = pathconfig.obtain_paths_and_variables(
             "SCENENET_SCRIPTS_PATH")
         linesandimagesfolder_path = pathconfig.obtain_paths_and_variables(
@@ -214,7 +214,7 @@ if __name__ == '__main__':
                      "using SceneNN dataset. Please use the argument "
                      "-dataset_path.")
 
-    # Compose auxiliary paths
+    # Compose auxiliary paths.
     path_to_linesfiles = os.path.join(linesandimagesfolder_path,
                                       '{0}_lines/traj_{1}/'.format(
                                           dataset_name, trajectory))

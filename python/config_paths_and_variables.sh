@@ -44,14 +44,14 @@
 # *** The following paths are independent of the specific data generation task
 #     being carried out (i.e., on the trajectory number and the dataset from
 #     which to extract the images) ***
-SCENENET_DATASET_PATH=/media/francesco/101f61e3-7b0d-4657-b369-3b79420829b8/francesco/ETH/Semester_3/Semester_Project/pySceneNetRGBD/
-SCENENN_DATASET_PATH=/media/francesco/line_tools_data/scenenn/download/scenenn_data
+SCENENET_DATASET_PATH=~/line_tools_data/pySceneNetRGBD/
+SCENENN_DATASET_PATH=~/line_tools_data/scenenn/download/scenenn_data
 SCENENET_SCRIPTS_PATH=~/catkin_ws/src/pySceneNetRGBD/
-BAGFOLDER_PATH=/media/francesco/line\ tools\ data/bags/
+BAGFOLDER_PATH=~/line_tools_data/bags/
 LINESANDIMAGESFOLDER_PATH=~/catkin_extended_ws/src/line_tools/data/
 PYTHONSCRIPTS_PATH=~/catkin_extended_ws/src/line_tools/python/
-TARFILES_PATH=/media/francesco/line\ tools\ data/tar\ files/
-PICKLEANDSPLIT_PATH=/media/francesco/line\ tools\ data/pickle\ files/
+TARFILES_PATH=~/line_tools_data/tar_files/
+PICKLEANDSPLIT_PATH=~/line_tools_data/pickle_files/
 
 # *** The following two variables are specific of the data generation task being
 #     carried out ***

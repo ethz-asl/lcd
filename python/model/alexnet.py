@@ -216,7 +216,7 @@ def fc(x, num_in, num_out, name, relu=True):
         act = tf.nn.xw_plus_b(x, weights, biases, name=scope.name)
 
         if relu is True:
-            # Apply ReLU non linearity.
+            # Apply ReLU nonlinearity.
             relu = tf.nn.relu(act)
             return relu
         else:

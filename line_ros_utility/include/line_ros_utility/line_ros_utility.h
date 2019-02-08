@@ -73,32 +73,34 @@ void storeLines3DinMarkerMsg(const std::vector<cv::Vec6f>& lines3D,
 // Output: path_or_variable_value: Value (either a string or an integer
 //                                 depending on the variable) corresponding to
 //                                 the input variable.
-// Return value: true if variable is successfully retrieved, false otherwise.
+//         return:                 True if variable is successfully retrieved,
+//                                 false otherwise.
 bool getDefaultPathsAndVariables(const std::string& path_or_variable_name,
                                  std::string* path_or_variable_value);
 bool getDefaultPathsAndVariables(const std::string& path_or_variable_name,
                                  int* path_or_variable_value);
 
-// This class helps publishing several different clusters of lines in
-// different colors, so that they are visualized by rviz. IMPORTANT: This
-// function cannot display more clusters than there are colors
-// defined in the constructor. If more clusters are given to the
-// object, only the one with the highest labels are published.
+// This class helps publishing several different clusters of lines in different
+// colors, so that they are visualized by rviz. IMPORTANT: This function cannot
+// display more clusters than there are colors defined in the constructor. If
+// more clusters are given to the object, only the one with the highest labels
+// are published.
 class DisplayClusters {
  public:
   DisplayClusters();
-  // Frame id of the marker message.
+  // Frame ID of the marker message.
   void setFrameID(const std::string& frame_id);
 
-  // Is used as input for the clusters to the class:
-  // lines3D:   Vector of 3D lines.
+  // It is used as input for the clusters to the class:
+  // Input: lines3D: Vector of 3D lines.
   //
-  // labels:    Vector of equal size as lines3D. Every entry labels the cluster
-  //            the 3D line with the same index belongs to. The lables should be
-  //            continous ((0,1,2,3 -> good), (0,4,8,16 -> bad)), because the
-  //            highest label defines how many clusters are created (in the
-  //            latter case of the example 17 clusters will be created, but only
-  //            4 will contain information).
+  //        labels:  Vector of equal size as lines3D. Every entry labels the
+  //                 cluster the 3D line with the same index belongs to. The
+  //                 labels should be continuous ((0, 1, 2, 3 -> good),
+  //                 (0, 4, 8, 16 -> bad)), because the highest label defines
+  //                 how many clusters are created (in the latter case of the
+  //                 example 17 clusters will be created, but only 4 will
+  //                 contain information).
   void setClusters(const std::vector<line_detection::LineWithPlanes>& lines3D,
                    const std::vector<int>& labels);
 
@@ -118,12 +120,12 @@ class DisplayClusters {
 class TreeClassifier {
  public:
   TreeClassifier();
-  // Retrieve line decision paths from the random forest for specific lines.
+  // Retrieves line decision paths from the random forest for specific lines.
   void getLineDecisionPath(
       const std::vector<line_detection::LineWithPlanes>& lines);
-  // Retrieve the tree structures of all trees within the random forest.
+  // Retrieves the tree structures of all trees within the random forest.
   void getTrees();
-  // Compute the distance between all lines. The lines are the one that were
+  // Computes the distance between all lines. The lines are the one that were
   // given to the last call of getLineDecisionPath().
   void computeDistanceMatrix();
   // Recursive function to compute the distance between two data points.
@@ -246,18 +248,18 @@ class ListenAndPublish {
 
   // (Deprecated). Old version of labelLinesWithInstances.
   // This function labels with an instances image.
-  // Input: lines:    Vector with the lines in 3D.
+  // Input: lines:       Vector with the lines in 3D.
   //
-  //        instances:  Image that labels objects with a different value for
-  //                    each instance. This image must be registered with the
-  //                    depth image where the point cloud was extracted.
+  //        instances:   Image that labels objects with a different value for
+  //                     each instance. This image must be registered with the
+  //                     depth image where the point cloud was extracted.
   //
-  //        camera_info: This is used to backproject 3D points onto the
-  //                     instances image.
+  //        camera_info: This is used to reproject 3D points onto the instances
+  //                     image.
   //
-  // Output: labels:     Labels all lines according to their backprojection onto
-  //                     instances. The labeling starts at 0 and goes up for
-  //                     every additional instance that was found.
+  // Output: labels: Labels all lines according to their backprojection onto
+  //                 instances. The labeling starts at 0 and goes up for every
+  //                 additional instance that was found.
   void labelLinesWithInstancesByMajorityVoting(
       const std::vector<line_detection::LineWithPlanes>& lines,
       const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info,
@@ -265,27 +267,27 @@ class ListenAndPublish {
 
   // This function labels with an instances image. The labelling depends on the
   // line type associated to each line.
-  // Input: lines:    Vector with the lines in 3D.
+  // Input: lines:       Vector with the lines in 3D.
   //
-  //        instances:  Image that labels objects with a different value for
-  //                    each instance. This image must be registered with the
-  //                    depth image where the point cloud was extracted.
+  //        instances:   Image that labels objects with a different value for
+  //                     each instance. This image must be registered with the
+  //                     depth image where the point cloud was extracted.
   //
-  //        camera_info: This is used to reproject 3D points onto the
-  //                     instances image.
+  //        camera_info: This is used to reproject 3D points onto the instances
+  //                     image.
   //
-  // Output: labels:     Labels all lines according to their reprojection onto
-  //                     instances. The labeling starts at 0 and goes up for
-  //                     every additional instance that was found.
+  // Output: labels: Labels all lines according to their reprojection onto
+  //                 instances. The labeling starts at 0 and goes up for every
+  //                 additional instance that was found.
   void labelLinesWithInstances(
       const std::vector<line_detection::LineWithPlanes>& lines,
       const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info,
       std::vector<int>* labels);
 
 
-  // Assign the instance labels of a line to be the most frequent instance label
-  // among the points of the inlier plane respectively closest or furthest to
-  // the origin. Overloads assignLabelOfInlierPlaneBasedOnDistance.
+  // Assigns the instance labels of a line to be the most frequent instance
+  // label among the points of the inlier plane respectively closest or furthest
+  // to the origin. Overloads assignLabelOfInlierPlaneBasedOnDistance.
   void assignLabelOfClosestInlierPlane(
     const line_detection::LineWithPlanes& line, const cv::Mat& instances,
     sensor_msgs::CameraInfoConstPtr camera_info, int* label);
@@ -320,23 +322,23 @@ class ListenAndPublish {
 
   // Given one or both the inlier planes of a line, returns the set of inlier
   // points (with the instance of each inlier point) associated to the plane(s).
-  // Input: line:                Input line.
+  // Input: line:               Input line.
   //
-  //        plane:               Plane(s) inlier to the input line. NOTE: When
-  //              or             first_plane_only is false, plane_1 should be
-  //        plane_1/plane_2:     the right plane and plane_2 the left plane.
+  //        plane:              Plane(s) inlier to the input line. NOTE: When
+  //              or            first_plane_only is false, plane_1 should be the
+  //        plane_1/plane_2:    right plane and plane_2 the left plane.
   //
-  //        instances:           Image that labels objects with a different
-  //                             value for each instance. This image must be
-  //                             registered with the depth image where the point
-  //                             cloud was extracted.
+  //        instances:          Image that labels objects with a different value
+  //                            for each instance. This image must be registered
+  //                            with the depth image where the point cloud was
+  //                            extracted.
   //
-  //        camera_info:         This is used to reproject 3D points onto the
-  //                             instances image.
+  //        camera_info:        This is used to reproject 3D points onto the
+  //                            instances image.
   //
-  //        (first_plane_only):  True if inliers should be obtained only for the
-  //                             first of the two planes. Used for overloading
-  //                             to have the single-plane version.
+  //        (first_plane_only): True if inliers should be obtained only for the
+  //                            first of the two planes. Used for overloading
+  //                            to have the single-plane version.
   //
   // Output: inliers:            Inlier points associated to the plane(s).
   //                 or
@@ -355,14 +357,14 @@ class ListenAndPublish {
   // Given a 3D line and one of its two inlier planes, computes the instance of
   // the line by taking the majority vote of the instances of the its inlier
   // points that lie on that plane.
-  // Input: line: 3D line, the instance of which should be computed.
+  // Input: line:        3D line, the instance of which should be computed.
   //
-  //        plane: cv::Vec4f vector representing the inlier plane from which to
-  //               extract the instance label (in Hessian form).
+  //        plane:       cv::Vec4f vector representing the inlier plane from
+  //                     which to extract the instance label (in Hessian form).
   //
-  //        instances:  Image that labels objects with a different value for
-  //                    each instance. This image must be registered with the
-  //                    depth image where the point cloud was extracted.
+  //        instances:   Image that labels objects with a different value for
+  //                     each instance. This image must be registered with the
+  //                     depth image where the point cloud was extracted.
   //
   //        camera_info: This is used to reproject 3D points onto the
   //                     instances image.
@@ -383,12 +385,13 @@ class ListenAndPublish {
   //                            Inliers fitted on the right/left rectangle, as
   //                            3D points.
   //
-  //        instances:  Image that labels objects with a different value for
-  //                    each instance. This image must be registered with the
-  //                    depth image where the point cloud was extracted.
+  //        instances:          Image that labels objects with a different value
+  //                            for each instance. This image must be registered
+  //                            with the depth image where the point cloud was
+  //                            extracted.
   //
-  //        camera_info: This is used to reproject 3D points onto the
-  //                     instances image.
+  //        camera_info:        This is used to reproject 3D points onto the
+  //                            instances image.
   void display2DLineWithRectangleInliers(
       const cv::Vec4f& line_2D,
       const std::vector<cv::Vec3f>& inliers_right,
@@ -441,11 +444,11 @@ class ListenAndPublish {
   std::vector<unsigned short> known_colors_;
 
   pcl::PointCloud<pcl::PointXYZRGB> pcl_cloud_;
-  // all 2D lines detected in the grayscale mage
+  // All the 2D lines detected in the grayscale image.
   std::vector<cv::Vec4f> lines2D_;
-  // all 2D lines kept (bijection with lines3D_)
+  // All the 2D lines kept (bijection with lines3D_).
   std::vector<cv::Vec4f> lines2D_kept_;
-  // a temperary variable for storing kept 2D lines
+  // A temporary variable to store the 2D lines kept.
   std::vector<cv::Vec4f> lines2D_kept_tmp_;
   std::vector<cv::Vec<float, 6>> lines3D_;
   std::vector<line_detection::LineWithPlanes> lines3D_temp_wp_;
@@ -454,7 +457,7 @@ class ListenAndPublish {
   std::vector<std::vector<int>> labels_left_right;
   std::vector<int> labels_rf_kmedoids_;
   sensor_msgs::CameraInfoConstPtr camera_info_;
-  // Camera projection matrix
+  // Camera projection matrix.
   cv::Mat camera_P_;
   // Publishers and Subscribers.
   tf::TransformBroadcaster broad_caster_;
@@ -483,12 +486,12 @@ class ListenAndPublish {
   // To measure time.
   std::chrono::time_point<std::chrono::system_clock> start_time_, end_time_;
   std::chrono::duration<double> elapsed_seconds_;
-  // For random forest clustering
+  // For random forest clustering.
   TreeClassifier tree_classifier_;
   line_clustering::KMedoidsCluster kmedoids_cluster_;
-  // To handle trajectories with a general index (not necessarily 1)
+  // To handle trajectories with a general index (not necessarily 1).
   const std::string kTrajectoryNumber_;
-  // Path where to write the lines files
+  // Path where to write the lines files.
   const std::string kWritePath_;
 };
 

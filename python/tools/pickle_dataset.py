@@ -139,6 +139,7 @@ def pickle_images(input_text_file, output_pickle_file, dataset_name):
         dataset, 'scenenn' if the data comes from the SceneNN dataset),
         trajectory number, frame number, image type (rgb or depth) and line
         number.
+
     Args:
         input_text_file (string): Path of the input text file that contains the
             list of frames to include in the pickle file, together with the

@@ -19,7 +19,7 @@ class LineClusteringTest : public ::testing::Test {
 
   virtual ~LineClusteringTest() { delete kmeans_cluster_; }
 
-  virtual void SetUp() override {
+  virtual void SetUp() {
     // Add edges of a unit cube to lines_
     lines_.push_back(cv::Vec6f(0, 0, 0, 0, 0, 1));
     lines_.push_back(cv::Vec6f(0, 0, 0, 0, 1, 0));

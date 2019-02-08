@@ -21,7 +21,7 @@ class SceneNetCameraModel:
     """
 
     def __init__(self, camera_intrinsics):
-        # camera projection matrix of shape (3,4)
+        # Camera projection matrix of shape (3, 4).
         self.P = camera_intrinsics
         self.cx = camera_intrinsics[0, 2]
         self.cy = camera_intrinsics[1, 2]
@@ -30,12 +30,14 @@ class SceneNetCameraModel:
 
     def project3dToPixel(self, point_3d):
         """ Projects 3D point to pixel.
+
         Args:
-            point_3d: numpy array of shape (3, ). [x, y, z].
+            point_3d (numpy array of shape (3, )): Point to be projected, in the
+                format [x, y, z].
 
         Returns:
-            pixel: numpy array of shape (2, ), of type int. Pixel position
-                corresponding to the 3d point.
+            pixel (numpy array of shape (2, ), and type int): Pixel position
+                corresponding to the 3D point.
         """
         point_coor_homo = np.append(point_3d, [1])
         pixel_homo = self.P.dot(point_coor_homo.T)

@@ -24,7 +24,7 @@ cv::Vec3f projectPointOnPlane(const cv::Vec4f& hessian,
 bool findIntersectionBetweenPlaneAndLine(const cv::Vec4f& plane,
                                          const cv::Vec3f& line_direction,
                                          cv::Vec3f* intersection_point) {
-  // Plane is parametrized as: a*x+b*y+c*z+d=0.
+  // Plane is parametrized as: a * x + b * y + c * z + d = 0.
   float a, b, c, d;
   cv::Vec3f normal_vector({plane[0], plane[1], plane[2]});
   d /= cv::norm(normal_vector);
@@ -56,7 +56,7 @@ bool findPlaneThroughPointAndLine(const cv::Vec3f& point,
   a = normal_vector[0];
   b = normal_vector[1];
   c = normal_vector[2];
-  // Find d so that, e.g. the point belongs to the plane.
+  // Find d so that, e.g., the point belongs to the plane.
   d = -(a * point[0] + b * point[1] + c * point[2]);
   (*plane)[0] = a;
   (*plane)[1] = b;
@@ -64,8 +64,6 @@ bool findPlaneThroughPointAndLine(const cv::Vec3f& point,
   (*plane)[3] = d;
   return true;
 }
-
-
 
 bool areLinesEqual2D(const cv::Vec4f line1, const cv::Vec4f line2) {
   // First compute the difference in angle. For easier computation not the
@@ -216,7 +214,8 @@ void findPointsInRectangle(std::vector<cv::Point2f>* corners,
     }
   }
   for (int i = 0; i < 4; ++i) {
-    if (corners->at(i) != left && corners->at(i) != upper && corners->at(i) != lower) {
+    if (corners->at(i) != left && corners->at(i) != upper &&
+        corners->at(i) != lower) {
       right = corners->at(i);
     }
   }
@@ -232,7 +231,7 @@ void findPointsInRectangle(std::vector<cv::Point2f>* corners,
   std::vector<int> right_border;
   findXCoordOfPixelsOnVector(upper, left, true, &left_border);
   findXCoordOfPixelsOnVector(upper, right, false, &right_border);
-  // Pop_back is used because otherwise the corners[left/right] pixels would
+  // Pop_back is used because otherwise the corners [left/right] pixels would
   // be counted twice.
   left_border.pop_back();
   right_border.pop_back();
@@ -249,7 +248,6 @@ void findPointsInRectangle(std::vector<cv::Point2f>* corners,
   int x, y;
   for (size_t i = 0; i < left_border.size(); ++i) {
     y = floor(upper.y) + i;
-    // y = floor(corners[upper].y) + i;
     x = left_border[i];
     do {
       points->push_back(cv::Point2i(x, y));
@@ -269,11 +267,11 @@ bool getPointOnPlaneIntersectionLine(const cv::Vec4f& hessian1,
   cv::Mat b(2, 1, CV_32FC1);
   cv::Mat x_0_mat(2, 1, CV_32FC1);
   int non_zero, count = 0;
-  // Because the system is underdetemined, we can set an element of our
-  // solution to zero. We just have to check that the corresponding element in
-  // the direction vector is non-zero. For numerical stability we check here
-  // that the element is greater than 0.1. Given that the vector is
-  // normalized, at least one element always meets this condition.
+  // Because the system is underdetemined, we can set an element of our solution
+  // to zero. We just have to check that the corresponding element in the
+  // direction vector is non-zero. For numerical stability we check here that
+  // the element is greater than 0.1. Given that the vector is normalized, at
+  // least one element always meets this condition.
   for (non_zero = 2; non_zero >= 0; --non_zero) {
     if (fabs(direction[non_zero]) > 0.1) break;
   }
@@ -289,7 +287,7 @@ bool getPointOnPlaneIntersectionLine(const cv::Vec4f& hessian1,
   bool success = cv::solve(m, b, x_0_mat);
   count = 0;
   // When filling in the solution we must again take into account that we
-  // assumend a certain component to be zero.
+  // assume a certain component to be zero.
   for (int i = 0; i < 3; ++i) {
     if (i == non_zero) {
       (*x_0)[i] = 0;
@@ -303,7 +301,7 @@ bool getPointOnPlaneIntersectionLine(const cv::Vec4f& hessian1,
 
 cv::Mat getImageOfLine(const cv::Vec4f& line, const cv::Mat background_image,
                        const int scale_factor) {
-   // Display line with rectangles in the image
+   // Display line with rectangles in the image.
    int cols = background_image.cols;
    int rows = background_image.rows;
 
@@ -312,11 +310,11 @@ cv::Mat getImageOfLine(const cv::Vec4f& line, const cv::Mat background_image,
 
    cv::Vec2f start({line[0], line[1]});
    cv::Vec2f end({line[2], line[3]});
-   // Line
+   // Line.
    cv::line(img_for_display, cv::Point(start[0], start[1]),
             cv::Point(end[0], end[1]),
-            CV_RGB(255, 0, 0));  // Red
-  // Resize image
+            CV_RGB(255, 0, 0));  // Red.
+  // Resize image.
    cv::resize(img_for_display, img_for_display,
      img_for_display.size()*scale_factor);
    return img_for_display;
@@ -327,7 +325,7 @@ cv::Mat getImageOfLineWithRectangles(const cv::Vec4f& line,
                                      const std::vector<cv::Point2f>& rect_right,
                                      const cv::Mat background_image,
                                      const int scale_factor) {
-  // Display line with rectangles in the image
+  // Display line with rectangles in the image.
   int cols = background_image.cols;
   int rows = background_image.rows;
 
@@ -339,21 +337,21 @@ cv::Mat getImageOfLineWithRectangles(const cv::Vec4f& line,
   // Line
   cv::line(img_for_display, cv::Point(start[0], start[1]),
            cv::Point(end[0], end[1]),
-           CV_RGB(0, 0, 255));  // Blue
-  // Left rectangle
+           CV_RGB(0, 0, 255));  // Blue.
+  // Left rectangle.
   cv::line(img_for_display, rect_left[0], rect_left[1],
-           CV_RGB(255, 0, 255)); // Magenta
+           CV_RGB(255, 0, 255)); // Magenta.
   cv::line(img_for_display, rect_left[2], rect_left[3],
-           CV_RGB(255, 0, 255)); // Magenta
+           CV_RGB(255, 0, 255)); // Magenta.
   cv::line(img_for_display, rect_left[1], rect_left[3],
-           CV_RGB(255, 0, 255)); // Magenta
-  // Left rectangle
+           CV_RGB(255, 0, 255)); // Magenta-
+  // Left rectangle.
   cv::line(img_for_display, rect_right[0], rect_right[1],
-           CV_RGB(0, 255, 255)); // Cyan
+           CV_RGB(0, 255, 255)); // Cyan.
   cv::line(img_for_display, rect_right[2], rect_right[3],
-           CV_RGB(0, 255, 255)); // Cyan
+           CV_RGB(0, 255, 255)); // Cyan.
   cv::line(img_for_display, rect_right[1], rect_right[3],
-           CV_RGB(0, 255, 255)); // Cyan
+           CV_RGB(0, 255, 255)); // Cyan.
   cv::resize(img_for_display, img_for_display,
     img_for_display.size()*scale_factor);
   return img_for_display;
@@ -403,7 +401,7 @@ void displayLineWithPointsAndPlanes(const cv::Vec3f& start,
         << inliers2[i][2] << "]" << std::endl;
   }
   out.close();
-  // Call python script
+  // Call Python script.
   boost::filesystem::path python_script_rel_path(
     "python/display_line_with_points_and_planes.py");
   full_path = line_tools_root_path / python_script_rel_path;
@@ -772,7 +770,7 @@ bool LineDetector::find3DLineStartAndEnd(const cv::Mat& point_cloud,
     if (start->x == end->x && start->y == end->y) break;
   }
   if (start->x == end->x && start->y == end->y) return false;
-  // From ending point
+  // From ending point.
   cv::LineIterator it_end_start(point_cloud, *(end), *(start), 8);
   while (std::isnan(point_cloud.at<cv::Vec3f>(*(end))[0])) {
     ++it_end_start;
@@ -846,7 +844,7 @@ double LineDetector::findAndRate3DLine(const cv::Mat& point_cloud,
 }
 
 cv::Vec4f LineDetector::fitLineToBounds(const cv::Vec4f& line2D, size_t x_max,
-                                          size_t y_max, bool keep_direction) {
+                                        size_t y_max, bool keep_direction) {
   CHECK(x_max > 0);
   CHECK(y_max > 0);
 
@@ -1398,7 +1396,7 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
                                       LineWithPlanes* line) {
   CHECK_NOTNULL(line);
   // To consider a line found as valid. It should have enough number of inliers
-  // and enough inliers around line's center.
+  // and enough inliers around the center of the line.
   bool enough_num_inliers, enough_inliers_around_center;
   // Endpoints of the line after readjustment through inliers.
   cv::Vec3f start_readjusted_line, end_readjusted_line;
@@ -1447,7 +1445,7 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
     // normal vectors is small, they are parallel and the line is surface
     // line.
     constexpr double kAngleDifference = 0.95;
-    // Note: since the two normal vectors have unitary norm by definition of
+    // NOTE: since the two normal vectors have unitary norm by definition of
     // Hessian normal form, their dot product is the cosine of the angle between
     // them.
     if (fabs(normal1.dot(normal2)) > kAngleDifference) {
@@ -1514,7 +1512,7 @@ bool LineDetector::find3DlineOnPlanes(const std::vector<cv::Vec3f>& points1,
       enough_num_inliers =
           adjustLineUsingInliers(points, start_guess, end_guess,
                                  &start_readjusted_line, &end_readjusted_line);
-      // Fix orientation w.r.t. reference line if needed
+      // Fix orientation w.r.t. reference line if needed.
       adjustLineOrientationGiven2DReferenceLine(reference_line_2D, camera_P,
                                                 &start_readjusted_line,
                                                 &end_readjusted_line);
@@ -1683,7 +1681,7 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
   if (determineConvexityFromViewpointGivenLineAndInlierPoints(*line,
     inliers_right, inliers_left, origin, &convex_true_concave_false)) {
       if (convex_true_concave_false) {
-        // Convex => Edge
+        // Convex => Edge.
         line->type = LineType::EDGE;
         num_edge_lines++;
         return true;
@@ -1715,11 +1713,11 @@ bool LineDetector::assignEdgeOrIntersectionLineType(const cv::Mat& cloud,
   cv::Vec3f end(line->line[3], line->line[4], line->line[5]);
   cv::Vec3f direction = end - start;
   normalizeVector3D(&direction);
-  // Line prolonged before start
+  // Line prolonged before start.
   cv::Vec3f start_line_before_start =
       start - params_->extension_length_for_edge_or_intersection * direction;
   cv::Vec3f end_line_before_start = start;
-  // Line prolonged after end
+  // Line prolonged after end.
   cv::Vec3f start_line_after_end = end;
   cv::Vec3f end_line_after_end =
       end + params_->extension_length_for_edge_or_intersection * direction;
@@ -2377,8 +2375,6 @@ void LineDetector::project2Dto3DwithPlanes(
     }
 
     if (visualization_mode_on_) {
-      //background_image_ = getImageOfLineWithRectangles(lines2D[i],
-      //                                    rect_left, rect_right, 1);
       background_image_ = image;
       // Display 2D image with rectangles.
       LOG(INFO) << "* Displaying new candidate line in 2D.";
@@ -2872,7 +2868,7 @@ bool LineDetector::checkIfValidLineWith2DInfo(const cv::Mat& cloud,
 
   double length = cv::norm(start_3D - end_3D);
 
-  // If the length of the line is too short, reject it
+  // If the length of the line is too short, reject it.
   if (length < params_->min_length_line_3D) {
     return false;
   }
@@ -3329,7 +3325,7 @@ bool LineDetector::checkIfValidLineUsingInliers(
     positions_on_line.push_back(position_on_line);
   }
   const double ratio_mid = getRatioOfPointsAroundCenter(positions_on_line);
-  // Most points are near the start and end points, reject this line
+  // Most points are near the start and end points, reject this line.
   constexpr double kRatioThreshold = 0.25;
   if (ratio_mid < kRatioThreshold) {
     return false;

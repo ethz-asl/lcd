@@ -121,7 +121,7 @@ ListenAndPublish::ListenAndPublish(std::string trajectory_number,
   tf::Quaternion quat;
   quat.setRPY(-line_detection::kPi / 2.0, 0.0, 0.0);
   transform_.setRotation(quat);
-  // To publish the lines in 3D to rviz.
+  // To publish the lines in 3D to RVIZ.
   display_clusters_.initPublishing(node_handle_);
 
   image_sub_.subscribe(node_handle_, "/line_tools/image/rgb", 100);
@@ -390,16 +390,16 @@ void ListenAndPublish::masterCallback(
     // converted to world coordinate frame.
     printToFile(lines3D_with_planes_, labels_, path);
 
-    // 2D lines kept (bijection with 3D lines above)
+    // 2D lines kept (bijection with 3D lines above).
     printToFile(lines2D_kept_, path_2D_kept);
 
-    // All 2D lines detected
+    // All 2D lines detected.
     printToFile(lines2D_, path_2D);
   }
   initDisplay();
   writeMatToPclCloud(cv_cloud_, cv_image_, &pcl_cloud_);
 
-  // The timestamp is set to 0 because rviz is not able to find the right
+  // The timestamp is set to 0 because RVIZ is not able to find the right
   // transformation otherwise.
   pcl_cloud_.header.stamp = 0;
   ROS_INFO("**** Started publishing ****");
@@ -433,7 +433,7 @@ void ListenAndPublish::labelLinesWithInstancesByMajorityVoting(
     end = {lines[i].line[3], lines[i].line[4], lines[i].line[5]};
     line = end - start;
     // Set the labels size equal to the known_colors size and initialize them
-    // with 0;
+    // with 0.
     labels_count = std::vector<int>(known_colors_.size(), 0);
     for (size_t k = 0u; k <= num_checks; ++k) {
       // Compute a point on a line.
@@ -450,7 +450,7 @@ void ListenAndPublish::labelLinesWithInstancesByMajorityVoting(
       // color = instances.at<cv::Vec3b>(point2D);
       color = instances.at<unsigned short>(point2D);
 
-      // Find the index of the color in the known_colors vector
+      // Find the index of the color in the known_colors vector.
       size_t j = 0;
       for (; j < known_colors_.size(); ++j) {
         if (known_colors_[j] == color) {
@@ -885,7 +885,7 @@ void ListenAndPublish::findInliersWithLabelsGivenPlanes(
       }
       num_valid_points_left_plane = valid_points_left_plane.size();
       num_valid_points_right_plane = valid_points_right_plane.size();
-      // Inliers
+      // Inliers.
       if (num_valid_points_left_plane > num_valid_points_right_plane) {
           // Plane_1 coincides with left plane.
           inliers_right->setInliersWithLabels(valid_points_left_plane);
@@ -907,13 +907,13 @@ void ListenAndPublish::findInliersWithLabelsGivenPlanes(
       // line, used in the ground-truth labelling part, does not match the
       // original 2D line when reprojected (due to the readjustment via
       // inliers), in such a way that in the rectangles no inliers with the
-      // original hessians are found. The latter might also happen in cases in
-      // which no readjustment is done (e.g., for discontinuity lines). Indeed,
-      // reprojecting a 3D point in 2D with the image_geometry method
-      // project3dToPixel, points are mapped to strictly integer pixel
-      // coordinates, whereas coordinates for the original 2D lines are in
-      // general not integer. If this is the case (that no inliers are found in
-      // one rectangle), all points in that rectangle are assumed to be inliers.
+      // original hessians are found. The latter might also happen if no
+      // readjustment was done. Indeed, reprojecting a 3D point in 2D with the
+      // image_geometry method project3dToPixel, points are mapped to
+      // strictly-integer pixel coordinates, whereas coordinates for the
+      // original 2D lines are in general not integer. If this is the case (that
+      // no inliers are found in one rectangle), all points in that rectangle
+      // are assumed to be inliers.
       if (valid_points_right_plane.size() == 0)
          valid_points_right_plane = points_right_plane;
       if (valid_points_left_plane.size() == 0)
@@ -964,7 +964,7 @@ void ListenAndPublish::display2DLineWithRectangleInliers(
   // Camera model for reprojection.
   image_geometry::PinholeCameraModel camera_model;
   camera_model.fromCameraInfo(camera_info);
-  // Display image of line with inliers
+  // Display image of line with inliers.
   cv::Mat background_image(instances.rows, instances.cols, CV_8UC3);
   cv_image_.copyTo(background_image);
   // Set right inliers to cyan, left to magenta.
@@ -987,7 +987,7 @@ void ListenAndPublish::display2DLineWithRectangleInliers(
     background_image.at<cv::Vec3b>(i, j)[2] = 255;
   }
   // Draw line on top.
-  cv::line(background_image, start_2D, end_2D, CV_RGB(255, 0, 0));  // Red
+  cv::line(background_image, start_2D, end_2D, CV_RGB(255, 0, 0));  // Red.
   // Resize image.
   cv::resize(background_image, background_image,
              background_image.size() * scale_factor_for_visualization);
@@ -1040,7 +1040,7 @@ void ListenAndPublish::displayLabelledLineOnInstanceImage(
   // Draw line on top.
   cv::line(background_image, cv::Point(line_2D[0], line_2D[1]),
            cv::Point(line_2D[2], line_2D[3]),
-           CV_RGB(255, 0, 0));  // Red
+           CV_RGB(255, 0, 0));  // Red.
   // Resize image.
   cv::resize(background_image, background_image,
              background_image.size() * scale_factor_for_visualization);
@@ -1142,15 +1142,15 @@ bool getDefaultPathsAndVariables(const std::string& path_or_variable_name,
                  << "Expected output type is integer, given string.";
     return false;
   }
-  // Run script to generate the paths_and_variables file
+  // Run script to generate the paths_and_variables file.
   std::string generating_script_path = line_tools_paths::kLineToolsRootPath +
       "/python/print_paths_and_variables_to_file.sh";
   system(generating_script_path.c_str());
-  // Read paths_and_variables file
+  // Read paths_and_variables file.
   std::ifstream paths_and_variables_file(line_tools_paths::kLineToolsRootPath +
                                          "paths_and_variables.txt");
   if (!paths_and_variables_file) {
-    // Error during file open
+    // Error during file open.
     LOG(WARNING) << "Error in opening file "
                  << line_tools_paths::kLineToolsRootPath
                  << "paths_and_variables.txt. Exiting.";
@@ -1163,7 +1163,7 @@ bool getDefaultPathsAndVariables(const std::string& path_or_variable_name,
     space_pos = line.find(" ");
     name = line.substr(0, space_pos);
     value = line.substr(space_pos + 1);
-    if (name == path_or_variable_name) {  // Path/variable found
+    if (name == path_or_variable_name) {  // Path/variable found.
       *path_or_variable_value = value;
       return true;
     }
@@ -1179,15 +1179,15 @@ bool getDefaultPathsAndVariables(const std::string& path_or_variable_name,
                  << "are: TRAJ_NUM.";
     return false;
   }
-  // Run script to generate the paths_and_variables file
+  // Run script to generate the paths_and_variables file.
   std::string generating_script_path = line_tools_paths::kLineToolsRootPath +
       "/python/print_paths_and_variables_to_file.sh";
   system(generating_script_path.c_str());
-  // Read paths_and_variables file
+  // Read paths_and_variables file.
   std::ifstream paths_and_variables_file(line_tools_paths::kLineToolsRootPath +
                                          "paths_and_variables.txt");
   if (!paths_and_variables_file) {
-    // Error during file open
+    // Error during file open.
     LOG(WARNING) << "Error in opening file "
                  << line_tools_paths::kLineToolsRootPath
                  << "paths_and_variables.txt. Exiting. Error: "
@@ -1201,7 +1201,7 @@ bool getDefaultPathsAndVariables(const std::string& path_or_variable_name,
     space_pos = line.find(" ");
     name = line.substr(0, space_pos);
     value = line.substr(space_pos + 1);
-    if (name == path_or_variable_name) {  // Path/variable found
+    if (name == path_or_variable_name) {  // Path/variable found.
       LOG(INFO) << path_or_variable_name << " found.";
       *path_or_variable_value = std::stoi(value);
       return true;
@@ -1224,18 +1224,18 @@ void InliersWithLabels::getInliersWithLabels(
 
 
 DisplayClusters::DisplayClusters() {
-  colors_.push_back({1, 0, 0});    // Red
-  colors_.push_back({0, 1, 0});    // Green
-  colors_.push_back({0, 0, 1});    // Blue
-  colors_.push_back({1, 1, 0});    // Yellow
-  colors_.push_back({1, 0, 1});    // Magenta
-  colors_.push_back({0, 1, 1});    // Cyan
-  colors_.push_back({1, 0.5, 0});  // Orange
-  colors_.push_back({1, 0, 0.5});  // Red/Fuchsia
-  colors_.push_back({0.5, 1, 0});  // Lemon green
-  colors_.push_back({0, 1, 0.5});  // Bright mint
-  colors_.push_back({0.5, 0, 1});  // Purple
-  colors_.push_back({0, 0.5, 1});  // Light blue
+  colors_.push_back({1, 0, 0});    // Red.
+  colors_.push_back({0, 1, 0});    // Green.
+  colors_.push_back({0, 0, 1});    // Blue.
+  colors_.push_back({1, 1, 0});    // Yellow.
+  colors_.push_back({1, 0, 1});    // Magenta.
+  colors_.push_back({0, 1, 1});    // Cyan.
+  colors_.push_back({1, 0.5, 0});  // Orange.
+  colors_.push_back({1, 0, 0.5});  // Red/Fuchsia.
+  colors_.push_back({0.5, 1, 0});  // Lemon green.
+  colors_.push_back({0, 1, 0.5});  // Bright mint.
+  colors_.push_back({0.5, 0, 1});  // Purple.
+  colors_.push_back({0, 0.5, 1});  // Light blue.
 
   frame_id_set_ = false;
   clusters_set_ = false;
@@ -1258,12 +1258,12 @@ void DisplayClusters::setClusters(
   line_clusters_.clear();
   for (size_t i = 0u; i < lines3D.size(); ++i) {
     // This if-clause sets the number of clusters. This works well as long the
-    // clusters are indexed as an array (0,1,2,3). In any other case, it creates
-    // too many clusters (which is not that bad, because empty clusters do not
-    // need a lot of memory nor a lot of time to allocate), but if one label is
-    // higher than the number of colors defined in the constructor (which
-    // defines the number of labels that can be displayed), some clusters might
-    // not be displayed.
+    // clusters are indexed as an array (0, 1, 2, 3). In any other case, it
+    // creates too many clusters (which is not that bad, because empty clusters
+    // do not need a lot of memory nor a lot of time to allocate), but if one
+    // label is higher than the number of colors defined in the constructor
+    // (which defines the number of labels that can be displayed), some clusters
+    // might not be displayed.
     if (static_cast<size_t>(labels[i]) >= N) {
       N = 1u + labels[i];
       line_clusters_.resize(N);
@@ -1278,7 +1278,7 @@ void DisplayClusters::setClusters(
     size_t n = i % colors_.size();
     storeLines3DinMarkerMsg(line_clusters_[i], &marker_lines_[i], colors_[n]);
     marker_lines_[i].header.frame_id = frame_id_;
-    marker_lines_[i].lifetime = ros::Duration(21);//ros::Duration(1.1);
+    marker_lines_[i].lifetime = ros::Duration(21);
   }
   clusters_set_ = true;
 }
@@ -1379,7 +1379,7 @@ void TreeClassifier::getLineDecisionPath(
   // Make sure the data received fits the stored trees_.
   CHECK_EQ(service.response.decision_paths.size(), trees_.size());
   decision_paths_.resize(trees_.size());
-  // For every tree, fill in the decision paths
+  // For every tree, fill in the decision paths.
   for (size_t i = 0u; i < trees_.size(); ++i) {
     cv_bridge::CvImagePtr cv_ptr_ =
         cv_bridge::toCvCopy(service.response.decision_paths[i], "64FC1");
@@ -1400,7 +1400,7 @@ double TreeClassifier::computeDistance(const SearchTree& tree,
                                        size_t idx) {
   if (path.value<double>(line_idx1, idx) != 0 &&
       path.value<double>(line_idx2, idx) != 0) {
-    if (tree.children_right[idx] == tree.children_left[idx]) {  // at leaves
+    if (tree.children_right[idx] == tree.children_left[idx]) {  // At leaves.
       return 0.0;
     } else {
       return computeDistance(tree, path, line_idx1, line_idx2,

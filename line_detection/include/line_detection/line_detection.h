@@ -577,7 +577,7 @@ class LineDetector {
   void fuseLines2D(const std::vector<cv::Vec4f>& lines_in,
                    std::vector<cv::Vec4f>* lines_out,
                    bool merge_at_the_end=false);
-  // These functions cluster nearby lines in line_in and summarizes them as one
+  // These functions cluster nearby lines in line_in and summarize them as one
   // line. All new lines are stored in lines_out. Two versions:
   // * First forms clusters of lines that each have at least one other line in
   //   the cluster to which to be merged into. Then, for all clusters, merge all
@@ -590,7 +590,7 @@ class LineDetector {
   void fuseLines2DOnTheFly(const std::vector<cv::Vec4f>& lines_in,
                            std::vector<cv::Vec4f>* lines_out);
 
-  // Return the 2D line obtained by merging the two input 2D lines.
+  // Returns the 2D line obtained by merging the two input 2D lines.
   cv::Vec4f mergeLines2D(const cv::Vec4f& line_1, const cv::Vec4f& line_2);
 
   // Simply paints all lines to image.
@@ -896,11 +896,11 @@ class LineDetector {
   //                  cv::Vec4f(start.x, start.y, end.x, end.y), where x,y are
   //                  in pixel coordinates.
   //
-  // Output: lines3D: A vector with the lines found in 3D.
+  // Output: lines3D:         A vector with the lines found in 3D.
   //
   //         correspondences: The i-th element of this vector is the index of
-  //                           the element in lines2D that corresponds to the
-  //                           i-th element in lines3D.
+  //                          the element in lines2D that corresponds to the
+  //                          i-th element in lines3D.
   void find3DlinesByShortest(const cv::Mat& cloud,
                              const std::vector<cv::Vec4f>& lines2D,
                              std::vector<cv::Vec6f>* lines3D,
@@ -945,17 +945,17 @@ class LineDetector {
                          std::vector<LineWithPlanes>* lines3D_out);
   // Overload: Check the validity of 3D lines with the help of the corresponded
   // 2D lines (using checkIfValidLineWith2DInfo function to check)
-  // Input: cloud: Point cloud in the format CV_32FC3.
+  // Input: cloud:       Point cloud in the format CV_32FC3.
   //
-  //        camera_P:  Camera projection matrix
+  //        camera_P:    Camera projection matrix
   //
-  //        lines2D_in: 2D lines corresponding to lines3D_in.
+  //        lines2D_in:  2D lines corresponding to lines3D_in.
   //
-  //        lines3D_in: 3D lines to be checked.
+  //        lines3D_in:  3D lines to be checked.
   //
   //        lines2D_out: 2D lines corresponding to lines3D_out.
   //
-  //        lines3D_out: All 3D lines that are considered as valid. after check
+  //        lines3D_out: All 3D lines that are considered as valid. after check.
   void runCheckOn3DLines(const cv::Mat& cloud, const cv::Mat& camera_P,
                          const std::vector<cv::Vec4f>& lines2D_in,
                          const std::vector<LineWithPlanes>& lines3D_in,
@@ -974,9 +974,9 @@ class LineDetector {
   //
   //        line:     Line in 3D defined by (start, end).
   //
-  //        camera_P:  camera projection matrix
+  //        camera_P: Camera projection matrix.
   //
-  //        line_2D:  Line in 2D correcponded to 3D line
+  //        line_2D:  Line in 2D correcponded to 3D line.
   //
   // Output: return:   True if it is a valid line, false otherwise.
   bool checkIfValidLineWith2DInfo(const cv::Mat& cloud, const cv::Mat& camera_P,
@@ -985,56 +985,56 @@ class LineDetector {
   // Checks if a line is valid by brute force approach: It computes the distance
   // between every point in the point cloud and the line and returns true if a
   // sufficiently large number of this distances are below a threshold.
-  // Input: cloud:    Point cloud as CV_32FC3
+  // Input: cloud: Point cloud as CV_32FC3.
   //
-  //        line:     Line in 3D defined by (start, end).
+  //        line:  Line in 3D defined by (start, end).
   //
-  // Output: return:   True if it is a possible line, false otherwise.
+  // Output: return: True if it is a possible line, false otherwise.
   bool checkIfValidLineBruteForce(const cv::Mat& cloud, cv::Vec6f* line);
 
-  // Checks if a line is valid by looking for discontinouties. It computes the
+  // Checks if a line is valid by looking for discontinuities. It computes the
   // mean of a patch around a pixel and looks for jumps when this mean is given
   // with respect to the line.
-  // Input: cloud:    Point cloud as CV_32FC3
+  // Input: cloud: Point cloud as CV_32FC3.
   //
-  //        line:     Line in 2D defined by (start, end).
+  //        line:  Line in 2D defined by (start, end).
   //
-  // Output: return:   True if it is a possible line, false otherwise.
+  // Output: return: True if it is a possible line, false otherwise.
   bool checkIfValidLineDiscont(const cv::Mat& cloud, const cv::Vec4f& line);
 
-  // This function does a search for a line with non NaN start and end points in
+  // This function does a search for a line with non-NaN start and end points in
   // 3D given a line in 2D. It then computes number of points on this line
   // and returns the mean error of all points.
   // Input: point_cloud: Point cloud given as CV_32FC3.
   //
-  //        line2D:   2D line in pixel coordinates.
+  //        line2D:      2D line in pixel coordinates.
   //
-  // Output: line3D:  3D line in coordinates of the cloud.
+  // Output: line3D:     3D line in coordinates of the cloud.
   //
   //         num_points: Number of points on the line.
   //
-  //         return:      Mean error of all inliers.
+  //         return:     Mean error of all inliers.
   double findAndRate3DLine(const cv::Mat& point_cloud, const cv::Vec4f& line2D,
                            cv::Vec6f* line3D, int* num_points);
   // Overload: Same as above, just without number of inliers as output.
   double findAndRate3DLine(const cv::Mat& point_cloud, const cv::Vec4f& line2D,
                            cv::Vec6f* line3D);
 
-  // Shrink 2D lines
-  // Input: lines2D_in: 2D lines to be shrinked
+  // Shrinks 2D lines.
+  // Input: lines2D_in:  2D lines to be shrinked.
   //
   //        shrink_coff: A 2D line will be shrunk to shrink_coff
   //                     times the original length while retaining the center.
   //                     The value should between 0 and 1
   //
-  //        min_length: If line length afer shrinking is less than min_length,
-  //        keep the original line
-  // Output: lines2D_out: 2D lines shrinked
+  //        min_length:  If line length afer shrinking is less than min_length,
+  //                     keep the original line.
+  // Output: lines2D_out: 2D lines shrinked.
   void shrink2Dlines(const std::vector<cv::Vec4f>& lines2D_in,
                      const double shrink_coff, const double min_length,
                      std::vector<cv::Vec4f>* lines2D_out);
 
-  // Get the nearest point to the 3D line.
+  // Gets the nearest point to the 3D line.
   // Input:  points: A set of points.
   //
   //         start: Start point of the line.
@@ -1046,7 +1046,7 @@ class LineDetector {
                              const cv::Vec3f& start, const cv::Vec3f& end,
                              cv::Vec3f* nearest_point);
 
-  // Get the fraction of points that are around the line's center
+  // Gets the fraction of points that are around the center of the line.
   // Input: samples: Points distance to line start point divided by the line
   //                 length.
   //
@@ -1080,21 +1080,21 @@ class LineDetector {
   // inlier planes, in the current implementation), returns the 3D endpoints
   // of the input line fitted to the given points. The endpoints are selected
   // among the given inlier points.
-  // Input: points:            Set of inlier points among which the output
-  //                           endpoints should be selected.
+  // Input: points:    Set of inlier points among which the output endpoints
+  //                   should be selected.
   //
-  //        start_ref:         Start point of the reference discontinuity line.
+  //        start_ref: Start point of the reference discontinuity line.
   //
-  //        end_ref:           End point of the reference discontinuity line.
+  //        end_ref:   End point of the reference discontinuity line.
   //
-  //        hessian:           Hessian of the plane to which the line should be
-  //                           assigned.
+  //        hessian:   Hessian of the plane to which the line should be
+  //                   assigned.
   //
-  //        camera_P:          Projection matrix.
+  //        camera_P:  Projection matrix.
   //
-  // Output: start_out:        Start point of the line after adjusting.
+  // Output: start_out: Start point of the line after adjustment.
   //
-  //         end_out:          End point of the line after adjusting.
+  //         end_out:   End point of the line after adjustment.
   void fitDiscontLineToInliers(const std::vector<cv::Vec3f>& points,
                                const cv::Vec3f& start_ref,
                                const cv::Vec3f& end_ref,
@@ -1132,9 +1132,9 @@ class LineDetector {
   // threshold kRatioThreshold, the line is not valid.
   // Input: points: A set of points.
   //
-  //        start: Start point of the line.
+  //        start:  Start point of the line.
   //
-  //        end: End point of the line.
+  //        end:    End point of the line.
   //
   // Return: True if the line if valid, false if not.
   bool checkIfValidLineUsingInliers(const std::vector<cv::Vec3f>& points,
@@ -1235,21 +1235,20 @@ private:
   // is found or the search reaches the end point. If a starting point was
   // found, then the same procedure is redone from the end point. It returns
   // true if a line was found and false otherwise.
-  // Input: point_cloud:    Mat of type CV_32FC3, that stores the 3D points. A
-  //                        point can be accessed by
-  //                        point_cloud.at<cv::Point3f>(j, i).x.
+  // Input: point_cloud: Mat of type CV_32FC3, that stores the 3D points. A
+  //                     point can be accessed by
+  //                     point_cloud.at<cv::Point3f>(j, i).x.
   //
-  //        line2D:         The line that was extracted in 2D.
+  //        line2D:      The line that was extracted in 2D.
   //
-  // Output: line3D:        If a 3D line is found it is push_backed to this
-  //                        vector. It is stored: (x_s, y_s, z_s, x_e, y_e,
-  //                        z_e), where _s/_e means resp. start and end point.
+  // Output: line3D: If a 3D line is found it is push_backed to this vector. It
+  //                 is stored: (x_s, y_s, z_s, x_e, y_e, z_e), where _s/_e
+  //                 means respectively start and end point.
   //
-  //         start:         2D start point that corresponds to start point of
-  //                        the 3D line.
+  //         start:  2D start point that corresponds to start point of the 3D
+  //                 line.
   //
-  //         end:           2D end point that corresponds to end point of the
-  //                        3D line.
+  //         end:    2D end point that corresponds to end point of the 3D line.
   bool find3DLineStartAndEnd(const cv::Mat& point_cloud,
                              const cv::Vec4f& line2D, cv::Vec6f* line3D,
                              cv::Point2f* start, cv::Point2f* end);

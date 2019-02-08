@@ -1,5 +1,5 @@
-"""
-Get virtual camera image for each line in trajectory with index given as input.
+""" Get virtual camera image for each line in trajectory with index given as
+    input.
 """
 import os
 import sys

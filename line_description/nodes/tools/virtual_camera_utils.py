@@ -3,8 +3,8 @@ import numpy as np
 
 def get_origin_virtual_camera(start3D, end3D, hessian_left, hessian_right,
                               line_type, distance):
-    """ Get the origin of virtual camera for the line. The origin candidates are
-        determined by the surfaces normals of the line. The virtual camera
+    """ Gets the origin of virtual camera for the line. The origin candidates
+        are determined by the surfaces normals of the line. The virtual camera
         origin is chosen as the nearest point to real camera origin.
 
     Args:
@@ -18,11 +18,14 @@ def get_origin_virtual_camera(start3D, end3D, hessian_left, hessian_right,
             meters).
 
     Returns:
+        origin_virtual_camera (numpy array of shape (3, 1)): Origin of the
+            virtual camera associated to the input line.
     """
     # X axis is taken as the direction of the line.
     x = (end3D - start3D) / np.linalg.norm(end3D - start3D)
     middle_point = (start3D + end3D) / 2
-    plane1_normal = hessian_left[:3]  # Plane normal already normalized.
+    # Plane normals are already normalized.
+    plane1_normal = hessian_left[:3]
     plane2_normal = hessian_right[:3]
 
     # Get possible virtual camera optical axis, store them in the list z_cand.
@@ -78,19 +81,21 @@ def get_origin_virtual_camera(start3D, end3D, hessian_left, hessian_right,
 
 
 def get_origin_virtual_camera_from_line(line, distance):
-    """ Get the origin of virtual camera for a line read from a file_line.
+    """ Gets the origin of virtual camera for a line read from a file_line.
 
     Args:
-        line: numpy array of shape (22, ). [start point(3, ), end point(3, ),
-            left plane hessian form(4, ), right plane hessian form(4, ),
-            left color(3, ), right color(3, ), line's type(1, ),
-            instance label(1, )].
-        distance: distance in meter between the origin of the virtual camera and
-            the middle point of the line.
+        line (numpy array of shape (22, )): The format of the line is the
+            following:
+                [start point (3, ), end point (3, ),
+                 left plane hessian form (4, ), right plane hessian form(4, ),
+                 left color (3, ), right color(3, ), line type (1, ),
+                 instance label(1, )].
+        distance (float): Distance in meters between the origin of the virtual
+            camera and the middle point of the line.
 
     Returns:
-        origin_virtual_camera: numpy array of shape (3, ). Origin of the virtual
-            camera.
+        origin_virtual_camera (numpy array of shape (3, )): Origin of the
+            virtual camera.
     """
     return get_origin_virtual_camera_from_line(
         start3D=line[:3],
@@ -103,7 +108,7 @@ def get_origin_virtual_camera_from_line(line, distance):
 
 def virtual_camera_pose(start3D, end3D, hessian_left, hessian_right, line_type,
                         distance):
-    """ Get the pose of the virtual camera according to the line.
+    """ Gets the pose of the virtual camera depending on the line.
 
     Args:
         start3D/end3D (numpy array of shape (3, 1)): Endpoints of the line in
@@ -128,31 +133,33 @@ def virtual_camera_pose(start3D, end3D, hessian_left, hessian_right, line_type,
 
     y = np.cross(z, x) / np.linalg.norm(np.cross(z, x))
 
-    R = np.array([x, y, z])  # rotation matrix
-    # translation vector expressed in this virtual camera frame
+    R = np.array([x, y, z])  # Rotation matrix.
+    # Translation vector expressed in the virtual-camera frame.
     t0 = -R.dot(origin).reshape((3, 1))
     T = np.concatenate((R, t0), axis=1)
-    # with respect to the original camera frame
+    # Transformation with respect to the original camera frame.
     T = np.vstack((T, np.array([0, 0, 0, 1])))
 
     return T, z
 
 
 def virtual_camera_pose_from_file_line(line, distance):
-    """ Get the pose of the virtual camera according to the line read from a
+    """ Gets the pose of the virtual camera according to the line read from a
         file of lines.
 
     Args:
-        line: numpy array of shape (22, ). [start point(3, ), end point(3, ),
-            left plane hessian form(4, ), right plane hessian form(4, ),
-            left color(3, ), right color(3, ), line's type(1, ),
-            instance label(1, )].
-        distance: distance in meter between the origin of the virtual camera and
-            the middle point of the line.
+        line (numpy array of shape (22, )): The format of the line is the
+            following:
+                [start point (3, ), end point (3, ),
+                 left plane hessian form (4, ), right plane hessian form(4, ),
+                 left color (3, ), right color(3, ), line type (1, ),
+                 instance label(1, )].
+        distance (float): Distance in meters between the origin of the virtual
+            camera and the middle point of the line.
 
     Returns:
-        T: numpy array of shape (4, 4). Transformation matrix.
-        z: numpy array of shape (3, ). Optical axis of the virtual camera.
+        T (numpy array of shape (4, 4)): Transformation matrix.
+        z (numpy array of shape (3, )): Optical axis of the virtual camera.
     """
     return virtual_camera_pose(
         start3D=line[:3],

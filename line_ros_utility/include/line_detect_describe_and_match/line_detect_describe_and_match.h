@@ -152,9 +152,9 @@ class LineDetectorDescriptorAndMatcher {
                     std::vector<line_detection::Line2D3DWithPlanes>* lines,
                     int* frame_index);
    // * Binary descriptor version:
-   //   Input: image_rgb_msg:   ROS message containing the RGB image from which
-   //                           to detect lines (it gets converted to grayscale
-   //                           by the line_extractor node).
+   //   Input: image_rgb_msg: ROS message containing the RGB image from which to
+   //                         detect lines (it gets converted to grayscale by
+   //                         the line_extractor node).
    //
    //   Output: keylines_msgs: ROS message containing the EDL KeyLines detected
    //                          in the input image.
@@ -177,7 +177,8 @@ class LineDetectorDescriptorAndMatcher {
    //                       format CV32FC3, in which each pixel has 3 channels
    //                       that correspond to the x, y and z coordinate of the
    //                       3D point shown at that pixel.
-   // Output: embeddings:   NN-embedding descriptor for the input line.
+   //
+   // Output: embeddings: NN-embedding descriptor for the input line.
    void getNNEmbeddings(
        const line_detection::Line2D3DWithPlanes& line,
        const sensor_msgs::ImageConstPtr& image_rgb_msg,
@@ -197,7 +198,7 @@ class LineDetectorDescriptorAndMatcher {
    //        camera_to_world_matrix_msg: ROS message containing the
    //                                    camera-to-world matrix.
    //
-   // Output: descriptor:   Binary descriptor for the input line.
+   // Output: descriptor: Binary descriptor for the input line.
    void getBinaryDescriptor(const line_detection::KeyLine& keyline_msg,
                             const sensor_msgs::ImageConstPtr& image_rgb_msg,
                             line_description::Descriptor* descriptor);
@@ -214,8 +215,8 @@ class LineDetectorDescriptorAndMatcher {
    //
    //        frame_index: Index to assign to the new frame.
    //
-   // Output: return:     False if a frame with the same frame index was already
-   //                     received, true otherwise.
+   // Output: return: False if a frame with the same frame index was already
+   //                 received, true otherwise.
    bool saveFrame(const std::vector<line_detection::Line2D3DWithPlanes>& lines,
                   const std::vector<line_description::Descriptor>& embeddings,
                   const cv::Mat& rgb_image, int frame_index);

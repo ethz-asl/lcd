@@ -85,8 +85,8 @@ class HistogramLineLengthsBuilder {
    //
    //        camera_info_msg: ROS message containing the camera info.
    //
-   // Output: lines:       Lines detected in the input image, both in 2D and 3D,
-   //                      and with their inlier planes and types.
+   // Output: lines: Lines detected in the input image, both in 2D and 3D, and
+   //                with their inlier planes and types.
    void detectLines(const sensor_msgs::ImageConstPtr& image_rgb_msg,
                     const sensor_msgs::ImageConstPtr& cloud_msg,
                     const sensor_msgs::CameraInfoConstPtr& camera_info_msg,

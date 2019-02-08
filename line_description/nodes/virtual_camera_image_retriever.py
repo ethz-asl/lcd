@@ -1,5 +1,5 @@
 """
-Get virtual camera image for each line in the given frame.
+Get virtual-camera image for each line in the given frame.
 """
 import numpy as np
 import cv2
@@ -10,7 +10,7 @@ from tools import virtual_camera_utils
 
 
 class VirtualCameraImageRetriever:
-    """Retrieves a virtual camera image from a given set of lines.
+    """ Retrieves a virtual-camera image from a given set of lines.
 
     Args:
         distance_from_line (float): Distance of the virtual camera from the
@@ -22,7 +22,8 @@ class VirtualCameraImageRetriever:
         distance_from_line (float): Distance of the virtual camera from the
             line.
         impainting_mode_on (bool): Set to true to impaint the empty pixels of
-            the virtual images. Beware that this is computationally intensive.
+            the virtual-camera images. Beware that this is computationally
+            intensive.
     """
 
     def __init__(self, distance_from_line, impainting=False):
@@ -31,7 +32,7 @@ class VirtualCameraImageRetriever:
 
     def get_virtual_camera_image(self, start3D, end3D, hessian_left,
                                  hessian_right, line_type, image_rgb, cloud):
-        """Returns a virtual camera image for the given line.
+        """ Returns a virtual-camera image for the given line.
 
         Args:
             start3D/end3D (numpy array of shape (3, 1)): Endpoints of the line
@@ -46,7 +47,7 @@ class VirtualCameraImageRetriever:
                 shown at pixel (i, j).
 
         Returns:
-            RGB and depth virtual camera images (Tuple).
+            RGB and depth virtual-camera images (tuple).
         """
         # Virtual camera is of the SceneNetRGBD (pinhole) camera model.
         virtual_camera = scenenet_utils.get_camera_model()

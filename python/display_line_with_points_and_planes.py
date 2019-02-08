@@ -36,7 +36,7 @@ def normalize_hessian(hessian):
     norm = np.linalg.norm(np.array(hessian[:3]))
     # Discontinuity lines are assigned one null hessian.
     if (norm < 1e-5):
-      return hessian
+        return hessian
     return hessian / norm
 
 
@@ -52,7 +52,7 @@ def project_point_on_plane(hessian, point):
     norm = np.linalg.norm(np.array(hessian[:3]))
     # Discontinuity lines are assigned one null hessian.
     if (norm < 1e-5):
-      return point
+        return point
     normal = np.array([a, b, c])
     for non_zero in range(3):
         if abs(normal[non_zero]) > 0.1:
@@ -74,8 +74,10 @@ def plot():
                            '../line_with_points_and_planes.yaml')) as f:
         data = yaml.load(f)
 
-    # a*x+b*y+c*z+d = 0 => a*(scale_factor*x)+b*(scale_factor*y)+
-    #                      c*(scale_factor*z)+d*(scale_factor) = 0
+    # a * x + b * y + c * z + d = 0 => a * (scale_factor * x) +
+    #                                  b * (scale_factor * y) +
+    #                                  c * (scale_factor * z) +
+    #                                  d * scale_factor = 0
     # => d must be scaled by scaled_factor
     hessian_1 = normalize_hessian(np.array(data['hessians'][0]))
     hessian_1[-1] *= scale_factor
@@ -144,7 +146,8 @@ def plot():
     # Plot inliers for first plane
     plot_.scatter(inliers_1[:, 0], inliers_1[:, 1], inliers_1[:, 2], c='cyan')
     # Plot inliers for second plane
-    plot_.scatter(inliers_2[:, 0], inliers_2[:, 1], inliers_2[:, 2], c='magenta')
+    plot_.scatter(
+        inliers_2[:, 0], inliers_2[:, 1], inliers_2[:, 2], c='magenta')
     # Plot first projected mean
     plot_.scatter(
         mean_point_1_proj[0],

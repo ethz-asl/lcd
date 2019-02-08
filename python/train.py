@@ -1,9 +1,9 @@
-import tensorflow as tf
+import argparse
+from datetime import datetime
 import numpy as np
 import os
-import argparse
+import tensorflow as tf
 
-from datetime import datetime
 
 from model.datagenerator import ImageDataGenerator
 from model.alexnet import AlexNet

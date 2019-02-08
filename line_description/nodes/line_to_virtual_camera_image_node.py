@@ -9,8 +9,8 @@ from cv_bridge import CvBridge, CvBridgeError
 
 
 class LineToVirtualCameraImageConverter:
-    """ Server for the service LineToVirtualCameraImage. Returns a virtual
-        camera image given a line.
+    """ Server for the service LineToVirtualCameraImage. Returns a
+        virtual-camera image given a line.
 
     Args:
         None.
@@ -18,7 +18,7 @@ class LineToVirtualCameraImageConverter:
     Attributes:
         virtual_camera_image_retriever (VirtualCameraImageRetriever): Instance
             of the class of the VirtualCameraImageRetriever to retrieve the
-            virtual camera image given a line.
+            virtual-camera image given a line.
     """
 
     def __init__(self):

@@ -16,6 +16,7 @@ def compute_histogram(picklefile_path):
 
     Args:
         picklefile_path (string): Path of the pickle file.
+
     Returns:
         histogram (dict): histogram[<instance_label>] contains the number of
             occurrences for the instance label <instance_label>.
@@ -80,7 +81,7 @@ def display_histogram(picklefile_path, save_data=False, save_data_path=None):
     plt.gca().set_xticklabels(
         ['{}'.format(int(x)) for x in plt.gca().get_xticks()])
     plt.xlabel("Instance label")
-    plt.ylabel("Occurrences in pickle file")
+    plt.ylabel("Number of occurrences in pickle file")
     # Compute average number of occurrences.
     num_instances = len(instance_labels)
     average_num_occurrences = np.mean(occurrences)

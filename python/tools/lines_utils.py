@@ -5,14 +5,17 @@ from transforms3d.euler import mat2euler
 def get_label_with_line_center(labels_batch):
     """ Converts an input batch of lines with endpoints and instance label to a
         batch of lines with only center of the line and instance label.
+
     Args:
-        labels_batch: Tensor of shape (batch_size, 7), with each row in the
-                      format
-                        [start point (3x)] [end point (3x)] [instance label]
+        labels_batch (numpy array of shape (batch_size, 7) and dtype
+            np.float32): labels_batch[i, :] contains the label of the i-th line
+            in the batch, in the following format:
+                [start point (3x)] [end point (3x)] [instance label].
 
     Returns:
-        Tensor of shape (batch_size, 4), with each row in the format
-          [center point (3x)] [instance label]
+        (numpy array of shape (batch_size, 4)): The i-th row contains the label
+            of the i-th line in the batch in the following format:
+                [center point (3x)] [instance label].
     """
     assert labels_batch.shape[1] == 7, "{}".format(labels_batch.shape)
     # Obtain center (batch_size, 6).
@@ -37,18 +40,19 @@ def get_geometric_info(start_points, end_points, line_parametrization):
               (4 degrees of freedom) of the infinite line that it belongs to.
               The representation is called orthonormal. => 4 parameters per
               line.
+
     Args:
-        start_points: Array of shape (num_lines, 3) containing the start point
-                      of each line.
-        end_points:   Array of shape (num_lines, 3) containing the end point of
-                      each line.
-        line_parametrization: Type of line parametrization, either
-                              'direction_and_centerpoint' or 'orthonormal'.
+        start_points (numpy array of shape (num_lines, 3)): start_points[i, :]
+            contains the start point of the i-th line.
+        end_points (numpy array of shape (num_lines, 3)): end_points[i, :]
+            contains the end point of the i-th line.
+        line_parametrization (string): Type of line parametrization, either
+            'direction_and_centerpoint' or 'orthonormal'.
 
     Returns:
-        geometric_info: Array of shape (num_lines, 5) or (num_lines, 4),
-                        depending on the line parametrization, that for each
-                        line contains the geometric info described above.
+        geometric_info (numpy array of shape (num_lines, 5) or (num_lines, 4),
+            depending on the line parametrization): geometric_info[i, :]
+            contains the geometric info described above for the i-th line.
     """
     assert (start_points.shape[0] == end_points.shape[0])
     assert (start_points.shape[1] == end_points.shape[1] == 3)
@@ -83,14 +87,16 @@ def endpoints_to_centerpoint_and_direction(start_point, end_point):
           [center point (3x)] [unit direction vector (3x)]
         where, furthermore, the unit direction vector is such that its first
         entry is non-negative.
+
     Args:
-        start_point, end_point: shape (3, ): Endpoints of the input line.
+        start_point, end_point (numpy arrays of shape (3, )): Endpoints of the
+            input line.
 
     Returns:
-        Array of shape (6, ), with the first three elements representing the
-        center point of the line segment and the last three elements
-        representing the unit direction vector, with the first of its entries
-        strictly non-negative.
+        (numpy array of shape (6, )): The first three elements represent the
+            center point of the line segment and the last three elements
+            represent the unit direction vector, with the first of its entries
+            strictly non-negative.
     """
     assert (start_point.shape == end_point.shape == (3,))
     center_point = ((start_point + end_point) / 2.).reshape(3, 1)
@@ -107,14 +113,16 @@ def endpoints_to_centerpoint_and_direction(start_point, end_point):
 def endpoints_to_pluecker_coordinates(start_point, end_point):
     """ Returns the Pluecker coordinates for a line given its endpoints (in
         regular inhomogeneous coordinates).
+
     Args:
-        start_point, end_point: shape (3, ): Endpoints of the input line.
+        start_point, end_point (numpy array of shape (3, )): Endpoints of the
+            input line.
 
     Returns:
-        Array of shape (6, ), with the first three elements representing n,
-        the normal vector of the plane determined by the line and the origin,
-        and the last three elements representing v, the direction vector of the
-        line.
+        (numpy array of shape (6, )): The first three elements represent n, the
+            normal vector of the plane determined by the line and the origin,
+            and the last three elements represent v, the unit direction vector
+            of the line.
     """
     assert (start_point.shape == end_point.shape == (3,))
     # Normal vector of the plane determined by the line and the origin.
@@ -143,14 +151,13 @@ def pluecker_to_orthonormal_representation(pluecker_coordinates):
         [2] Zuo et al. - "Robust Visual SLAM with Point and Line Features".
 
     Args:
-        pluecker_coordinates: Array of shape (6, ), with the first three
-                              elements representing n, the normal vector of the
-                              plane determined by the line and the origin, and
-                              the last three elements representing v, the
-                              direction vector of the line.
+        pluecker_coordinates (numpy array of shape (6, )): The first three
+            elements representing n, the normal vector of the plane determined
+            by the line and the origin, and the last three elements represent v,
+            the unit direction vector of the line.
 
     Returns:
-        theta: Parameter vector defined above.
+        theta (numpy array of shape (4, ) ): Parameter vector defined above.
     """
     assert (pluecker_coordinates.shape == (6,))
     # Obtain n and v from the Pluecker coordinates.
