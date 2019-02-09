@@ -157,6 +157,5 @@ if __name__ == '__main__':
                     save_data_path=args.save_data_path)
             else:
                 display_histogram(picklefile_path=picklefile_path)
-
     except:
         pass

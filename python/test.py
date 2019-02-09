@@ -225,6 +225,7 @@ if (use_ground_truth_instance_labels):
         sys.exit()
     else:
         instance_labels = data_lines_world[:, -1]
+        np.save(os.path.join(log_files_folder, 'ground_truth_instances.npy'), instance_labels)
 
 # Cluster lines.
 if cluster_strategy == "kmeans":
