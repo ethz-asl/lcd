@@ -64,6 +64,7 @@ saver.restore(
 
 # Test dataset.
 test_files = '/media/francesco/line_tools_data/pickle files/train_0/traj_1/pickled_val.pkl'
+name_test_file = test_files.split('/')[-1].split('.')[0]
 
 # Retrieve mean of the training set.
 train_set_mean = sess.run('train_set_mean:0')
@@ -78,7 +79,8 @@ test_generator = ImageDataGenerator(
 
 # Check if embeddings have already been generated (look for them at the path
 # embeddings_path). If not, generate them.
-embeddings_path = os.path.join(log_files_folder, 'embeddings.npy')
+embeddings_path = os.path.join(log_files_folder,
+                               'embeddings_{}.npy'.format(name_test_file))
 if os.path.isfile(embeddings_path):
     print("Using embeddings found at {}".format(embeddings_path))
     test_embeddings_all = np.load(embeddings_path)
@@ -225,7 +227,11 @@ if (use_ground_truth_instance_labels):
         sys.exit()
     else:
         instance_labels = data_lines_world[:, -1]
-        np.save(os.path.join(log_files_folder, 'ground_truth_instances.npy'), instance_labels)
+        np.save(
+            os.path.join(
+                log_files_folder,
+                'ground_truth_instances_{}.npy'.format(name_test_file)),
+            instance_labels)
 
 # Cluster lines.
 if cluster_strategy == "kmeans":
@@ -294,7 +300,8 @@ elif visualizer == 'matplotlib':
                                    "Ground-truth instances")
 
 # Display embeddings in the feature space, coloured with instance label.
-LOG_DIR = os.path.join(log_files_folder, 'embedding_logs')
+LOG_DIR = os.path.join(log_files_folder,
+                       'embedding_logs_{}'.format(name_test_file))
 if not os.path.isdir(LOG_DIR): os.makedirs(LOG_DIR)
 metadata = os.path.join(LOG_DIR, 'embedding_metadata.tsv')
 test_embeddings = tf.Variable(test_embeddings_all, name='test_embeddings')
