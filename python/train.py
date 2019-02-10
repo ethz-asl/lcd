@@ -174,7 +174,7 @@ def train(read_as_pickle=True):
         input_images=image_type)
 
     # Retrieve embeddings (cluster descriptors) from model output.
-    embeddings = tf.nn.l2_normalize(model.fc9, axis=1)
+    embeddings = tf.nn.l2_normalize(model.fc9, axis=1, name="embeddings")
 
     # Get mean of training set if the training is just starting (i.e., if no
     # previous checkpoints are found).

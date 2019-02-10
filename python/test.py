@@ -91,7 +91,12 @@ else:
     # Dropout probability tensor.
     keep_prob = graph.get_tensor_by_name('keep_prob:0')
     # Embeddings tensor.
-    embeddings = graph.get_tensor_by_name('l2_normalize:0')
+    try:
+	# New models have the embedding tensor named 'embeddings'.
+    	embeddings = graph.get_tensor_by_name('embeddings:0')
+    except KeyError:
+	# Old models have the embedding tensor named 'l2_normalize'.
+    	embeddings = graph.get_tensor_by_name('l2_normalize:0')
     # Line type tensor.
     line_types = graph.get_tensor_by_name('line_types:0')
     # Geometric info tensor.
