@@ -142,14 +142,14 @@ if __name__ == '__main__':
         "'../pySceneNetRGBD/').")
     parser.add_argument(
         "-dataset_name",
-        help="Either train or val, indicating whether "
-        "the data being pickled comes from the train or val dataset of "
-        "pySceneNetRGBD.")
+        help="If the data comes from the val or train_NUM dataset of "
+        "SceneNetRGBD, either 'val' or 'train_NUM' (NUM is a number between 0 "
+        "and 16). If the data comes from SceneNN, 'scenenn'.")
     parser.add_argument(
         "-linesandimagesfolder_path",
         help="Path to folder (e.g. 'data') containing text lines files (e.g. "
-        "under 'data/train_lines') as well as virtual camera images (e.g. "
-        "under 'data/train_lines').")
+        "under 'data/train_0_lines') as well as virtual-camera images (e.g. "
+        "under 'data/train_0').")
     parser.add_argument(
         "-output_path",
         help="Path where to write the txt files with the splitting.")

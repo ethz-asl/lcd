@@ -369,12 +369,12 @@ if __name__ == '__main__':
     parser.add_argument(
         "-linesandimagesfolder_path",
         help="Path to folder (e.g. 'data') containing text lines files (e.g. "
-        "under 'data/train_lines') and that should store the output virtual "
-        "camera images (e.g. under 'data/train_lines').")
+        "under 'data/train_0_lines') and that should store the output "
+        "virtual-camera images (e.g. under 'data/train_0').")
     parser.add_argument(
         "-output_path",
-        help="Data folder where to store the virtual camera images (e.g. "
-        "'data/train').")
+        help="Data folder where to store the virtual-camera images (e.g. "
+        "'data/train_0').")
 
     args = parser.parse_args()
     if (args.trajectory and args.scenenetscripts_path and args.dataset_name and

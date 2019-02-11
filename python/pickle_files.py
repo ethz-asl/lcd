@@ -21,15 +21,15 @@ if __name__ == '__main__':
         description='Pickle files based on splitting.')
     parser.add_argument(
         "-splittingfiles_path",
-        help="Path to files indicating the splitting (i.e. \{train, test, val\}"
-        ".txt).")
+        help="Path to the files indicating the splitting (i.e. \{train, test, "
+        "val\}.txt).")
     parser.add_argument(
-        "-output_path", help="Path where to store pickle files.")
+        "-output_path", help="Path where to store the pickle files.")
     parser.add_argument(
         "-dataset_name",
-        help="Either train or val, indicating whether "
-        "the data being pickled comes from the train or val dataset of "
-        "SceneNetRGBD.")
+        help="If the data comes from the val or train_NUM dataset of "
+        "SceneNetRGBD, either 'val' or 'train_NUM' (NUM is a number between 0 "
+        "and 16). If the data comes from SceneNN, 'scenenn'.")
 
     args = parser.parse_args()
     if (args.splittingfiles_path and args.output_path and args.dataset_name):

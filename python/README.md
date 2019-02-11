@@ -1,9 +1,7 @@
-# Preprocess and train data in tensorflow
-
-This repository is for
-1. preprocessing the lines data got from ros package `line_ros_utility`
-2. training with triplet loss to get the embeddings for lines
-3. visualization
+This package contains Python scripts that serve the following purposes:
+1. Processing the lines data obtained from the package `line_ros_utility`, to obtain the virtual-camera images associated to the lines and compacting storing all the data (in _pickle_ files) to later feed them to a neural network;
+2. Training the neural network that will be used to retrieve the embeddings for the lines;
+3. Providing utilities for visualization and statistics about the virtual-camera images and the lines.
 
 ## Requirements
 Python 2.7 is used here. You can create a virtual environment and install the packages:
@@ -12,76 +10,119 @@ virtualenv --python=python2.7 ~/.virtualenvs/line_tools
 source ~/.virtualenvs/line_tools/bin/activate
 pip install -r requirements.txt
 ```
-To use jupyter notebook, you need to type the following commands when you are inside `line_tools` virtual environment:
+To use `jupyter notebook`, you need to type the following commands when you are inside `line_tools` virtual environment:
 ```bash
 pip install ipykernel
 python -m ipykernel install --user --name line_tools
 ```
 
-Tensorflow cpu version is used here. If you want to use gpu, change `requirements.txt` accordingly.
+Tensorflow CPU version is used here. If you want to use GPU, change `requirements.txt` accordingly.
 
-## Dataset
-Before reaching to this repository, make sure that you have followed the instructions for the ros packages and get the lines data in `../data/train_lines`.
+### Main scripts
+*NOTE: the arguments of the scripts below (apart from those in `tools/` can be avoided by using the data-generation script `../generate_trajectory_files.sh`, after setting the variables in `../config_paths_and_variables.sh`*.
+- `display_line_with_points_and_planes.py`: Displays a line in 3D, before and after readjustment, together with the points that are inliers to the planes fitted around it. The data for the line is read from `../line_with_points_and_planes.yaml`. The script is called by the `line_detection` package when the associated flag is set to `true`;
 
-Here we use the trajectory 1 in the [train_0](https://robotvault.bitbucket.io/scenenet-rgbd.html) dataset of `SceneNetRGBD` as an example. You first need to clone the repository [pySceneNetRGBD](https://github.com/jmccormac/pySceneNetRGBD), download the dataset as well as the protobuf to `pySceneNetRGBD/data`. Set `pySceneNetRGBD_root` in `tools/pathconfig.py` properly.
-```bash
-cd ../..
-git clone https://github.com/jmccormac/pySceneNetRGBD.git
-cd pySceneNetRGBD
-mkdir data && cd data
-wget http://www.doc.ic.ac.uk/~ahanda/train_split/train_0.tar.gz train_0.tar.gz
-wget http://www.doc.ic.ac.uk/~ahanda/train_protobufs.tar.gz train_protobufs.tar.gz
-tar -xvzf train_0.tar.gz train_protobufs.tar.gz
-cd .. && make
-```
 
-If you want to try other trajectories, change the variables `path_to_photos` and `path_to_lines` accordingly.
+- `get_virtual_camera_images.py`: Obtain the virtual-camera images associated to lines extracted from a trajectory from either SceneNetRGBD or SceneNN.
+
+  _Arguments_:
+  - `-trajectory`: Number (index) of the trajectory in the original dataset;
+  - `-frame_step`: Number of frames in one step of the ROS bag used to detect lines, i.e., (`frame_step` - 1) frames were originally skipped after each frame inserted in the ROS bag;
+  - `-end_frame`: Index of the last frame in the trajectory;
+  - `-scenenetscripts_path`: Path to folder containing the scripts from pySceneNetRGBD, in particular `scenenet_pb2.py` (e.g. `scenenetscripts_path`=`'pySceneNetRGBD/'`). Needed to extract the model of the virtual camera;
+  - `-dataset_path`: Path to folder containing the different image files from the dataset. For SceneNetRGBD datasets, the path should be such that concatenating the render path to it gives a folder with folders `depth`, `instances` and `photo` inside (e.g. `dataset_path`=`'pySceneNetRGBD/data/train/'`). For SceneNN datasets, the path should contain a subfolder `XYZ/` for each scene (where `XYZ` is a three-digit ID associated to the scene, e.g. `005`) and a subfolder `intrinsic`.;
+  - `-dataset_name`: If the data comes from the `val` or `train_NUM` dataset of SceneNetRGBD, either `'val'` or `'train_NUM'` (`NUM` is a number between 0 and 16). If the data comes from SceneNN, `'scenenn'`;
+  - `-linesandimagesfolder_path`: Path to folder (e.g. `'data/'`) containing text lines files (e.g. under `'data/train_0_lines'`) and that should store the output virtual-camera images (e.g. under `'data/train_0'`);
+  - `-output_path`: Data folder where to store the virtual-camera images (e.g. `'data/train_0'`).
+
+  **NOTE:** the virtual-camera images obtained are reprojection of the point cloud from a different viewpoint and therefore always have 'black parts', i.e., regions of pixels for which no data are available. The following methods are currently available to make this problem milder:
+  - Vary the distance of the virtual camera from the lines, by setting the variable `distance` (in meters). The closer the camera, the more empty pixels will be in the virtual-camera images, as the point cloud will appear more spread-out;
+  - Only keep lines that have at least a certain fraction of nonempty pixels, by setting the variable `min_fraction_nonempty_pixels` (between 0 and 1);
+  - _Impaint_ the empty pixels, i.e., reconstruct their intensity information by using the information from the surrounding nonempty pixels => Set the variable `impainting` to `True`. *Beware: this process is highly computationally expensive (up to 2 seconds per line on a regular laptop with i7 process @ 2.5 GHz).*
+
+
+- `pickle_files.py`: Creates *pickle* files that compactly store the information and the virtual-camera image for each line in each frame, based on the splitting performed by `split_dataset_with_labels_world.py`.
+
+  _Arguments_:
+  - `-splittingfiles_path`: Path to the files indicating the splitting (i.e. {`train`, `test`, `val`}`.txt`);
+  - `-output_path`: Path where to store the pickle files;
+  - `-dataset_name`: If the data comes from the `val` or `train_NUM` dataset of SceneNetRGBD, either `'val'` or `'train_NUM'` (`NUM` is a number between 0 and 16). If the data comes from SceneNN, `'scenenn'`.
+
+
+- `split_dataset_with_labels_world.py`: Converts the 3D lines detected from camera-frame coordinates to world-frame coordinates, by retrieving the camera-to-world matrix from the original dataset. It then splits the input data in a training, test and validation set.
+
+  _Arguments_:
+  - `-trajectory`: Number (index) of the trajectory in the original dataset;
+  - `-frame_step`: Number of frames in one step of the ROS bag used to detect lines, i.e., (`frame_step` - 1) frames were originally skipped after each frame inserted in the ROS bag;
+  - `-end_frame`: Index of the last frame in the trajectory;
+  - `-scenenetscripts_path`: Path to folder containing the scripts from pySceneNetRGBD, in particular `scenenet_pb2.py` (e.g. `scenenetscripts_path`=`'pySceneNetRGBD/'`);
+  - `-dataset_name`: If the data comes from the `val` or `train_NUM` dataset of SceneNetRGBD, either `'val'` or `'train_NUM'` (`NUM` is a number between 0 and 16). If the data comes from SceneNN, `'scenenn'`;
+  - `-linesandimagesfolder_path`: Path to folder (e.g. `'data/'`) containing text lines files (e.g. under `'data/train_0_lines'`) as well as the virtual-camera images (e.g. under `'data/train_0'`);
+  - `-output_path`: Path where to write the `.txt` files with the splitting;
+  - `-dataset_path`: Path to folder containing the different image files from the dataset. For SceneNetRGBD datasets, the path should be such that concatenating the render path to it gives a folder with folders `depth/`, `instances/` and `photo/` inside (e.g. `dataset_path`=`'pySceneNetRGBD/data/train/'`). For SceneNN datasets, the path should contain a subfolder `XYZ/` for each scene (where `XYZ` is a three-digit ID associated to the scene, e.g. `005`) and a subfolder `intrinsic`.
+
+
+- `train.py`: Trains the neural-network that will later be used to retrieve the embeddings. Please note that there are several training parameters that can be changed by editing directly the associated variables in the script and that are documented within the script itself.
+
+  _Arguments_:
+  - `-job_name`: Name to assign to the training job (used to name the folder where the output will be stored).
+
+
+- `test.py`: Retrieves the embeddings for a test set, by using a previously-trained model. It then clusters the embeddings based on the method chosen in the script itself and saves the embeddings to file. Please several parameters that can be changed by editing directly the associated variables in the script and that are documented within the script itself.
+
+
+- `tools/histogram_empty_pixels.py`: Creates a histogram with the number of nonempty pixels in the virtual-camera images. The number of nonempty pixels is previously saved to disk by `get_virtual_camera_images.py`.
+
+  _Arguments_:
+  - `-textfile_path`: Path of the textfile containing the number of nonempty pixels for each virtual-camera images in the set considered.
+
+
+- `tools/histogram_instances_in_pickle_file.py`: Creates a histogram of the distribution of the instance labels in a pickle file.
+
+  _Arguments_:
+  - `-picklefile_path`: Path of the pickle file;
+  - `-save_data_path`: Path where to save the histogram statistics file.
+
+
+- `tools/pickle_dataset.py`: Contains utils to pickle files and merge previously-creted pickle files, but also allows to _repickle_ files, by either keeping a restricted set of instances, or by substituting the virtual-camera images with empty images (for testing purposes).
+
+
+- `tools/statistics_on_embeddings.py`: Displays statistics about the embeddings obtained for each instance in a certain dataset, i.e., it displays statistics about the potential clusters  that can be formed in the embedding space (e.g., mean and standard deviation  of the distances from the 'mean embedding', max and min 'intra-instance' distance, etc.).
+
+  _Arguments_:
+  - `-embeddings_file_path`: Path of the embeddings file;
+  - `-instances_file_path`: Path of the ground-truth instance file;
+  - `-output_file_path`: Path where to save the statistics.
 
 
 ## Usage
+**Data generation**
+
 Please note that the entire process of generating the bag files, obtaining the
-lines data and performing the subsequent steps explained below can be
-automatically executed by launching `roscore` and then running `generate_trajectory_files.sh`. Before generating the data, the variables in the configuration file `config_paths_and_variables.sh` should be set as indicated in the description in the script itself.
+lines data and virtual-camera images, splitting the dataset and generating pickle files can be
+automatically executed by launching `roscore` and then running `generate_trajectory_files.sh`. Before generating the data, the variables in the configuration file `config_paths_and_variables.sh` should be set as indicated in the description in the script itself. *The latter is the suggested procedure.*
 
-If you want to separately run each Python script in the pipeline without using the bash script `config_paths_and_variables.sh`, please note that they all accept arguments that should be comply to a specific format. However, to make things easier, you can avoid passing any argument and simply set the paths and variables in `config_paths_and_variables.py`. By default, the scripts will read those values and combine them in the right format.
+If you instead want to separately run each Python script in the pipeline without using the Bash script `generate_trajectory_files.sh`, please note that they all accept arguments that should be comply to a specific format. If some arguments are missing, their value will be replaced based on the paths and variables in `config_paths_and_variables.sh`.  
+Once the lines data have been obtained (by using the procedure in `line_ros_utility`), the pipeline proceeds as follows:
+- Generate the virtual-camera images => run the script `get_virtual_camera_images.py` with the arguments explained above;
+- Convert the lines from camera-frame coordinates to world-frame coordinates and split the dataset in training, test and validation set => run the script `split_dataset_with_labels_world.py` with the arguments explained above;
+- Compactly store all the data in _pickle_ files, to later feed them to the neural network => run the script `pickle_dataset.py` with the arguments explained above.
 
+**Training and testing**
 
-You can create subdirectories in `../data/train` to store the images data we will use for training.
-```bash
-./create_data_dir.sh
-```
-Note that the above bash script also accepts the number of the trajectory as an
-argument (1 by default).
+Once the pickle files have been generated, the network can be trained.  
+The last thing to do before training is to download the pretrained weights [bvlc_alexnet.npy](http://www.cs.toronto.edu/~guerzhoy/tf_alexnet/) for **AlexNet** and place it in the folder `model/`.
 
-Run `get_virtual_camera_images.py` to get the virtual camera image associated to each line for every frame in the input trajectory (1 by default).
-```bash
-python get_virtual_camera_images.py -trajectory 1
-```
-
-Notice that these images data are reprojection of the pointcloud from a different viewpoint and there are black parts in the images that have no data. We can further more inpaint these images to fill in the "small" black parts. To inpaint, check the notebook `examples/00-Go_through_our_data.ipynb`.
-
-Take trajectory 1 as an example, we split its 300 frames to `train`, `val` and `test` (ratio = 3:1:1). (Normally one can follow the split of dataset provided by `SceneNetRGBD`)
-```bash
-python split_dataset_with_labels_world.py
-```
-
-The path to image data and label(4d array) of each image are then be written into the file `train.txt`, `val.txt` and `test.txt`.
-
-The label is a 4d array `[center of the line, instance label of the line]`
-
-The last thing to do before training is to download the pretrained weights [bvlc_alexnet.npy](http://www.cs.toronto.edu/~guerzhoy/tf_alexnet/) for **AlexNet** and place it in the folder `model`:
-
-Until now we should have all the data needed, to
-train with **AlexNet** and **triplet loss**:
-```bash
+The training process can then be started by editing the script `train.py` to set the training parameters as well as the training set to use and then run it:
+```python2
 python train.py
 ```
-**Note**: If you use a different train set, you need to calculate the train set mean with `tools/train_set_mean.py` and pass the train set mean to the `ImageDataGenerator`.
+
+Testing can be performed in the same way, by editing the script `test.py`, so as to select the previously-trained model and test set to use as well as the clustering strategy, and then running it:
+```python2
+python test.py
+```
+
 
 ## Notebooks
-Notebooks provide better comprehension of the codes as well as some visualizations. One can check them in `examples`.
-
-## Possible improvements
-1. The virtual image for line is taken with the same camera as the SceneNetRGBD dataset's one. The camera's distance to the line is set to 3 meters, which introduce some occlusions for certain lines. As an alternative, one might consider using strange cameras, eg. omnidirectional camera. Thus we can put the "camera" near the line and project the pointcloud(or points near the line) to get virtual image for that line.
-
-2. For an intersection line, there is just one instance label associated to it. It's probably better to associate it with two virtual images and two labels using the left&right sides planes of the line. This can be done in the `line_detection` library similarly to the function `LineDetector::assignColorToLines`.
+Jupyter notebooks are available, to provide example execution of the code in separate steps, as well as some visualization. However, they are not meant to be comprehensive. You can check them in the `examples/` folder.
