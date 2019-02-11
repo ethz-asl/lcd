@@ -14,7 +14,8 @@ def obtain_paths_and_variables(name, verbose=False):
     # Execute script that produces the paths_and_variables.txt file.
     subprocess.call(
         os.path.abspath(
-            os.path.join(file_dir, '../print_paths_and_variables_to_file.sh')))
+            os.path.join(file_dir,
+                         '../../print_paths_and_variables_to_file.sh')))
     # Read file
     with open(
             os.path.abspath(
@@ -33,4 +34,4 @@ def obtain_paths_and_variables(name, verbose=False):
             else:
                 return variable_value
     print("Variable {} not found.".format(name) + " Please check list of valid "
-          "variables in '../generate_trajectory_files.sh'")
+          "variables in '../../config_paths_and_variables.sh'")

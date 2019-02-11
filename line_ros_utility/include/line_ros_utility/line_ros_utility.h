@@ -64,11 +64,11 @@ void storeLines3DinMarkerMsg(const std::vector<cv::Vec6f>& lines3D,
                              cv::Vec3f color);
 // This functions are used to retrieve the default values for the paths and
 // variables defined in the package, in case some arguments are not specified.
-// Please see the script python/config_paths_and_variables.sh for a list of
-// the paths and variables used and their meaning.
+// Please see the script config_paths_and_variables.sh for a list of the paths
+// and variables used and their meaning.
 // Input: path_or_variable_name:   Name of the path or variable to retrieve.
 //                                 Valid names are listed in
-//                                 python/config_paths_and_variables.sh
+//                                 config_paths_and_variables.sh
 //
 // Output: path_or_variable_value: Value (either a string or an integer
 //                                 depending on the variable) corresponding to

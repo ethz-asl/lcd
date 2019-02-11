@@ -39,7 +39,7 @@
 #   comes from. Valid values are 'val' and 'train_0', indicating respectively
 #   the validation set and the index-0 training set in SceneNetRGBD, but all
 #   other values that find a correspondence in the protobuf 'database' (in
-#   python/config_protobuf_paths) can be used.
+#   config_protobuf_paths) can be used.
 
 # *** The following paths are independent of the specific data generation task
 #     being carried out (i.e., on the trajectory number and the dataset from

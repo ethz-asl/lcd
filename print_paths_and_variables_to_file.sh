@@ -3,7 +3,7 @@
 # to the root of line_tools (e.g. ~/catkin_extended_ws/src/line_tools/)
 CURRENT_DIR=`dirname $0`
 source $CURRENT_DIR/config_paths_and_variables.sh
-LINE_TOOLS_ROOT="$CURRENT_DIR"/..
+LINE_TOOLS_ROOT="$CURRENT_DIR"
 
 if [[ `basename $(dirname $(realpath $LINE_TOOLS_ROOT))` != "src" || `basename $(realpath $LINE_TOOLS_ROOT)` != "line_tools" ]];
 then

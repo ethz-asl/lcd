@@ -23,6 +23,5 @@
   <depend>glog_catkin</depend>
   <depend>opencv3_catkin</depend>
 
-
   <depend>line_detection</depend>
 </package>

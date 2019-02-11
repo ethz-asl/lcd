@@ -194,10 +194,10 @@ for word in test train val all_lines; do
 done
 
 # Delete lines files and virtual camera images.
-echo -e "\n**** Delete lines files for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
-rm "$LINESANDIMAGESFOLDER_PATH"/VALID_LINES_FILES_${TRAJ_NUM}_${DATASET_NAME};
-rm -r "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/traj_${TRAJ_NUM};
-echo -e "\n**** Delete virtual camera images for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
-rm "$LINESANDIMAGESFOLDER_PATH"/VALID_VIRTUAL_CAMERA_IMAGES_${TRAJ_NUM}_${DATASET_NAME};
-rm -r "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM};
-rm -r "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM}_inpaint;
+#echo -e "\n**** Delete lines files for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
+#rm "$LINESANDIMAGESFOLDER_PATH"/VALID_LINES_FILES_${TRAJ_NUM}_${DATASET_NAME};
+#rm -r "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/traj_${TRAJ_NUM};
+#echo -e "\n**** Delete virtual camera images for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
+#rm "$LINESANDIMAGESFOLDER_PATH"/VALID_VIRTUAL_CAMERA_IMAGES_${TRAJ_NUM}_${DATASET_NAME};
+#rm -r "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM};
+#rm -r "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}/traj_${TRAJ_NUM}_inpaint;

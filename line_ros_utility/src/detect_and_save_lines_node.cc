@@ -45,7 +45,7 @@ int main(int argc, char** argv) {
     }
   } else {
     ROS_INFO("Not enough arguments. Using default paths and variables in "
-              "python/config_paths_and_variables.sh.");
+              "config_paths_and_variables.sh.");
     std::string linesandimagesfolder_path, dataset_name;
     if (!line_ros_utility::getDefaultPathsAndVariables("TRAJ_NUM", &traj_num)) {
       ROS_ERROR("Error in retrieving default argument TRAJ_NUM. Exiting."

@@ -1144,7 +1144,7 @@ bool getDefaultPathsAndVariables(const std::string& path_or_variable_name,
   }
   // Run script to generate the paths_and_variables file.
   std::string generating_script_path = line_tools_paths::kLineToolsRootPath +
-      "/python/print_paths_and_variables_to_file.sh";
+      "/print_paths_and_variables_to_file.sh";
   system(generating_script_path.c_str());
   // Read paths_and_variables file.
   std::ifstream paths_and_variables_file(line_tools_paths::kLineToolsRootPath +
@@ -1181,7 +1181,7 @@ bool getDefaultPathsAndVariables(const std::string& path_or_variable_name,
   }
   // Run script to generate the paths_and_variables file.
   std::string generating_script_path = line_tools_paths::kLineToolsRootPath +
-      "/python/print_paths_and_variables_to_file.sh";
+      "/print_paths_and_variables_to_file.sh";
   system(generating_script_path.c_str());
   // Read paths_and_variables file.
   std::ifstream paths_and_variables_file(line_tools_paths::kLineToolsRootPath +

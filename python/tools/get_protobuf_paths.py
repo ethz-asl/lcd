@@ -9,12 +9,13 @@ import sys
 import argparse
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
+parent_parent_dir = os.path.dirname(os.path.dirname(current_dir))
 
 
 def get_protobuf_path(dataset_name):
     try:
-        with open(os.path.join(parent_dir, 'config_protobuf_paths')) as f:
+        with open(os.path.join(parent_parent_dir,
+                               'config_protobuf_paths')) as f:
             lines = f.readlines()
             for line in lines:
                 # Exclude comments.
@@ -31,7 +32,7 @@ def get_protobuf_path(dataset_name):
     except IOError:
         sys.stderr.write("Configuration file containing protobuf paths not "
                          "found. Please make sure that this script is in "
-                         "python/tools and that the python folder contains the "
+                         "python/tools and that the root folder contains the "
                          "configuration file config_protobuf_paths.")
         return None
 
