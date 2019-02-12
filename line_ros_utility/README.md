@@ -1,4 +1,4 @@
-The following package contains ROS utilities mainly to make the first steps of the place-recognition pipeline compact: lines are extracted and labelled with ground-truth instance labels. The extracted lines with 2D and 3D info are saved to disk for later use in the pipeline.
+The following package contains ROS utilities mainly to allow extraction of lines from ROS bags generated from the SceneNetRGBD or SceneNN datasets. The lines extracted are then labelled with ground-truth instance labels (based on the information from the datasets above) and saved to disk (with 2D and 3D info) for later use in the pipeline.
 
 ### Libraries
 
