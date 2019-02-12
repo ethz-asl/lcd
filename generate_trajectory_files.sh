@@ -4,19 +4,18 @@ source ~/catkin_extended_ws/devel/setup.bash
 source ~/.virtualenvs/line_tools/bin/activate
 CURRENT_DIR=`dirname $0`
 source $CURRENT_DIR/config_paths_and_variables.sh
-TRAJ_NUM=$1
 
-# Check that the trajectory number was passed.
-if [ $# -eq 0 ]
+# Check the trajectory number.
+if [ -z $TRAJ_NUM ]
   then
-    echo "Please provide the trajectory number as argument, e.g. './generate_trajectory_files.sh 1'.";
+    echo "Please provide the trajectory number (in config_paths_and_variables.sh).";
     exit 1
 fi
 
 # Check dataset name.
 if [ -z $DATASET_NAME ]
 then
-    echo "Please provide the name of dataset to use. Possible options are and 'val' and 'train_NUM', where NUM is a number between 0 and 16, 'scenenn'. Exiting."
+    echo "Please provide the name of dataset to use (in config_paths_and_variables.sh). Possible options are and 'val' and 'train_NUM', where NUM is a number between 0 and 16, 'scenenn'. Exiting."
     exit 1
 fi
 
