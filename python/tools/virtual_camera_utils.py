@@ -97,7 +97,7 @@ def get_origin_virtual_camera_from_line(line, distance):
         origin_virtual_camera (numpy array of shape (3, )): Origin of the
             virtual camera.
     """
-    return get_origin_virtual_camera_from_line(
+    return get_origin_virtual_camera(
         start3D=line[:3],
         end3D=line[3:6],
         hessian_left=line[6:10],
