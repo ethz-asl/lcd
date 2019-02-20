@@ -163,7 +163,8 @@ def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path):
                     depth_image_from_line_view.astype(np.uint16))
 
         end_time = timer()
-        average_time_per_line /= num_valid_lines
+        if (num_valid_lines > 0):
+            average_time_per_line /= num_valid_lines
 
         # Append the histogram for the frame to the output text file.
         with open('hist_percentages.txt', 'aw') as f:
@@ -313,7 +314,8 @@ def get_virtual_camera_images_scenenn(trajectory, dataset_path):
                     depth_image_from_line_view.astype(np.uint16))
 
         end_time = timer()
-        average_time_per_line /= num_valid_lines
+        if (num_valid_lines > 0):
+            average_time_per_line /= num_valid_lines
 
         # Append the histogram for the frame to the output text file.
         with open('hist_percentages.txt', 'aw') as f:
