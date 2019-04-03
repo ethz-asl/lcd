@@ -18,8 +18,9 @@ cv::Mat detect3DLines(const cv::Mat cv_image_, const cv::Mat cv_image_depth_,
   std::vector<cv::Vec4f> lines2D_kept_tmp_, lines2D_kept_;
   std::vector<line_detection::LineWithPlanes> lines3D_temp_wp_,
       lines3D_with_planes_;
-  line_detector_.project2Dto3DwithPlanes(cv_cloud_, cv_image_, lines2D_, true,
-                                         &lines2D_kept_tmp_, &lines3D_temp_wp_);
+  line_detector_.project2Dto3DwithPlanes(cv_cloud_, cv_image_, camera_P_,
+                                         lines2D_, true, &lines2D_kept_tmp_,
+                                         &lines3D_temp_wp_);
 
   // Check if line is valid.
   line_detector_.runCheckOn3DLines(cv_cloud_, camera_P_, lines2D_kept_tmp_,

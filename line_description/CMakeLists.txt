@@ -15,7 +15,7 @@ catkin_install_python(PROGRAMS
   nodes/line_to_virtual_camera_image_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
-add_executable(line_binary_descriptor_node src/line_binary_descriptor_node.cc)
+cs_add_executable(line_binary_descriptor_node src/line_binary_descriptor_node.cc)
 target_link_libraries(line_binary_descriptor_node ${PROJECT_NAME})
 
 add_custom_target(test_data)
