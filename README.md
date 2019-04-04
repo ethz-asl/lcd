@@ -110,12 +110,12 @@ The following section explains how to obtain the data that should be fed to the 
 
 
 Before starting generating the data, make sure that the following variables are set as indicated below:
-- In `scenenet_ros_tools/nodes/scenenet_to_rosbag.py`, function `publish`:
-  - `publish_scene_pcl = True`
-  - `publish_rgbd = True`
-  - `publish_instances = True`
-  - `publish_instances_color = False`
-  - You may also set `publish_object_segments = False`, as object segments are not used for this project, but make the ROS bags heavier.
+- In `scenenet_ros_tools/nodes/scenenet_to_rosbag.py`, function `convert`:
+  - `write_scene_pcl = True`
+  - `write_rgbd = True`
+  - `write_instances = True`
+  - `write_instances_color = False`
+  - You may also set `write_object_segments = False`, as object segments are not used for this project, but make the ROS bags heavier.
 - In `scenenn_ros_tools/nodes/scenenn_to_rosbag.py`, function `publish`:
   - `publish_scene_pcl = True`
   - `publish_rgbd = True`
