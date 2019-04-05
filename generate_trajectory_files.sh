@@ -1,7 +1,6 @@
 #!/bin/bash
-source ~/catkin_ws/devel/setup.bash
-source ~/catkin_extended_ws/devel/setup.bash
-source ~/.virtualenvs/line_tools/bin/activate
+source ~/line_ws/devel/setup.bash
+#source ~/.virtualenvs/line_tools/bin/activate
 CURRENT_DIR=`dirname $0`
 source $CURRENT_DIR/config_paths_and_variables.sh
 
@@ -66,7 +65,7 @@ then
       echo -e "PLEASE NOTE! If an error occurs during the formation of the bag (e.g. "
       echo -e "early termination by interrupt) the script will not check if the bag "
       echo -e "is valid. Therefore invalid bags should be manually removed.\n"
-      rosrun scenenet_ros_tools scenenet_to_rosbag.py -scenenet_path "$SCENENET_DATASET_PATH" -trajectory $TRAJ_NUM -dataset_type ${DATASET_NAME} -output_bag "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenet_traj_${TRAJ_NUM}.bag;
+      rosrun scenenet_ros_tools scenenet_to_rosbag.py --scenenet-path "$SCENENET_DATASET_PATH" --trajectory $TRAJ_NUM --dataset-type ${DATASET_TYPE} --train-set-split ${TRAIN_NUM} --output-bag "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenet_traj_${TRAJ_NUM}.bag;
   fi
   # Get number of frames in the bag.
   NUM_FRAMES_IN_BAG=$(python "$PYTHONSCRIPTS_PATH"/tools/get_number_of_frames_in_bag.py -rosbag_path "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenet_traj_${TRAJ_NUM}.bag);
@@ -119,7 +118,7 @@ else
     else
       rosbag play -d 3.5 --queue 1000 -r 2 "$BAGFOLDER_PATH"/${DATASET_NAME}/scenenn_traj_${TRAJ_NUM}.bag;
     fi
-    sudo kill ${LAUNCH_PID};
+    kill ${LAUNCH_PID};
     # Repeat process from scratch if not all lines have been generated.
     [ ! -e "$LINESANDIMAGESFOLDER_PATH"/${DATASET_NAME}_lines/traj_${TRAJ_NUM}/lines_2D_${END_FRAME}.txt ]
   do
