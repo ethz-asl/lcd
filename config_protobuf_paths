@@ -1,19 +1,19 @@
 # Please enter dataset names followed by a colon, (a whitespace) and the path
 # of the protobuf file corresponding to the dataset name.
-train_0: /home/spadmin/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_0.pb
-train_1: /home/spadmin/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_1.pb
-train_2: /home/spadmin/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_2.pb
-train_3: /home/spadmin/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_3.pb
-train_4: /home/spadmin/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_4.pb
-train_5: /home/spadmin/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_5.pb
-train_6: /home/spadmin/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_6.pb
-train_7: /home/spadmin/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_7.pb
-train_8: /home/spadmin/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_8.pb
-train_9: /home/spadmin/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_9.pb
-train_10: /home/spadmin/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_10.pb
-train_11: /home/spadmin/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_11.pb
-train_12: /home/spadmin/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_12.pb
-train_13: /home/spadmin/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_13.pb
-train_14: /home/spadmin/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_14.pb
-train_15: /home/spadmin/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_15.pb
-train_16: /home/spadmin/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_16.pb
+train_0: /home/felix/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_0.pb
+train_1: /home/felix/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_1.pb
+train_2: /home/felix/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_2.pb
+train_3: /home/felix/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_3.pb
+train_4: /home/felix/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_4.pb
+train_5: /home/felix/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_5.pb
+train_6: /home/felix/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_6.pb
+train_7: /home/felix/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_7.pb
+train_8: /home/felix/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_8.pb
+train_9: /home/felix/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_9.pb
+train_10: /home/felix/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_10.pb
+train_11: /home/felix/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_11.pb
+train_12: /home/felix/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_12.pb
+train_13: /home/felix/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_13.pb
+train_14: /home/felix/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_14.pb
+train_15: /home/felix/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_15.pb
+train_16: /home/felix/line_ws/data/pySceneNetRGBD/data/scenenet_rgbd_train_16.pb

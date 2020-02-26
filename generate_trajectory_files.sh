@@ -94,6 +94,7 @@ fi
 echo -e "The bag contains ${NUM_FRAMES_IN_BAG} frames."
 END_FRAME=$(($START_FRAME + ($NUM_FRAMES_IN_BAG - 1) * $FRAME_STEP))
 
+read  -n 1 -p "Next step: Detect and save lines. Continue?" mainmenuinput
 # Create folders to store the data.
 echo -e "\n**** Creating folders to store the data for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
 bash "$CURRENT_DIR"/create_data_dir.sh $TRAJ_NUM "$LINESANDIMAGESFOLDER_PATH" $DATASET_NAME $START_FRAME $END_FRAME $FRAME_STEP;
@@ -129,6 +130,7 @@ else
   touch "$LINESANDIMAGESFOLDER_PATH"/VALID_LINES_FILES_${TRAJ_NUM}_${DATASET_NAME};
 fi
 
+read  -n 1 -p "Next step: Generate virtual camera images. Continue?" mainmenuinput
 # Only generate virtual camera images files if not there already (and valid).
 if [ -e "$LINESANDIMAGESFOLDER_PATH"/VALID_VIRTUAL_CAMERA_IMAGES_${TRAJ_NUM}_${DATASET_NAME} ]
 then
@@ -138,7 +140,8 @@ else
    echo -e "\n**** Generating virtual camera images for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
    if [ "$SCENENET_TRUE_SCENENN_FALSE" = true ]
    then
-     python "$PYTHONSCRIPTS_PATH"/get_virtual_camera_images.py -trajectory ${TRAJ_NUM} -scenenetscripts_path "$SCENENET_SCRIPTS_PATH" -dataset_name ${DATASET_NAME} -dataset_path "$SCENENET_DATASET_PATH"/data/${DATASET_NAME%_*}/ -linesandimagesfolder_path "$LINESANDIMAGESFOLDER_PATH"/;
+     #${DATASET_NAME%_*}
+     python "$PYTHONSCRIPTS_PATH"/get_virtual_camera_images.py -trajectory ${TRAJ_NUM} -scenenetscripts_path "$SCENENET_SCRIPTS_PATH" -dataset_name ${DATASET_NAME} -dataset_path "$SCENENET_DATASET_PATH"/data/${DATASET_NAME}/ -linesandimagesfolder_path "$LINESANDIMAGESFOLDER_PATH"/;
    else
      python "$PYTHONSCRIPTS_PATH"/get_virtual_camera_images.py -trajectory ${TRAJ_NUM} -scenenetscripts_path "$SCENENET_SCRIPTS_PATH" -dataset_name ${DATASET_NAME} -dataset_path "$SCENENN_DATASET_PATH" -linesandimagesfolder_path "$LINESANDIMAGESFOLDER_PATH"/ -frame_step ${FRAME_STEP} -end_frame ${END_FRAME};
    fi
@@ -148,6 +151,7 @@ else
    touch "$LINESANDIMAGESFOLDER_PATH"/VALID_VIRTUAL_CAMERA_IMAGES_${TRAJ_NUM}_${DATASET_NAME};
 fi
 
+read  -n 1 -p "Next step: Zip files for trajectory. Continue?" mainmenuinput
 # Create archive.
 echo -e "\n**** Zipping files for trajectory ${TRAJ_NUM} in ${DATASET_NAME} set ****\n";
 cd "$LINESANDIMAGESFOLDER_PATH";

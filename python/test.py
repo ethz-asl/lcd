@@ -51,19 +51,19 @@ read_as_pickle = True
 use_ground_truth_instance_labels = False
 
 # Folder where the checkpoints and meta graph for the test are stored.
-log_files_folder = '/media/francesco/line_tools_data/logs/300119_1312/'
+log_files_folder = './logs/240220_2216/'
 
 sess = tf.InteractiveSession()
 saver = tf.train.import_meta_graph(
     os.path.join(log_files_folder,
-                 'triplet_loss_batch_all_ckpt/bgr-d_model_epoch60.ckpt.meta'))
+                 'triplet_loss_batch_all_wohlhart_lepetit_ckpt/bgr-d_model_epoch30.ckpt.meta'))
 saver.restore(
     sess,
     os.path.join(log_files_folder,
-                 'triplet_loss_batch_all_ckpt/bgr-d_model_epoch60.ckpt'))
+                 'triplet_loss_batch_all_wohlhart_lepetit_ckpt/bgr-d_model_epoch30.ckpt'))
 
 # Test dataset.
-test_files = '/media/francesco/line_tools_data/pickle files/train_0/traj_1/pickled_val.pkl'
+test_files = '/home/felix/line_ws/data/pickle_files/train_0/traj_1/pickled_val.pkl'
 name_test_file = test_files.split('/')[-1].split('.')[0]
 
 # Retrieve mean of the training set.

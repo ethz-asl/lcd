@@ -44,17 +44,17 @@
 # *** The following paths are independent of the specific data generation task
 #     being carried out (i.e., on the trajectory number and the dataset from
 #     which to extract the images) ***
-SCENENET_DATASET_PATH=/home/spadmin/line_ws/data/pySceneNetRGBD
-SCENENET_SCRIPTS_PATH=/home/spadmin/line_ws/src/pySceneNetRGBD
-BAGFOLDER_PATH=/home/spadmin/line_ws/data/bags
-LINESANDIMAGESFOLDER_PATH=/home/spadmin/line_ws/data/line_tools
-PYTHONSCRIPTS_PATH=/home/spadmin/line_ws/src/line_tools/python
-TARFILES_PATH=/home/spadmin/line_ws/data/tar_files
-PICKLEANDSPLIT_PATH=/home/spadmin/line_ws/data/pickle_files
+SCENENET_DATASET_PATH=/home/felix/line_ws/data/pySceneNetRGBD
+SCENENET_SCRIPTS_PATH=/home/felix/line_ws/data/pySceneNetRGBD
+BAGFOLDER_PATH=/home/felix/line_ws/data/bags
+LINESANDIMAGESFOLDER_PATH=/home/felix/line_ws/data/line_tools
+PYTHONSCRIPTS_PATH=/home/felix/line_ws/src/line_tools/python
+TARFILES_PATH=/home/felix/line_ws/data/tar_files
+PICKLEANDSPLIT_PATH=/home/felix/line_ws/data/pickle_files
 
 # *** The following two variables are specific of the data generation task being
 #     carried out ***
-TRAJ_NUM=6
+TRAJ_NUM=2
 DATASET_NAME=train_0
 DATASET_TYPE=train
 TRAIN_NUM=0

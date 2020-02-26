@@ -6,6 +6,8 @@ add_definitions(-std=c++11)
 find_package(catkin_simple REQUIRED)
 catkin_simple(ALL_DEPS_REQUIRED)
 
+find_package(PCL 1.8 REQUIRED)
+
 cs_add_library(${PROJECT_NAME}
   src/line_detection.cc
 )

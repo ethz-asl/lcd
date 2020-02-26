@@ -117,7 +117,7 @@ struct LineDetectionParams {
   // default = 0.2: LineDetector::checkIfValidLineWith2DInfo
   double min_length_line_3D = 0.2;
   // default = 2.0: LineDetector::checkIfValidLineWith2DInfo
-  double min_pixel_length_line_3D_reprojected = 2.0;
+  double min_pixel_length_line_3D_reprojected = 2.0; //2.0
   // default = 0.1: LineDetector::assignEdgeOrIntersectionLineType
   double extension_length_for_edge_or_intersection = 0.08;
   // default = 10: LineDetector::checkIfValidPointsOnPlanesGivenProlongedLine

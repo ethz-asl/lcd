@@ -61,6 +61,8 @@ def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path):
         f.write("fraction_nonempty_pixels_threshold=%.3f\n" %
                 min_fraction_nonempty_pixels)
 
+    
+
     for frame_id in range(300):
         start_time = timer()
         photo_id = frame_id * 25

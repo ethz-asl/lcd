@@ -7,7 +7,7 @@
 namespace line_tools_paths {
   // The following path should point to the root folder of line_tools (e.g.
   // ~/catkin_extended_ws/src/line_tools/)
-  const std::string kLineToolsRootPath = "/home/francesco/catkin_extended_ws/src/line_tools/";
+  const std::string kLineToolsRootPath = "/home/felix/line_ws/src/line_tools/";
 
 }  // namespace line_tools_paths
 
