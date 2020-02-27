@@ -54,7 +54,7 @@ PICKLEANDSPLIT_PATH=/home/felix/line_ws/data/pickle_files
 
 # *** The following two variables are specific of the data generation task being
 #     carried out ***
-TRAJ_NUM=2
+TRAJ_NUM=1
 DATASET_NAME=train_0
 DATASET_TYPE=train
 TRAIN_NUM=0

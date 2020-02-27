@@ -9,6 +9,7 @@ import pandas as pd
 import argparse
 from timeit import default_timer as timer
 
+from tools import camera_utils
 from tools import cloud_utils
 from tools import scenenn_utils
 from tools import scenenet_utils
@@ -17,7 +18,7 @@ from tools import pathconfig
 from tools import get_protobuf_paths
 
 
-def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path):
+def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path, dataset_name, scenenetscripts_path):
     impainting = False
     trajectories = sn.Trajectories()
     try:
@@ -61,7 +62,12 @@ def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path):
         f.write("fraction_nonempty_pixels_threshold=%.3f\n" %
                 min_fraction_nonempty_pixels)
 
-    
+
+    # Camera to world matrix retriever.
+    cam_to_world = camera_utils.SceneNetCameraToWorldMatrixRetriever(trajectory, dataset_name, scenenetscripts_path)
+
+    # Sliding window accumulator for point cloud, stored in world frame.
+    pcl_world = np.zeros((0, 6))
 
     for frame_id in range(300):
         start_time = timer()
@@ -75,9 +81,21 @@ def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path):
             os.path.join(path_to_photos, 'depth/{0}.png'.format(photo_id)),
             cv2.IMREAD_UNCHANGED)
 
+        # Retrieve camera to world transformation.
+        cam_to_world_t = cam_to_world.get_camera_to_world_matrix(frame_id)
+
         # Obtain coloured point cloud from RGB-D image.
-        pcl = real_camera.rgbd_to_pcl(
+        pcl_new = real_camera.rgbd_to_pcl(
             rgb_image=rgb_image, depth_image=depth_image, visualize_cloud=False)
+        # Add this point cloud (transformed to world frame) to the sliding window.
+        pcl_world = np.vstack((cloud_utils.pcl_transform(pcl_new, cam_to_world_t), pcl_world))
+        if np.shape(pcl_world)[0] > (np.shape(pcl_new)[0] * 10):
+            pcl_world = pcl_world[:np.shape(pcl_new)[0]*10, :]
+
+        # Transform world point cloud back to camera frame. And use this denser point cloud for virtual camera images.
+        pcl = cloud_utils.pcl_transform(pcl_world, np.linalg.inv(cam_to_world_t))
+        print(np.shape(pcl))
+
         path_to_lines = os.path.join(
             path_to_lines_root, 'lines_with_labels_{0}.txt'.format(frame_id))
 
@@ -427,7 +445,7 @@ if __name__ == '__main__':
             # Compose script arguments if necessary.
             dataset_path = os.path.join(scenenet_dataset_path, 'data/',
                                         dataset_name.split('_')[0])
-        get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path)
+        get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path, dataset_name, scenenetscripts_path)
     elif dataset_name == "scenenn":
         # Dataset from SceneNN.
         if not args.frame_step:

@@ -51,7 +51,7 @@ read_as_pickle = True
 use_ground_truth_instance_labels = False
 
 # Folder where the checkpoints and meta graph for the test are stored.
-log_files_folder = './logs/240220_2216/'
+log_files_folder = './logs/260220_2254/'
 
 sess = tf.InteractiveSession()
 saver = tf.train.import_meta_graph(
