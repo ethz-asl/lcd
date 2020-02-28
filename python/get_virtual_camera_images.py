@@ -19,7 +19,8 @@ from tools import get_protobuf_paths
 
 
 def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path, dataset_name, scenenetscripts_path):
-    impainting = False
+    impainting = True
+    show_line = False
     trajectories = sn.Trajectories()
     try:
         with open(protobuf_path, 'rb') as f:
@@ -49,10 +50,10 @@ def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path, dataset_na
     real_camera = scenenet_utils.get_camera_model()
 
     # Distance between virtual camera origin and center of the line.
-    distance = 3
+    distance = 0.5
     # Min fraction of nonempty pixels in the associated virtual-camera image for
     # a line to be considered as valid.
-    min_fraction_nonempty_pixels = 0.1
+    min_fraction_nonempty_pixels = 0.5
 
     # Write in a text file (that will store the histogram of percentages of
     # nonempty pixels) the distance of the virtual camera from the lines and the
@@ -122,25 +123,33 @@ def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path, dataset_na
             # Draw the line in the virtual camera image.
             start_point = data_lines[i, :3]
             end_point = data_lines[i, 3:6]
-            line_3D = np.hstack([start_point, [0, 0, 255]])
+            line_length = np.linalg.norm(end_point - start_point)
 
-            num_points_in_line = 1000
-            for idx in range(num_points_in_line):
-                line_3D = np.vstack([
-                    line_3D,
-                    np.hstack([(start_point + idx / float(num_points_in_line) *
-                                (end_point - start_point)), [0, 0, 255]])
-                ])
-            # Transform the point cloud so as to make it appear as seen from
-            # the virtual camera pose.
-            pcl_from_line_view = cloud_utils.pcl_transform(
-                np.vstack([pcl, line_3D]), T)
+            if show_line:
+                line_3D = np.hstack([start_point, [0, 0, 255]])
+
+                num_points_in_line = 200;
+                for idx in range(num_points_in_line):
+                    line_3D = np.vstack([
+                        line_3D,
+                        np.hstack([(start_point + idx / float(num_points_in_line) *
+                                    (end_point - start_point)), [0, 0, 255]])
+                    ])
+                # Transform the point cloud so as to make it appear as seen from
+                # the virtual camera pose.
+                pcl_from_line_view = cloud_utils.pcl_transform(
+                    np.vstack([pcl, line_3D]), T)
+                # Move line points directly to the image plane, so that it is never occluded.
+                pcl_from_line_view[-1000:, 2] = 0;
+            else:
+                pcl_from_line_view = cloud_utils.pcl_transform(pcl, T)
             # Obtain the RGB and depth virtual camera images by reprojecting the
             # point cloud on the image plane, under the view of the virtual
             # camera. Also obtain the number of nonempty pixels.
             (rgb_image_from_line_view, depth_image_from_line_view,
-             num_nonempty_pixels) = cloud_utils.project_pcl_to_image(
-                 pcl_from_line_view, virtual_camera)
+             num_nonempty_pixels) = cloud_utils.project_pcl_to_image_orthogonal(
+                pcl_from_line_view, line_length * 2, line_length * 6/4, 40, 30)
+            # cloud_utils.project_pcl_to_image(pcl_from_line_view, virtual_camera)
             # Discard lines that have less than the specified fraction of
             # nonempty pixels.
             fraction_nonempty_pixels = num_nonempty_pixels / float(
@@ -164,12 +173,19 @@ def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path, dataset_na
 
                     rgb_image_from_line_view = cv2.inpaint(
                         rgb_image_from_line_view, dilated_mask, 10,
-                        cv2.INPAINT_TELEA)
+                        cv2.INPAINT_NS)
                     depth_image_from_line_view = cv2.inpaint(
                         depth_image_from_line_view, dilated_mask, 10,
-                        cv2.INPAINT_TELEA)
+                        cv2.INPAINT_NS)
                 end_time_line = timer()
                 average_time_per_line += (end_time_line - start_time_line)
+
+                # Upscaling to 320 x 240 resolution.
+                dim = (320, 240)
+                rgb_image_from_line_view = cv2.resize(
+                    rgb_image_from_line_view, dim, interpolation=cv2.INTER_AREA)
+                depth_image_from_line_view = cv2.resize(
+                    depth_image_from_line_view, dim, interpolation=cv2.INTER_AREA)
 
                 # Print images to file.
                 cv2.imwrite(
