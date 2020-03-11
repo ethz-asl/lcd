@@ -25,7 +25,7 @@ sys.path.insert(0, python_root)
 # Configuration.
 # Cluster strategy. One of "kmeans", "aggr_clustering" and
 # "affinity_propagation".
-cluster_strategy = "aggr_clustering"
+cluster_strategy = "kmeans" #"aggr_clustering"
 
 # Visualizer of the lines coloured with the instances from clustering. Possible
 # values: 'open3d', 'matplotlib'.
@@ -51,7 +51,7 @@ read_as_pickle = True
 use_ground_truth_instance_labels = False
 
 # Folder where the checkpoints and meta graph for the test are stored.
-log_files_folder = './logs/260220_2254/'
+log_files_folder = './logs/080320_2305/'
 
 sess = tf.InteractiveSession()
 saver = tf.train.import_meta_graph(
@@ -245,7 +245,7 @@ if cluster_strategy == "kmeans":
     cluster_labels = cluster_lines_kmeans(
         embeddings=test_embeddings_all, num_clusters=num_clusters)
 elif cluster_strategy == "aggr_clustering":
-    num_clusters = 32
+    num_clusters = 20
     print("Clustering using Agglomerative Clustering with {} clusters".format(
         num_clusters))
     cluster_labels = cluster_lines_aggr_clustering(

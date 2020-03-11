@@ -53,7 +53,7 @@ def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path, dataset_na
     distance = 0.5
     # Min fraction of nonempty pixels in the associated virtual-camera image for
     # a line to be considered as valid.
-    min_fraction_nonempty_pixels = 0.5
+    min_fraction_nonempty_pixels = 0.3
 
     # Write in a text file (that will store the histogram of percentages of
     # nonempty pixels) the distance of the virtual camera from the lines and the
@@ -181,11 +181,11 @@ def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path, dataset_na
                 average_time_per_line += (end_time_line - start_time_line)
 
                 # Upscaling to 320 x 240 resolution.
-                dim = (320, 240)
-                rgb_image_from_line_view = cv2.resize(
-                    rgb_image_from_line_view, dim, interpolation=cv2.INTER_AREA)
-                depth_image_from_line_view = cv2.resize(
-                    depth_image_from_line_view, dim, interpolation=cv2.INTER_AREA)
+                #dim = (320, 240)
+                #rgb_image_from_line_view = cv2.resize(
+                #    rgb_image_from_line_view, dim, interpolation=cv2.INTER_AREA)
+                #depth_image_from_line_view = cv2.resize(
+                #    depth_image_from_line_view, dim, interpolation=cv2.INTER_AREA)
 
                 # Print images to file.
                 cv2.imwrite(
