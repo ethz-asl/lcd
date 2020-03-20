@@ -31,7 +31,7 @@ target_link_libraries(scenenet_to_line_tools ${PROJECT_NAME})
 add_executable(scenenn_to_line_tools src/scenenn_to_line_tools_node.cc)
 target_link_libraries(scenenn_to_line_tools ${PROJECT_NAME})
 
-add_executable(scenenn_to_line_tools src/interiornet_to_line_tools_node.cc)
+add_executable(interiornet_to_line_tools src/interiornet_to_line_tools_node.cc)
 target_link_libraries(interiornet_to_line_tools ${PROJECT_NAME})
 
 add_executable(freiburg_to_line_tools src/freiburg_to_line_tools_node.cc)

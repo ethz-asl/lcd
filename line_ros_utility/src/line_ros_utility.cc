@@ -302,6 +302,7 @@ void ListenAndPublish::reconfigureCallback(
       config.min_distance_between_points_hessian;
   params_.max_cos_theta_hessian_computation =
       config.max_cos_theta_hessian_computation;
+  params_.min_length_line_3D = config.min_length_line_3D;
   params_.max_rating_valid_line = config.max_rating_valid_line;
   params_.canny_edges_threshold1 = config.canny_edges_threshold1;
   params_.canny_edges_threshold2 = config.canny_edges_threshold2;
