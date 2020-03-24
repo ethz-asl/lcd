@@ -54,7 +54,10 @@ std::vector<int> clusterLinesAfterClassification(
 // The lines are printed in the file given by path. They are in the format that
 // can be read by the random_forest.py node.
 bool printToFile(const std::vector<line_detection::LineWithPlanes>& lines3D,
-                 const std::vector<int>& labels, const std::string& path);
+                 const std::vector<int>& labels,
+                 const std::vector<std::vector<cv::Vec3f>> line_normals,
+                 const std::vector<std::vector<bool>> line_opens,
+                 const std::string& path);
 // Print 2D lines.
 bool printToFile(const std::vector<cv::Vec4f>& lines2D,
                  const std::string& path);
@@ -62,6 +65,13 @@ bool printToFile(const std::vector<cv::Vec4f>& lines2D,
 void storeLines3DinMarkerMsg(const std::vector<cv::Vec6f>& lines3D,
                              visualization_msgs::Marker* disp_lines,
                              cv::Vec3f color);
+// Stores lines in marker messages with more detail.
+void storeLinesinMarkerMsg(const std::vector<line_detection::LineWithPlanes>& lines3D,
+                           const std::vector<std::vector<cv::Vec3f>>& line_normals,
+                           const std::vector<std::vector<bool>>& line_opens,
+                           const size_t type,
+                           visualization_msgs::Marker* disp_lines,
+                           cv::Vec3f color);
 // This functions are used to retrieve the default values for the paths and
 // variables defined in the package, in case some arguments are not specified.
 // Please see the script config_paths_and_variables.sh for a list of the paths
@@ -115,6 +125,28 @@ class DisplayClusters {
   std::vector<ros::Publisher> pub_;
   std::string frame_id_;
   std::vector<cv::Vec3f> colors_;
+};
+
+// This class helps publish the lines in rviz, including their normals,
+// types and openness.
+class DisplayLines {
+public:
+    DisplayLines();
+    // Frame ID of the marker message.
+    void setFrameID(const std::string& frame_id);
+
+    // This functions advertises the message.
+    void initPublishing(ros::NodeHandle& node_handle);
+    void publish(const std::vector<line_detection::LineWithPlanes>& lines3D,
+                 const std::vector<std::vector<cv::Vec3f>>& line_normals,
+                 const std::vector<std::vector<bool>>& line_opens);
+
+private:
+    bool frame_id_set_, initialized_;
+    std::vector<visualization_msgs::Marker> marker_lines_;
+    std::vector<ros::Publisher> pub_;
+    std::string frame_id_;
+    std::vector<cv::Vec3f> colors_;
 };
 
 class TreeClassifier {
@@ -421,6 +453,39 @@ class ListenAndPublish {
       const cv::Mat& image, const cv::Mat& instances,
       sensor_msgs::CameraInfoConstPtr camera_info);
 
+  // Extracts the normal facing the camera from the hessians and stores them
+  // in the lines.
+  // Input: lines:       Lines with 3D start and endpoints.
+  void extractNormalsFromLines(
+      const std::vector<line_detection::LineWithPlanes>& lines,
+      std::vector<std::vector<cv::Vec3f>>* normals);
+
+  // Checks if lines are open or not. Open line ends are end points that cannot
+  // be fully determined as such. This can happen if the line is obscured by an
+  // object or continues outside of the camera FOV.
+  // Input: lines:       Lines with 3D start and endpoints.
+  //
+  //        depth:       Depth image.
+  //
+  //        camera_info: Used to reproject 3D points onto depth image.
+  void checkLinesOpen(
+      const std::vector<line_detection::LineWithPlanes>& lines,
+      const cv::Mat& depth_map, sensor_msgs::CameraInfoConstPtr camera_info,
+      std::vector<std::vector<bool>>* opens);
+
+  // Helper function to check if one line is open or not at the end point.
+  // Input: startpoint:  Point where the line starts in 3D.
+  //
+  //        endpoint:    Point where the line ends in 3D. This is where
+  //                     openness is checked.
+  //
+  //        depth:       Depth image.
+  //
+  //        camera_info: Used to reproject 3D points onto depth image.
+  bool checkLineOpen(cv::Vec3f start_point, cv::Vec3f end_point,
+     const cv::Mat& depth_map, sensor_msgs::CameraInfoConstPtr camera_info);
+
+
  private:
   // True if lines should be displayed, once labelled, overlapped on the
   // instance image.
@@ -455,6 +520,8 @@ class ListenAndPublish {
   std::vector<line_detection::LineWithPlanes> lines3D_with_planes_;
   std::vector<int> labels_;
   std::vector<std::vector<int>> labels_left_right;
+  std::vector<std::vector<cv::Vec3f>> line_normals_;
+  std::vector<std::vector<bool>> line_opens_;
   std::vector<int> labels_rf_kmedoids_;
   sensor_msgs::CameraInfoConstPtr camera_info_;
   // Camera projection matrix.
@@ -478,6 +545,7 @@ class ListenAndPublish {
   line_detection::LineDetector line_detector_;
   line_clustering::KMeansCluster kmeans_cluster_;
   DisplayClusters display_clusters_;
+  DisplayLines display_lines_;
   // To dynamically reconfigure parameters.
   dynamic_reconfigure::Server<line_ros_utility::line_toolsConfig>
       dynamic_rcf_server_;

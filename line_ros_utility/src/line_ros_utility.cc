@@ -486,7 +486,7 @@ void ListenAndPublish::masterCallback(
 
     // 3D lines data. NOTE: This lines are in the camera frame and should be
     // converted to world coordinate frame.
-    printToFile(lines3D_with_planes_, labels_, path);
+    printToFile(lines3D_with_planes_, labels_, line_normals_, line_opens_, path);
 
     // 2D lines kept (bijection with 3D lines above).
     printToFile(lines2D_kept_, path_2D_kept);
