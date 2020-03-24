@@ -525,7 +525,7 @@ def get_virtual_camera_images_interiornet(scene_path, scene_type, trajectory, li
             if show_line:
                 line_3D = np.hstack([start_point, [0, 0, 255]])
 
-                num_points_in_line = 200;
+                num_points_in_line = 200
                 for idx in range(num_points_in_line):
                     line_3D = np.vstack([
                         line_3D,
@@ -537,7 +537,7 @@ def get_virtual_camera_images_interiornet(scene_path, scene_type, trajectory, li
                 pcl_from_line_view = cloud_utils.pcl_transform(
                     np.vstack([pcl, line_3D]), T)
                 # Move line points directly to the image plane, so that it is never occluded.
-                pcl_from_line_view[-1000:, 2] = 0;
+                pcl_from_line_view[-1000:, 2] = 0
             else:
                 pcl_from_line_view = cloud_utils.pcl_transform(pcl, T)
             # Obtain the RGB and depth virtual camera images by reprojecting the

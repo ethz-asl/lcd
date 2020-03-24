@@ -58,8 +58,93 @@ void storeLines3DinMarkerMsg(const std::vector<cv::Vec6f>& lines3D,
   }
 }
 
+void storeLinesinMarkerMsg(const std::vector<line_detection::LineWithPlanes>& lines,
+                           const std::vector<std::vector<cv::Vec3f>>& line_normals,
+                           const std::vector<std::vector<bool>>& line_opens,
+                           const size_t type,
+                           visualization_msgs::Marker* disp_lines,
+                           cv::Vec3f color) {
+    CHECK_NOTNULL(disp_lines);
+    disp_lines->points.clear();
+    if (color[0] > 1 || color[1] > 1 || color[2] > 1) cv::norm(color);
+    disp_lines->action = visualization_msgs::Marker::ADD;
+    disp_lines->type = visualization_msgs::Marker::LINE_LIST;
+    disp_lines->scale.x = 0.01;
+    disp_lines->scale.y = 0.01;
+    disp_lines->color.a = 1;
+    disp_lines->color.r = color[0];
+    disp_lines->color.g = color[1];
+    disp_lines->color.b = color[2];
+    disp_lines->id = 1;
+    // Fill in the line information. LINE_LIST is an array where the first point
+    // is the start and the second is the end of the line. The third is then again
+    // the start of the next line, and so on.
+    geometry_msgs::Point p;
+    for (size_t i = 0u; i < lines.size(); ++i) {
+        // Check if the line is of the type we want to render.
+        const int line_type = (int)lines[i].type;
+        if (line_type != type) {
+            continue;
+        }
+
+        cv::Vec6f line = lines[i].line;
+        p.x = line[0];
+        p.y = line[1];
+        p.z = line[2];
+        disp_lines->points.push_back(p);
+        p.x = line[3];
+        p.y = line[4];
+        p.z = line[5];
+        disp_lines->points.push_back(p);
+
+        // Display normals and planes:
+        cv::Vec3f start_point(line[0], line[1], line[2]);
+        cv::Vec3f end_point(line[3], line[4], line[5]);
+        cv::Vec3f mid_point = (start_point + end_point) / 2.0f;
+
+        std::vector<cv::Vec3f> normals = line_normals[i];
+
+        for (size_t h = 0u; h < normals.size(); ++h) {
+            cv::Vec3f normal = normals[h];
+            p.x = mid_point[0];
+            p.y = mid_point[1];
+            p.z = mid_point[2];
+            disp_lines->points.push_back(p);
+            p.x = mid_point[0] + normal[0] * 0.1;
+            p.y = mid_point[1] + normal[1] * 0.1;
+            p.z = mid_point[2] + normal[2] * 0.1;
+            disp_lines->points.push_back(p);
+        }
+        if (line_opens[i][1]) {
+            cv::Vec3f normal = normals[0];
+            p.x = end_point[0];
+            p.y = end_point[1];
+            p.z = end_point[2];
+            disp_lines->points.push_back(p);
+            p.x = end_point[0] + normal[0] * 0.1;
+            p.y = end_point[1] + normal[1] * 0.1;
+            p.z = end_point[2] + normal[2] * 0.1;
+            disp_lines->points.push_back(p);
+        }
+        if (line_opens[i][0]) {
+            cv::Vec3f normal = normals[0];
+            p.x = start_point[0];
+            p.y = start_point[1];
+            p.z = start_point[2];
+            disp_lines->points.push_back(p);
+            p.x = start_point[0] + normal[0] * 0.1;
+            p.y = start_point[1] + normal[1] * 0.1;
+            p.z = start_point[2] + normal[2] * 0.1;
+            disp_lines->points.push_back(p);
+        }
+    }
+}
+
 bool printToFile(const std::vector<line_detection::LineWithPlanes>& lines3D,
-                 const std::vector<int>& labels, const std::string& path) {
+                 const std::vector<int>& labels,
+                 const std::vector<std::vector<cv::Vec3f>> line_normals,
+                 const std::vector<std::vector<bool>> line_opens,
+                 const std::string& path) {
   CHECK(labels.size() == lines3D.size());
   std::ofstream file(path);
   if (file.is_open()) {
@@ -79,7 +164,12 @@ bool printToFile(const std::vector<line_detection::LineWithPlanes>& lines3D,
       } else {
         file << 3 << " ";
       }
-      file << labels[i] << std::endl;
+      file << labels[i] << " ";//std::endl;
+
+      for (int j = 0; j < 3; ++j) file << line_normals[i][0][j] << " ";
+      for (int j = 0; j < 3; ++j) file << line_normals[i][1][j] << " ";
+      for (int j = 0; j < 2; ++j) file << line_opens[i][j] << " ";
+      std::cout << std::endl;
     }
     file.close();
     return true;
@@ -123,6 +213,7 @@ ListenAndPublish::ListenAndPublish(std::string trajectory_number,
   transform_.setRotation(quat);
   // To publish the lines in 3D to RVIZ.
   display_clusters_.initPublishing(node_handle_);
+  display_lines_.initPublishing(node_handle_);
 
   image_sub_.subscribe(node_handle_, "/line_tools/image/rgb", 100);
   depth_sub_.subscribe(node_handle_, "/line_tools/image/depth", 100);
@@ -270,6 +361,7 @@ void ListenAndPublish::initDisplay() {
   } else {
     display_clusters_.setClusters(lines3D_with_planes_, labels_rf_kmedoids_);
   }
+  display_lines_.setFrameID(frame_id);
 }
 
 void ListenAndPublish::publish() {
@@ -278,6 +370,7 @@ void ListenAndPublish::publish() {
       tf::StampedTransform(transform_, ros::Time::now(), "map", frame_id));
   pcl_pub_.publish(pcl_cloud_);
   display_clusters_.publish();
+  display_lines_.publish(lines3D_with_planes_, line_normals_, line_opens_);
 }
 
 void ListenAndPublish::printNumberOfLines() {
@@ -333,9 +426,10 @@ void ListenAndPublish::masterCallback(
   cv_bridge::CvImageConstPtr cv_img_ptr =
       cv_bridge::toCvShare(rosmsg_image, "rgb8");
   cv_image_ = cv_img_ptr->image;
-  // Extract depth from message. (Commented because it is not used).
-  //cv_bridge::CvImageConstPtr cv_depth_ptr = cv_bridge::toCvShare(rosmsg_depth);
-  //cv_depth_ = cv_depth_ptr->image;
+  // Extract depth from message. (Used to check openness).
+  cv_bridge::CvImageConstPtr cv_depth_ptr = cv_bridge::toCvShare(rosmsg_depth,
+          "16UC1");
+  cv_depth_ = cv_depth_ptr->image;
   // Extract instances from message.
   cv_bridge::CvImageConstPtr cv_instances_ptr =
       cv_bridge::toCvShare(rosmsg_instances);
@@ -370,6 +464,9 @@ void ListenAndPublish::masterCallback(
   if (clustering_with_random_forest) {
     clusterKmedoid();
   }
+
+  extractNormalsFromLines(lines3D_with_planes_, &line_normals_);
+  checkLinesOpen(lines3D_with_planes_, cv_depth_, camera_info_, &line_opens_);
 
   if (write_labeled_lines) {
     std::string path =
@@ -1061,6 +1158,107 @@ void ListenAndPublish::displayLabelledLineOnInstanceImage(
   }
 }
 
+void ListenAndPublish::extractNormalsFromLines(
+        const std::vector<line_detection::LineWithPlanes>& lines,
+        std::vector<std::vector<cv::Vec3f>>* normals) {
+    normals->resize(lines.size());
+
+    cv::Vec3f normal1;
+    cv::Vec3f normal2;
+    cv::Vec3f start_point;
+    cv::Vec3f end_point;
+    for (size_t i = 0u; i < lines.size(); ++i) {
+        start_point = {lines[i].line[0],
+                       lines[i].line[1],
+                       lines[i].line[2]};
+        start_point = {lines[i].line[3],
+                       lines[i].line[4],
+                       lines[i].line[5]};
+        normal1 = {lines[i].hessians[0][0],
+                  lines[i].hessians[0][1],
+                  lines[i].hessians[0][2]};
+        // Always use the normal pointing towards the camera
+        // Obviously, otherwise it will point into the object.
+        if (start_point.dot(normal1) > 0.0f)
+            normal1 = -normal1;
+
+        if (lines[i].type == line_detection::LineType::DISCONT) {
+            // For discontinuity lines we have only one normal.
+            // This normal is always put first.
+            normal2 = {0.0f, 0.0f, 0.0f};
+            normals->at(i) = {normal1, normal2};
+        } else {
+            normal2 = {lines[i].hessians[1][0],
+                       lines[i].hessians[1][1],
+                       lines[i].hessians[1][2]};
+            if (start_point.dot(normal2) > 0.0f)
+                normal2 = -normal2;
+            // For lines with two normals, we have to sort them according
+            // to the right hand rule and the direction of the line.
+            if ((normal1.cross(normal2)).dot(end_point - start_point) > 0.0f) {
+                normals->at(i) = {normal1, normal2};
+            } else {
+                normals->at(i) = {normal2, normal1};
+            }
+        }
+    }
+}
+
+void ListenAndPublish::checkLinesOpen(
+        const std::vector<line_detection::LineWithPlanes>& lines,
+        const cv::Mat& depth_map, sensor_msgs::CameraInfoConstPtr camera_info,
+        std::vector<std::vector<bool>>* opens) {
+    opens->resize(lines.size());
+
+    cv::Vec3f start;
+    cv::Vec3f end;
+    for (size_t i = 0u; i < lines.size(); ++i) {
+        start = {lines[i].line[0], lines[i].line[1], lines[i].line[2]};
+        end = {lines[i].line[3], lines[i].line[4], lines[i].line[5]};
+        opens->at(i) = {checkLineOpen(end, start, depth_map, camera_info),
+                        checkLineOpen(start, end, depth_map, camera_info)};
+    }
+}
+
+bool ListenAndPublish::checkLineOpen(cv::Vec3f start_point, cv::Vec3f end_point,
+        const cv::Mat& depth_map, sensor_msgs::CameraInfoConstPtr camera_info) {
+    int cols = depth_map.cols;
+    int rows = depth_map.rows;
+    image_geometry::PinholeCameraModel camera_model;
+    camera_model.fromCameraInfo(camera_info);
+
+    cv::Point2f start_2D = camera_model.project3dToPixel({start_point[0],
+                                                          start_point[1],
+                                                          start_point[2]});
+    cv::Point2f end_2D = camera_model.project3dToPixel({end_point[0],
+                                                        end_point[1],
+                                                        end_point[2]});
+
+    cv::Point2f line_2D = end_2D - start_2D;
+    float line_length_2D = cv::norm(line_2D);
+    const float offset_length_2D = 2.0f;
+    cv::Point2f check_2D = end_2D + line_2D / line_length_2D * offset_length_2D;
+
+    cv::Vec3f line_3D = end_point - start_point;
+    // float line_length_3D = cv::norm(line_3D);
+    // Here we assume the line has the same 3D to 2D ratio anywhere on the screen.
+    // This probably not correct, but since the distance is so small, acceptable.
+    cv::Vec3f check_3D = end_point + line_3D / line_length_2D * offset_length_2D;
+
+    cv::Point2f check_3D_to_2D = camera_model.project3dToPixel({check_3D[0],
+                                                                check_3D[1],
+                                                                check_3D[2]});
+
+    const float threshold = 0.1f;
+    float depth_check = cv::norm(check_3D);
+    float depth_from_map = depth_map.at<uint16_t>(check_3D_to_2D) / 1000.0f;
+
+    bool open = !check_3D_to_2D.inside(camera_model.rawRoi());
+    open = open || depth_from_map < (depth_check - threshold);
+
+    return open;
+}
+
 InliersWithLabels::InliersWithLabels() {
 
 }
@@ -1305,6 +1503,60 @@ void DisplayClusters::publish() {
     size_t n = i % pub_.size();
     pub_[n].publish(marker_lines_[i]);
   }
+}
+
+DisplayLines::DisplayLines() {
+    colors_.push_back({1, 0, 0});    // Red for discontinuity lines.
+    colors_.push_back({0, 1, 0});    // Green for planar lines.
+    colors_.push_back({0, 0, 1});    // Blue for edge lines.
+    colors_.push_back({1, 1, 0});    // Yellow for intersect lines.
+    colors_.push_back({1, 0, 1});    // Magenta for normals.
+    colors_.push_back({0, 1, 1});    // Cyan for planes.
+
+    frame_id_set_ = false;
+    initialized_ = false;
+}
+
+void DisplayLines::setFrameID(const std::string& frame_id) {
+    frame_id_ = frame_id;
+    frame_id_set_ = true;
+}
+
+void DisplayLines::initPublishing(ros::NodeHandle& node_handle) {
+    pub_.resize(4);
+
+    pub_[0] = node_handle.advertise<visualization_msgs::Marker>(
+            "/line_marker_discont", 1000);
+    pub_[1] = node_handle.advertise<visualization_msgs::Marker>(
+            "/line_marker_plane", 1000);
+    pub_[2] = node_handle.advertise<visualization_msgs::Marker>(
+            "/line_marker_edge", 1000);
+    pub_[3] = node_handle.advertise<visualization_msgs::Marker>(
+            "/line_marker_intersect", 1000);
+
+    initialized_ = true;
+}
+
+void DisplayLines::publish(
+        const std::vector<line_detection::LineWithPlanes>& lines3D,
+        const std::vector<std::vector<cv::Vec3f>>& line_normals,
+        const std::vector<std::vector<bool>>& line_opens) {
+    CHECK(initialized_)
+            << "You need to call initPublishing to advertise before publishing.";
+    CHECK(frame_id_set_) << "You need to set the frame_id before publishing.";
+
+    // Split up the lines into their 4 categories.
+    marker_lines_.resize(4);
+
+    // Iterate over all types.
+    for (size_t t = 0u; t < 4; ++t) {
+        storeLinesinMarkerMsg(lines3D, line_normals, line_opens, t, &marker_lines_[t],
+                colors_[t]);
+        marker_lines_[t].header.frame_id = frame_id_;
+        marker_lines_[t].lifetime = ros::Duration(21);
+
+        pub_[t].publish(marker_lines_[t]);
+    }
 }
 
 TreeClassifier::TreeClassifier() {
