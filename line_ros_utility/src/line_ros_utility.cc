@@ -169,7 +169,7 @@ bool printToFile(const std::vector<line_detection::LineWithPlanes>& lines3D,
       for (int j = 0; j < 3; ++j) file << line_normals[i][0][j] << " ";
       for (int j = 0; j < 3; ++j) file << line_normals[i][1][j] << " ";
       for (int j = 0; j < 2; ++j) file << line_opens[i][j] << " ";
-      std::cout << std::endl;
+      file << std::endl;
     }
     file.close();
     return true;
