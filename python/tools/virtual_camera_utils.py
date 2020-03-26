@@ -163,11 +163,6 @@ def virtual_camera_pose_from_file_line(line, distance):
         z (numpy array of shape (3, )): Optical axis of the virtual camera.
     """
 
-    print(line_file_utils.read_normal_1(line))
-    print(line_file_utils.read_normal_2(line))
-    print(line_file_utils.read_start_point(line))
-    print(line_file_utils.read_end_point(line))
-    print(line_file_utils.read_type(line))
     return virtual_camera_pose(
         start3D=line_file_utils.read_start_point(line),
         end3D=line_file_utils.read_end_point(line),

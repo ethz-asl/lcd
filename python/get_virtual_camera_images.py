@@ -413,7 +413,7 @@ def parse_frames(scene_path, scene_type, traj):
 
 
 def get_virtual_camera_images_interiornet(scene_path, scene_type, trajectory, light_type, linesfiles_path, output_path):
-    impainting = True
+    impainting = False
     show_line = False
 
     # TODO: Frame step.
@@ -452,7 +452,7 @@ def get_virtual_camera_images_interiornet(scene_path, scene_type, trajectory, li
     distance = 0.5
     # Min fraction of nonempty pixels in the associated virtual-camera image for
     # a line to be considered as valid.
-    min_fraction_nonempty_pixels = 0.3
+    min_fraction_nonempty_pixels = 0.1
 
     # Write in a text file (that will store the histogram of percentages of
     # nonempty pixels) the distance of the virtual camera from the lines and the
@@ -486,15 +486,19 @@ def get_virtual_camera_images_interiornet(scene_path, scene_type, trajectory, li
 
         # Sliding window:
         sliding_window_length = 1
-        # Add this point cloud (transformed to world frame) to the sliding window.
-        pcl_world = np.vstack((cloud_utils.pcl_transform(pcl_new, cam_to_world_t), pcl_world))
-        if np.shape(pcl_world)[0] > (np.shape(pcl_new)[0] * sliding_window_length):
-            pcl_world = pcl_world[:np.shape(pcl_new)[0]*sliding_window_length, :]
+        if sliding_window_length > 1:
+            # Add this point cloud (transformed to world frame) to the sliding window.
+            pcl_world = np.vstack((cloud_utils.pcl_transform(
+                pcl_new, cam_to_world_t), pcl_world))
+            if np.shape(pcl_world)[0] > (np.shape(pcl_new)[0] * sliding_window_length):
+                pcl_world = pcl_world[:np.shape(pcl_new)[0]*sliding_window_length, :]
 
-        # Transform world point cloud back to camera frame.
-        # And use this denser point cloud for virtual camera images.
-        pcl = cloud_utils.pcl_transform(pcl_world, np.linalg.inv(cam_to_world_t))
-        print(np.shape(pcl))
+            # Transform world point cloud back to camera frame.
+            # And use this denser point cloud for virtual camera images.
+            pcl = cloud_utils.pcl_transform(pcl_world, np.linalg.inv(cam_to_world_t))
+            print(np.shape(pcl))
+        else:
+            pcl = pcl_new
 
         path_to_lines = os.path.join(
             path_to_lines_root, 'lines_with_labels_{0}.txt'.format(frame_id))
@@ -517,8 +521,6 @@ def get_virtual_camera_images_interiornet(scene_path, scene_type, trajectory, li
         for i in range(lines_count):
             start_time_line = timer()
             # Obtain the pose of the virtual camera for each line.
-            loll = np.array([0.])
-            lol = np.array([1.]) / loll
             T, _ = virtual_camera_utils.virtual_camera_pose_from_file_line(
                 data_lines[i, :], distance)
             # Draw the line in the virtual camera image.

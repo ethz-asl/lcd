@@ -16,23 +16,23 @@ from tools.camera_utils import SceneNetCameraToWorldMatrixRetriever
 
 def transform_to_world_rot(vector, camera_rotation):
     return transform_to_world_off_rot(
-        vector, np.zeros((3, 1)), camera_rotation)[0:3]
+        vector, np.zeros((3,)), camera_rotation)[0:3]
 
 
 def transform_to_world_off_rot(vector, camera_origin, camera_rotation):
     x = camera_origin[0]
     y = camera_origin[1]
     z = camera_origin[2]
-    e0 = camera_rotation[0]
-    e1 = camera_rotation[1]
-    e2 = camera_rotation[2]
-    e3 = camera_rotation[3]
+    e0 = camera_rotation[3]
+    e1 = camera_rotation[0]
+    e2 = camera_rotation[1]
+    e3 = camera_rotation[2]
     T = np.array([[e0**2 + e1**2 - e2**2 - e3**2, 2 * e1 * e2 - 2 * e0 * e3, 2 * e0 * e2 + 2 * e1 * e3, x],
                   [2 * e0 * e3 + 2 * e1 * e2, e0**2 - e1**2 + e2**2 - e3**2, 2 * e2 * e3 - 2 * e0 * e1, y],
                   [2 * e1 * e3 - 2 * e0 * e2, 2 * e0 * e1 + 2 * e2 * e3, e0**2 - e1**2 - e2**2 + e3**2, z],
                   [0, 0, 0, 1]])
+    #T = np.linalg.inv(T)
     return T.dot(np.append(vector, [1.]))[0:3]
-
 
 
 def read_all_lines(line_path):
@@ -118,6 +118,8 @@ def split_dataset(line_files_path, virtual_images_path, output_path):
                'test': test.tolist(),
                'all_lines': list(range(line_count))}
 
+    lines_found = 0
+
     for key, set_line_idx in dataset.iteritems():
         for i in set_line_idx:
             frame_id = int(frame_idx[i])
@@ -126,14 +128,14 @@ def split_dataset(line_files_path, virtual_images_path, output_path):
             path_to_virtual_imgs = os.path.join(virtual_images_path,
                                                 "frame_{}".format(frame_id))
             path_to_write = os.path.join(path_to_virtual_imgs,
-                                         'rgb/' + '{}.png'.format(i))
+                                         'rgb/' + '{}.png'.format(line_id_in_frame))
             # If the virtual-camera image associated to the line does not
             # exist (because it does not contain enough nonempty pixels), do
             # not include the line in the dataset.
             if not os.path.isfile(path_to_write):
                 print("Virtual-camera image not found for line {} ".format(
                     line_id_in_frame) + "in frame {}.".format(frame_id))
-                #continue
+                continue
 
             line = lines[i, :]
             start_point_camera = line_file_utils.read_start_point(line)
@@ -147,6 +149,9 @@ def split_dataset(line_files_path, virtual_images_path, output_path):
             camera_origin = line_file_utils.read_camera_origin(line)
             camera_rotation = line_file_utils.read_camera_rotation(line)
 
+            print("Origin: {}".format(camera_origin))
+            print("Rotation: {}".format(camera_rotation))
+
             line_start_point_world = transform_to_world_off_rot(
                 np.transpose(start_point_camera), camera_origin, camera_rotation)
             line_end_point_world = transform_to_world_off_rot(
@@ -158,13 +163,10 @@ def split_dataset(line_files_path, virtual_images_path, output_path):
                 np.transpose(normal_2_camera),
                 camera_rotation)
 
-            print(start_point_camera)
-            print(line_start_point_world)
-
-            exit(0)
-
             # center_of_line = (
             #   line_start_point_world[:3] + line_end_point_world[:3]) / 2
+
+            lines_found = lines_found + 1
 
             with open(
                     os.path.join(output_path,
@@ -188,8 +190,9 @@ def split_dataset(line_files_path, virtual_images_path, output_path):
                     str(normal_2_world[2]) + ' ' +
                     str(start_open) + ' ' +
                     str(end_open) + ' ' +
-                    '"' + path_to_write + '"'
                     '\n')
+
+    print("Found {} lines.".format(lines_found))
 
 
 if __name__ == '__main__':
