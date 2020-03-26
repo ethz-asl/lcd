@@ -142,12 +142,28 @@ void storeLinesinMarkerMsg(const std::vector<line_detection::LineWithPlanes>& li
 
 bool printToFile(const std::vector<line_detection::LineWithPlanes>& lines3D,
                  const std::vector<int>& labels,
-                 const std::vector<std::vector<cv::Vec3f>> line_normals,
-                 const std::vector<std::vector<bool>> line_opens,
+                 const std::vector<std::vector<cv::Vec3f>>& line_normals,
+                 const std::vector<std::vector<bool>>& line_opens,
+                 const tf::StampedTransform& transform,
                  const std::string& path) {
   CHECK(labels.size() == lines3D.size());
   std::ofstream file(path);
   if (file.is_open()) {
+    // Lines are stored in the following format:
+    // 0 - 2: start point
+    // 3 - 5: end point
+    // 6 - 9: hessian 1
+    // 10-13: hessian 2
+    // 14-16: colors 1
+    // 17-19: colors 2
+    //    20: type
+    //    21: label
+    // 22-24: normal 1
+    // 25-27: normal 2
+    //    28: open 1
+    //    29: open 2
+    // 30-32: camera origin
+    // 33-36: camera rotation
     for (size_t i = 0u; i < lines3D.size(); ++i) {
       for (int j = 0; j < 6; ++j) file << lines3D[i].line[j] << " ";
       for (int j = 0; j < 4; ++j) file << lines3D[i].hessians[0][j] << " ";
@@ -169,7 +185,13 @@ bool printToFile(const std::vector<line_detection::LineWithPlanes>& lines3D,
       for (int j = 0; j < 3; ++j) file << line_normals[i][0][j] << " ";
       for (int j = 0; j < 3; ++j) file << line_normals[i][1][j] << " ";
       for (int j = 0; j < 2; ++j) file << line_opens[i][j] << " ";
-      file << std::endl;
+      file << transform.getOrigin().x() << " ";
+      file << transform.getOrigin().y() << " ";
+      file << transform.getOrigin().z() << " ";
+      file << transform.getRotation().x() << " ";
+      file << transform.getRotation().y() << " ";
+      file << transform.getRotation().z() << " ";
+      file << transform.getRotation().w() << std::endl;
     }
     file.close();
     return true;
@@ -468,6 +490,10 @@ void ListenAndPublish::masterCallback(
   extractNormalsFromLines(lines3D_with_planes_, &line_normals_);
   checkLinesOpen(lines3D_with_planes_, cv_depth_, camera_info_, &line_opens_);
 
+  tf::StampedTransform transform;
+  tf_listener_.lookupTransform("world", "/interiornet_camera_frame",
+          ros::Time(0), transform);
+
   if (write_labeled_lines) {
     std::string path =
         kWritePath_ + "/traj_" + kTrajectoryNumber_ + "/lines_with_labels_" +
@@ -484,9 +510,10 @@ void ListenAndPublish::masterCallback(
         std::to_string(iteration_) + ".txt";
     ROS_INFO("path_2D is %s", path_2D.c_str());
 
-    // 3D lines data. NOTE: This lines are in the camera frame and should be
-    // converted to world coordinate frame.
-    printToFile(lines3D_with_planes_, labels_, line_normals_, line_opens_, path);
+    // 3D lines data. NOTE: These lines are in the camera frame and should be
+    // converted to world coordinate frame. For this reason, tf is included.
+    printToFile(lines3D_with_planes_, labels_, line_normals_, line_opens_,
+            transform, path);
 
     // 2D lines kept (bijection with 3D lines above).
     printToFile(lines2D_kept_, path_2D_kept);
@@ -1177,22 +1204,21 @@ void ListenAndPublish::extractNormalsFromLines(
         normal1 = {lines[i].hessians[0][0],
                   lines[i].hessians[0][1],
                   lines[i].hessians[0][2]};
+        normal2 = {lines[i].hessians[1][0],
+                   lines[i].hessians[1][1],
+                   lines[i].hessians[1][2]};
         // Always use the normal pointing towards the camera
         // Obviously, otherwise it will point into the object.
         if (start_point.dot(normal1) > 0.0f)
             normal1 = -normal1;
+        if (start_point.dot(normal2) > 0.0f)
+            normal2 = -normal2;
 
         if (lines[i].type == line_detection::LineType::DISCONT) {
-            // For discontinuity lines we have only one normal.
-            // This normal is always put first.
-            normal2 = {0.0f, 0.0f, 0.0f};
+            // For discontinuity lines we have only one normal, the other
+            // one is zero. So nothing needs to be done.
             normals->at(i) = {normal1, normal2};
         } else {
-            normal2 = {lines[i].hessians[1][0],
-                       lines[i].hessians[1][1],
-                       lines[i].hessians[1][2]};
-            if (start_point.dot(normal2) > 0.0f)
-                normal2 = -normal2;
             // For lines with two normals, we have to sort them according
             // to the right hand rule and the direction of the line.
             if ((normal1.cross(normal2)).dot(end_point - start_point) > 0.0f) {

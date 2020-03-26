@@ -7,7 +7,6 @@
 #include <ros/ros.h>
 
 #include <cv_bridge/cv_bridge.h>
-#include <geometry_msgs/TransformStamped.h>
 #include <image_geometry/pinhole_camera_model.h>
 #include <dynamic_reconfigure/server.h>
 #include <message_filters/subscriber.h>
@@ -20,6 +19,7 @@
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <tf/transform_broadcaster.h>
+#include <tf/transform_listener.h>
 #include <visualization_msgs/Marker.h>
 
 #include <line_clustering/line_clustering.h>
@@ -55,8 +55,9 @@ std::vector<int> clusterLinesAfterClassification(
 // can be read by the random_forest.py node.
 bool printToFile(const std::vector<line_detection::LineWithPlanes>& lines3D,
                  const std::vector<int>& labels,
-                 const std::vector<std::vector<cv::Vec3f>> line_normals,
-                 const std::vector<std::vector<bool>> line_opens,
+                 const std::vector<std::vector<cv::Vec3f>>& line_normals,
+                 const std::vector<std::vector<bool>>& line_opens,
+                 const tf::StampedTransform& transform,
                  const std::string& path);
 // Print 2D lines.
 bool printToFile(const std::vector<cv::Vec4f>& lines2D,
@@ -529,6 +530,7 @@ class ListenAndPublish {
   // Publishers and Subscribers.
   tf::TransformBroadcaster broad_caster_;
   tf::Transform transform_;
+  tf::TransformListener tf_listener_;
   ros::Publisher pcl_pub_;
   message_filters::Synchronizer<MySyncPolicy>* sync_;
   message_filters::Subscriber<sensor_msgs::Image> image_sub_;

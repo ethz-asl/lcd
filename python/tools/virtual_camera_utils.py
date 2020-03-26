@@ -1,4 +1,5 @@
 import numpy as np
+import line_file_utils
 
 
 def get_origin_virtual_camera(start3D, end3D, hessian_left, hessian_right,
@@ -161,10 +162,16 @@ def virtual_camera_pose_from_file_line(line, distance):
         T (numpy array of shape (4, 4)): Transformation matrix.
         z (numpy array of shape (3, )): Optical axis of the virtual camera.
     """
+
+    print(line_file_utils.read_normal_1(line))
+    print(line_file_utils.read_normal_2(line))
+    print(line_file_utils.read_start_point(line))
+    print(line_file_utils.read_end_point(line))
+    print(line_file_utils.read_type(line))
     return virtual_camera_pose(
-        start3D=line[:3],
-        end3D=line[3:6],
-        hessian_left=line[6:10],
-        hessian_right=line[10:14],
-        line_type=line[-2],
+        start3D=line_file_utils.read_start_point(line),
+        end3D=line_file_utils.read_end_point(line),
+        hessian_left=line_file_utils.read_normal_1(line),
+        hessian_right=line_file_utils.read_normal_2(line),
+        line_type=line_file_utils.read_type(line),
         distance=distance)

@@ -66,7 +66,9 @@ def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path, dataset_na
 
 
     # Camera to world matrix retriever.
-    cam_to_world = camera_utils.SceneNetCameraToWorldMatrixRetriever(trajectory, dataset_name, scenenetscripts_path)
+    cam_to_world = camera_utils.SceneNetCameraToWorldMatrixRetriever(trajectory,
+                                                                     dataset_name,
+                                                                     scenenetscripts_path)
 
     # Sliding window accumulator for point cloud, stored in world frame.
     pcl_world = np.zeros((0, 6))
@@ -515,6 +517,8 @@ def get_virtual_camera_images_interiornet(scene_path, scene_type, trajectory, li
         for i in range(lines_count):
             start_time_line = timer()
             # Obtain the pose of the virtual camera for each line.
+            loll = np.array([0.])
+            lol = np.array([1.]) / loll
             T, _ = virtual_camera_utils.virtual_camera_pose_from_file_line(
                 data_lines[i, :], distance)
             # Draw the line in the virtual camera image.
@@ -733,7 +737,8 @@ if __name__ == '__main__':
             # Compose script arguments if necessary.
             dataset_path = os.path.join(scenenet_dataset_path, 'data/',
                                         dataset_name.split('_')[0])
-        get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path, dataset_name, scenenetscripts_path)
+        get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path,
+                                                dataset_name, scenenetscripts_path)
     elif dataset_name == "scenenn":
         # Dataset from SceneNN.
         if not args.frame_step:
@@ -754,8 +759,12 @@ if __name__ == '__main__':
         # Dataset from InteriorNet.
         scene_path_split = interiornet_scene_path.rsplit('/')
         scene_type = int(scene_path_split[-2][2])
-        get_virtual_camera_images_interiornet(interiornet_scene_path, scene_type, interiornet_trajectory,
-                                              interiornet_light_type, linesfiles_path, output_path)
+        get_virtual_camera_images_interiornet(interiornet_scene_path,
+                                              scene_type,
+                                              interiornet_trajectory,
+                                              interiornet_light_type,
+                                              linesfiles_path,
+                                              output_path)
     else:
         raise ValueError("Invalid dataset name. Valid names are 'val', "
                          "'train_NUM', where NUM is a number between 0 and 16, "
