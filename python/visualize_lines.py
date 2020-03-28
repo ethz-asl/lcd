@@ -11,11 +11,7 @@ def get_colors():
     rgbs = np.zeros((500, 3))
 
     for i in range(500):
-        # NOTE: Here it is crucial to note that when initializing the random
-        # number generator everytime immediately before generating the
-        # random number, the latter will always be same if the same seed is
-        # used. Therefore, same lines_color[i] will always correspond to the
-        # same colour.
+        # Generate random numbers. With fixed seeds.
         np.random.seed(i)
         rgb = np.random.randint(255, size=(1, 3)) / 255.0
         rgbs[i, :] = rgb
@@ -76,3 +72,4 @@ if __name__ == '__main__':
     colors = get_colors()
     o3d.visualization.draw_geometries([render_lines(lines, colors),
                                        render_normals(lines)])
+    print("Number of lines is: {}".format(lines.shape[0]))

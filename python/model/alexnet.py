@@ -107,7 +107,16 @@ class AlexNet(object):
         # https://github.com/kratzert/finetune_alexnet_with_tensorflow/issues/70
 
         # Load the weights into memory.
+        np_load_old = np.load
+
+        # modify the default parameters of np.load
+        np.load = lambda *a, **k: np_load_old(*a, allow_pickle=True, **k)
+
+        # call load_data with allow_pickle implicitly set to true
         weights_dict = np.load(self.WEIGHTS_PATH, encoding='bytes').item()
+
+        # restore np.load for future normal usage
+        np.load = np_load_old
 
         # Loop over all layer names stored in the weights dict.
         for op_name in weights_dict:
@@ -117,7 +126,7 @@ class AlexNet(object):
                 # For rgb-d images input, just initialize the weights
                 # corresponding to the bgr channels and the biases.
                 if self.INPUT_IMAGES == 'bgr-d' and op_name == 'conv1':
-                    with tf.variable_scope(op_name, reuse=True):
+                    with tf.compat.v1.variable_scope(op_name, reuse=True):
                         # Loop over list of weights/biases and assign them to
                         # their corresponding tf variable.
                         for data in weights_dict[op_name]:
@@ -127,21 +136,21 @@ class AlexNet(object):
                                 session.run(var.assign(data))
                             # Weights.
                             else:
-                                var = tf.get_variable(
+                                var = tf.compat.v1.get_variable(
                                     'weights', trainable=False)
                                 session.run(var[:, :, :3, :].assign(data))
                 else:
-                    with tf.variable_scope(op_name, reuse=True):
+                    with tf.compat.v1.variable_scope(op_name, reuse=True):
                         # Loop over list of weights/biases and assign them to
                         # their corresponding tf variable.
                         for data in weights_dict[op_name]:
                             # Biases.
                             if len(data.shape) == 1:
-                                var = tf.get_variable('biases', trainable=False)
+                                var = tf.compat.v1.get_variable('biases', trainable=False)
                                 session.run(var.assign(data))
                             # Weights.
                             else:
-                                var = tf.get_variable(
+                                var = tf.compat.v1.get_variable(
                                     'weights', trainable=False)
                                 session.run(var.assign(data))
 
@@ -171,16 +180,16 @@ def conv(x,
         return tf.nn.conv2d(
             i, k, strides=[1, stride_y, stride_x, 1], padding=padding)
 
-    with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
+    with tf.compat.v1.variable_scope(name, reuse=tf.compat.v1.AUTO_REUSE):
         # Create tf variables for the weights and biases of the conv layer.
-        weights = tf.get_variable(
+        weights = tf.compat.v1.get_variable(
             'weights',
             shape=[
                 filter_height, filter_width, input_channels / groups,
                 num_filters
             ],
             trainable=True)
-        biases = tf.get_variable('biases', shape=[num_filters], trainable=True)
+        biases = tf.compat.v1.get_variable('biases', shape=[num_filters], trainable=True)
 
         if groups == 1:
             conv = convolve(x, weights)
@@ -206,14 +215,14 @@ def conv(x,
 
 
 def fc(x, num_in, num_out, name, relu=True):
-    with tf.variable_scope(name) as scope:
+    with tf.compat.v1.variable_scope(name) as scope:
         # Create tf variables for the weights and biases.
-        weights = tf.get_variable(
+        weights = tf.compat.v1.get_variable(
             'weights', shape=[num_in, num_out], trainable=True)
-        biases = tf.get_variable('biases', [num_out], trainable=True)
+        biases = tf.compat.v1.get_variable('biases', [num_out], trainable=True)
 
         # Matrix multiply weights and inputs and add bias.
-        act = tf.nn.xw_plus_b(x, weights, biases, name=scope.name)
+        act = tf.compat.v1.nn.xw_plus_b(x, weights, biases, name=scope.name)
 
         if relu is True:
             # Apply ReLU nonlinearity.
@@ -230,7 +239,7 @@ def max_pool(x,
              stride_x,
              name,
              padding='SAME'):
-    return tf.nn.max_pool(
+    return tf.nn.max_pool2d(
         x,
         ksize=[1, filter_height, filter_width, 1],
         strides=[1, stride_y, stride_x, 1],
@@ -244,4 +253,4 @@ def lrn(x, radius, alpha, beta, name, bias=1.0):
 
 
 def dropout(x, keep_prob):
-    return tf.nn.dropout(x, keep_prob)
+    return tf.nn.dropout(x, rate=1 - keep_prob)

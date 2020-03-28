@@ -54,7 +54,8 @@ def read_all_lines(line_path):
 
     for i in range(frame_count):
         try:
-            path_to_line = os.path.join(line_path, "lines_with_labels_{}.txt".format(i))
+            path_to_line = os.path.join(line_path,
+                                        "lines_with_labels_{}.txt".format(i))
             data_lines = pd.read_csv(path_to_line, sep=" ", header=None)
             data_lines = data_lines.values
             line_count = data_lines.shape[0]
@@ -190,6 +191,7 @@ def split_dataset(line_files_path, virtual_images_path, output_path):
                     str(normal_2_world[2]) + ' ' +
                     str(start_open) + ' ' +
                     str(end_open) + ' ' +
+                    str(frame_id) + ' ' +
                     '\n')
 
     print("Found {} lines.".format(lines_found))
