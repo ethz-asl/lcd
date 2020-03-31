@@ -12,7 +12,7 @@ from timeit import default_timer as timer
 from tools import camera_utils
 from tools import cloud_utils
 from tools import scenenn_utils
-from tools import scenenet_utils
+#from tools import scenenet_utils
 from tools import virtual_camera_utils
 from tools import pathconfig
 from tools import get_protobuf_paths
@@ -452,7 +452,7 @@ def get_virtual_camera_images_interiornet(scene_path, scene_type, trajectory, li
     distance = 0.5
     # Min fraction of nonempty pixels in the associated virtual-camera image for
     # a line to be considered as valid.
-    min_fraction_nonempty_pixels = 0.1
+    min_fraction_nonempty_pixels = 0.0
 
     # Write in a text file (that will store the histogram of percentages of
     # nonempty pixels) the distance of the virtual camera from the lines and the

@@ -31,7 +31,6 @@ def transform_to_world_off_rot(vector, camera_origin, camera_rotation):
                   [2 * e0 * e3 + 2 * e1 * e2, e0**2 - e1**2 + e2**2 - e3**2, 2 * e2 * e3 - 2 * e0 * e1, y],
                   [2 * e1 * e3 - 2 * e0 * e2, 2 * e0 * e1 + 2 * e2 * e3, e0**2 - e1**2 - e2**2 + e3**2, z],
                   [0, 0, 0, 1]])
-    #T = np.linalg.inv(T)
     return T.dot(np.append(vector, [1.]))[0:3]
 
 
@@ -85,6 +84,12 @@ def read_all_lines(line_path):
     print("Line count: {}".format(lines.shape))
 
     return lines, frame_count, frame_idx, line_idx
+
+
+def read_lines_min_instance(line_path, min_lines_per_instance):
+    lines, frame_count, frame_idx, line_idx = read_all_lines(line_path)
+    instances = np.unique(lines[:, line_file_utils.label_index()])
+
 
 
 def split_dataset(line_files_path, virtual_images_path, output_path):
@@ -150,9 +155,6 @@ def split_dataset(line_files_path, virtual_images_path, output_path):
             camera_origin = line_file_utils.read_camera_origin(line)
             camera_rotation = line_file_utils.read_camera_rotation(line)
 
-            print("Origin: {}".format(camera_origin))
-            print("Rotation: {}".format(camera_rotation))
-
             line_start_point_world = transform_to_world_off_rot(
                 np.transpose(start_point_camera), camera_origin, camera_rotation)
             line_end_point_world = transform_to_world_off_rot(
@@ -194,7 +196,7 @@ def split_dataset(line_files_path, virtual_images_path, output_path):
                     str(frame_id) + ' ' +
                     '\n')
 
-    print("Found {} lines.".format(lines_found))
+    print("Found {} lines.".format(lines_found / 2))
 
 
 if __name__ == '__main__':

@@ -189,10 +189,10 @@ class ImageDataGenerator:
         # Allocate memory for the batch of images.
         if self.image_type == 'bgr':
             images = np.ndarray(
-                [batch_size, self.scale_size[0], self.scale_size[1], 3])
+                [batch_size, self.scale_size[1], self.scale_size[0], 3])
         elif self.image_type == 'bgr-d':
             images = np.ndarray(
-                [batch_size, self.scale_size[0], self.scale_size[1], 4])
+                [batch_size, self.scale_size[1], self.scale_size[0], 4])
 
         # Get next batch of image (by retrieving its path), labels and line
         # types.
@@ -204,9 +204,9 @@ class ImageDataGenerator:
         line_types = [self.lines_geometry[i, -1] for i in indices]
         geometries = [self.lines_geometry[i, 0:-1] for i in indices]
 
-        print("Number of indices: {}".format(len(indices)))
-        print("Batch size: {}".format(batch_size))
-        print("Pointer location: {}".format(self.trajectories[0].pointer))
+        #print("Number of indices: {}".format(len(indices)))
+        #print("Batch size: {}".format(batch_size))
+        #print("Pointer location: {}".format(self.trajectories[0].pointer))
 
         # Read images.
         for i in range(len(paths)):

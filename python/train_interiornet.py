@@ -74,7 +74,7 @@ def train(read_as_pickle=True):
     #      A line segment is parametrized with a minimum-DOF parametrization
     #      (4 degrees of freedom) of the infinite line that it belongs to. The
     #      representation is called orthonormal. => 4 parameters per line.
-    line_parametrization = 'direction_and_centerpoint'
+    line_parametrization = 'felix'
 
     log_files_folder = "./logs/"
     # True to output statistics and print images about the triplets formed (in
@@ -96,11 +96,11 @@ def train(read_as_pickle=True):
     batch_step_triplets_statistics = 10
 
     # Learning parameters.
-    learning_rate = 0.0003
-    num_epochs = 30
-    batch_size = 128
+    learning_rate = 0.0004
+    num_epochs = 60
+    batch_size = 256
     # Margin of the triplet loss.
-    margin = 0.2
+    margin = 0.8
     # Regularization hyperparameter required when using the loss based on
     # 'batch_all'/'batch_all_wohlhart_lepetit' triplet selection strategy.
     lambda_regularization = 0.1
@@ -112,10 +112,14 @@ def train(read_as_pickle=True):
     really_all = False
 
     # Network parameters.
-    dropout_rate = 0.5
+    # This is the probability that the neurons are kept.
+    dropout_rate = 1.
 
     # How often we want to write the tf.summary data to disk.
     display_step = 1
+
+    #image_resolution = (99, 67)
+    image_resolution = (227, 227)
 
     # Path for tf.summary.FileWriter and to store model checkpoints.
     filewriter_path = os.path.join(log_files_folder, job_name,
@@ -136,10 +140,10 @@ def train(read_as_pickle=True):
     # Input placeholder.
     if image_type == 'bgr':
         input_img = tf.compat.v1.placeholder(
-            tf.float32, [None, 227, 227, 3], name="input_img")
+            tf.float32, [None, image_resolution[1], image_resolution[0], 3], name="input_img")
     elif image_type == 'bgr-d':
         input_img = tf.compat.v1.placeholder(
-            tf.float32, [None, 227, 227, 4], name="input_img")
+            tf.float32, [None, image_resolution[1], image_resolution[0], 4], name="input_img")
 
     # For each line, labels is in the format
     #   [line_center (3x)] [instance label (1x)]
@@ -157,15 +161,16 @@ def train(read_as_pickle=True):
             tf.float32, [None, 4], name="geometric_info")
     elif line_parametrization == 'felix':
         geometric_info = tf.compat.v1.placeholder(
-            tf.float32, [None, 8], name='geometric_info')
+            tf.float32, [None, 14], name='geometric_info')
     else:
         raise ValueError("Line parametrization should be "
                          "'direction_and_centerpoint' or 'orthonormal'.")
 
     # Layers for which weights should not be trained.
-    no_train_layers = ['conv1', 'pool1', 'norm1', 'conv2', 'pool2', 'norm2']
+    #no_train_layers = ['conv1', 'pool1', 'norm1', 'conv2', 'pool2', 'norm2']
+    no_train_layers = ['conv1', 'pool1', 'norm1', 'conv2', 'pool2', 'norm2', 'conv3', 'conv4', 'conv5', 'pool5', 'fc6', 'fc7']
     # Layers for which ImageNet weights should not be loaded.
-    skip_layers = ['fc8', 'fc9']
+    skip_layers = ['fc8', 'fc9', 'fc10', 'fc11']
 
     # Initialize model.
     model = AlexNet(
@@ -311,7 +316,7 @@ def train(read_as_pickle=True):
             sess.run(tf.compat.v1.global_variables_initializer())
             # Load the pretrained weights into the layers which are not in
             # skip_layers.
-            model.load_initial_weights(sess)
+            #model.load_initial_weights(sess)
             # Set first epoch to use for training as 0.
             starting_epoch = 0
         else:
@@ -349,12 +354,14 @@ def train(read_as_pickle=True):
             horizontal_flip=False,
             shuffle=True,
             image_type=image_type,
+            scale_size=image_resolution,
             mean=train_set_mean,
             read_as_pickle=read_as_pickle)
         val_generator = ImageDataGenerator(
             files_list=val_files,
             shuffle=True,
             image_type=image_type,
+            scale_size=image_resolution,
             mean=train_set_mean,
             read_as_pickle=read_as_pickle)
 
@@ -384,6 +391,11 @@ def train(read_as_pickle=True):
             print("{} Epoch number: {}".format(datetime.now(), epoch + 1))
             step = 1
 
+            #if epoch == 5:
+            #    dropout_rate = 0.8
+            #elif epoch == 15:
+            #    dropout_rate = 0.5
+
             while step <= train_batches_per_epoch:
                 # Get a batch of images and labels.
                 (batch_input_img_train, batch_labels_train,
@@ -402,7 +414,10 @@ def train(read_as_pickle=True):
                     batch_labels_train = get_label_with_line_center(
                         labels_batch=batch_labels_train)
                 else:
-                    batch_geometric_info_train = batch_line_geometries[:, 0:6]
+                    if line_parametrization == 'direction_and_centerpoint':
+                        batch_geometric_info_train = batch_line_geometries[:, :6]
+                    elif line_parametrization == 'felix':
+                        batch_geometric_info_train = batch_line_geometries[:, :14]
 
                 # Run the training operation.
                 sess.run(
@@ -549,7 +564,10 @@ def train(read_as_pickle=True):
                     batch_labels_val = get_label_with_line_center(
                         labels_batch=batch_labels_val)
                 else:
-                    batch_geometric_info_val = batch_line_geometries[:, 0:6]
+                    if line_parametrization == 'direction_and_centerpoint':
+                        batch_geometric_info_val = batch_line_geometries[:, :6]
+                    elif line_parametrization == 'felix':
+                        batch_geometric_info_val = batch_line_geometries[:, :14]
 
                 # Obtain validation loss.
                 (loss_current, validation_s) = sess.run(

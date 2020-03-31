@@ -12,12 +12,10 @@ import tensorflow as tf
 from tensorflow.contrib import tensorboard
 from timeit import default_timer as timer
 
-from model.datagenerator import ImageDataGenerator
+from model.datagenerator_interiornet import ImageDataGenerator
 from tools.cluster_lines import cluster_lines_affinity_propagation, \
                                 cluster_lines_kmeans, \
                                 cluster_lines_aggr_clustering
-from tools.lines_utils import get_label_with_line_center, get_geometric_info
-from tools.visualization import pcl_lines_for_plot
 
 python_root = '../'
 sys.path.insert(0, python_root)
@@ -25,11 +23,11 @@ sys.path.insert(0, python_root)
 # Configuration.
 # Cluster strategy. One of "kmeans", "aggr_clustering" and
 # "affinity_propagation".
-cluster_strategy = "aggr_clustering"
+cluster_strategy = "kmeans"
 
 # Visualizer of the lines coloured with the instances from clustering. Possible
 # values: 'open3d', 'matplotlib'.
-visualizer = 'open3d'
+visualizer = 'felix'
 
 # Whether or not the test dataset should be read as a pickle file.
 # NOTE: non-pickle mode is currently deprecated and not fully supported.
@@ -49,23 +47,24 @@ read_felix = True
 # use_ground_truth_instance_labels to False. In this case, it is still expected
 # that the pickle files contain an entry called 'labels', with the first six
 # entries corresponding to [start point (3x)] [end point (3x)].
-use_ground_truth_instance_labels = False
+use_ground_truth_instance_labels = True
 
 # Folder where the checkpoints and meta graph for the test are stored.
-log_files_folder = './logs/300320_2258/'
+log_files_folder = './logs/310320_0402/'
+#300320_2359
 
 sess = tf.InteractiveSession()
 saver = tf.train.import_meta_graph(
     os.path.join(log_files_folder,
-                 'triplet_loss_batch_all_wohlhart_lepetit_ckpt/bgr-d_model_epoch18.ckpt.meta'))
+                 'triplet_loss_batch_all_wohlhart_lepetit_ckpt/bgr-d_model_epoch46.ckpt.meta'))
 saver.restore(
     sess,
     os.path.join(log_files_folder,
-                 'triplet_loss_batch_all_wohlhart_lepetit_ckpt/bgr-d_model_epoch18.ckpt'))
+                 'triplet_loss_batch_all_wohlhart_lepetit_ckpt/bgr-d_model_epoch46.ckpt'))
 
 # Test dataset.
-test_files = '/home/felix/line_ws/data/line_tools/interiornet_lines_split/test_with_line_endpoints.txt'
-name_test_file = test_files.split('/')[-1].split('.')[0]
+test_files = ['/home/felix/line_ws/data/line_tools/interiornet_lines_split/train_with_line_endpoints.txt']
+name_test_file = test_files[0].split('/')[-1].split('.')[0]
 
 # Retrieve mean of the training set.
 train_set_mean = sess.run('train_set_mean:0')
@@ -73,9 +72,10 @@ train_set_mean = sess.run('train_set_mean:0')
 print("Train set mean is {}".format(train_set_mean))
 
 test_generator = ImageDataGenerator(
-    file_list = [test_files],
+    files_list=test_files,
     image_type='bgr-d',
     mean=train_set_mean,
+    scale_size=(227, 227),
     read_as_pickle=read_as_pickle)
 
 # Check if embeddings have already been generated (look for them at the path
@@ -118,6 +118,8 @@ else:
 
     if read_as_pickle:
         test_set_size = len(test_generator.pickled_labels)
+    elif read_felix:
+        test_set_size = test_generator.data_size
     else:
         # TODO: fix so that test frames can be written directly
         # According to ../split_dataset_with_labels_world.py
@@ -152,7 +154,7 @@ else:
     for i in range(test_set_size / batch_size):
         print("Batch no. {}".format(i))
         (batch_input_img, batch_labels,
-         batch_line_types) = test_generator.next_batch(batch_size)
+         batch_line_types, batch_geometric_info) = test_generator.next_batch(batch_size)
         # Create dictionary of the values to feed to the tensors to run the
         # operation.
         feed_dict = {
@@ -160,6 +162,9 @@ else:
             line_types: batch_line_types,
             keep_prob: 1.
         }
+
+        if read_felix:
+            feed_dict[geometric_info] = batch_geometric_info[:, :14]
 
         # To ensure backcompatibility, geometric information is fed into the
         # network only if the version of the network trained contains the
@@ -216,6 +221,11 @@ num_lines_with_embeddings = len(test_embeddings_all)
 # Retrieve true instances.
 if read_as_pickle:
     data_lines_world = np.array(test_generator.pickled_labels, dtype=np.float32)
+elif read_felix:
+    data_lines_world = test_generator.lines_geometry[:, [0,1,2,3,4,5]]
+    lines_labels = test_generator.lines_labels[:, -1]
+    lines_labels = lines_labels.reshape(-1, 1)
+    data_lines_world = np.hstack((data_lines_world, lines_labels))
 else:
     from tools.visualization import get_lines_world_coordinates_with_instances
     data_lines_world = get_lines_world_coordinates_with_instances(
@@ -224,7 +234,7 @@ else:
 # Only keep the lines for which an embedding was sought (since data is processed
 # in batches only for a number of lines multiple of the batch size the embedding
 # is computed, cf. above).
-data_lines_world = data_lines_world[:num_lines_with_embeddings]
+data_lines_world = data_lines_world[:num_lines_with_embeddings, :]
 if (use_ground_truth_instance_labels):
     if (data_lines_world.shape[1] != 7):
         print("Ground-truth instance labels not found: entry 'labels' of the "
@@ -241,12 +251,12 @@ if (use_ground_truth_instance_labels):
 
 # Cluster lines.
 if cluster_strategy == "kmeans":
-    num_clusters = 32
+    num_clusters = 20
     print("Clustering using K-means with {} clusters".format(num_clusters))
     cluster_labels = cluster_lines_kmeans(
         embeddings=test_embeddings_all, num_clusters=num_clusters)
 elif cluster_strategy == "aggr_clustering":
-    num_clusters = 20
+    num_clusters = 7
     print("Clustering using Agglomerative Clustering with {} clusters".format(
         num_clusters))
     cluster_labels = cluster_lines_aggr_clustering(
@@ -288,6 +298,12 @@ if visualizer == 'open3d':
         print("Displaying scene with ground-truth instances")
         plot_lines_with_open3d(pcl_lines_open3d_ground_truth,
                                "Ground-truth instances")
+
+elif visualizer == 'felix':
+    from tools.visualize_lines import render_clusters
+    lines_with_cluster_labels = np.hstack((data_lines_world[:, 0:6], cluster_labels.reshape(-1,1)))
+    print("Displaying scene with obtained instances")
+    render_clusters(lines_with_cluster_labels)
 
 elif visualizer == 'matplotlib':
     from tools.visualization import plot_lines_with_matplotlib

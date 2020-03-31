@@ -104,3 +104,7 @@ def read_camera_rotation(line):
         camera_rotation
     """
     return line[33:37]
+
+
+def label_index():
+    return 21

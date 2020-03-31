@@ -38,61 +38,84 @@ class AlexNet(object):
         self.create()
 
     def create(self):
-        # 1st Layer: Conv (w ReLu) -> Pool -> Lrn.
-        conv1 = conv(self.X, 11, 11, 96, 4, 4, padding='VALID', name='conv1')
-        pool1 = max_pool(conv1, 3, 3, 2, 2, padding='VALID', name='pool1')
-        norm1 = lrn(pool1, 2, 2e-05, 0.75, name='norm1')
+        use_alex_net = True
 
-        # 2nd Layer: Conv (w ReLu) -> Pool -> Lrn with 2 groups.
-        conv2 = conv(norm1, 5, 5, 256, 1, 1, groups=2, name='conv2')
-        pool2 = max_pool(conv2, 3, 3, 2, 2, padding='VALID', name='pool2')
-        norm2 = lrn(pool2, 2, 2e-05, 0.75, name='norm2')
+        if use_alex_net:
+            # 1st Layer: Conv (w ReLu) -> Pool -> Lrn.
+            conv1 = conv(self.X, 11, 11, 96, 4, 4, padding='VALID', name='conv1')
+            pool1 = max_pool(conv1, 3, 3, 2, 2, padding='VALID', name='pool1')
+            norm1 = lrn(pool1, 2, 2e-05, 0.75, name='norm1')
 
-        # 3rd Layer: Conv (w ReLu).
-        conv3 = conv(norm2, 3, 3, 384, 1, 1, name='conv3')
+            # 2nd Layer: Conv (w ReLu) -> Pool -> Lrn with 2 groups.
+            conv2 = conv(norm1, 5, 5, 256, 1, 1, groups=2, name='conv2')
+            pool2 = max_pool(conv2, 3, 3, 2, 2, padding='VALID', name='pool2')
+            norm2 = lrn(pool2, 2, 2e-05, 0.75, name='norm2')
 
-        # 4th Layer: Conv (w ReLu) splitted into two groups.
-        conv4 = conv(conv3, 3, 3, 384, 1, 1, groups=2, name='conv4')
+            # 3rd Layer: Conv (w ReLu).
+            conv3 = conv(norm2, 3, 3, 384, 1, 1, name='conv3')
 
-        # 5th Layer: Conv (w ReLu) -> Pool splitted into two groups.
-        conv5 = conv(conv4, 3, 3, 256, 1, 1, groups=2, name='conv5')
-        pool5 = max_pool(conv5, 3, 3, 2, 2, padding='VALID', name='pool5')
+            # 4th Layer: Conv (w ReLu) splitted into two groups.
+            conv4 = conv(conv3, 3, 3, 384, 1, 1, groups=2, name='conv4')
 
-        # 6th Layer: Flatten -> FC (w ReLu) -> Dropout.
-        flattened = tf.reshape(pool5, [-1, 6 * 6 * 256])
-        fc6 = fc(flattened, 6 * 6 * 256, 4096, name='fc6')
-        dropout6 = dropout(fc6, self.KEEP_PROB)
+            # 5th Layer: Conv (w ReLu) -> Pool splitted into two groups.
+            conv5 = conv(conv4, 3, 3, 256, 1, 1, groups=2, name='conv5')
+            pool5 = max_pool(conv5, 3, 3, 2, 2, padding='VALID', name='pool5')
 
-        # 7th Layer: FC (w ReLu) -> Dropout.
-        fc7 = fc(dropout6, 4096, 4096, name='fc7')
-        dropout7 = dropout(fc7, self.KEEP_PROB)
-        flattened_dropout7 = tf.reshape(dropout7, [-1, 4096])
+            # 6th Layer: Flatten -> FC (w ReLu) -> Dropout.
+            flattened = tf.reshape(pool5, [-1, 6 * 6 * 256])
+            fc6 = fc(flattened, 6 * 6 * 256, 4096, name='fc6')
+            dropout6 = dropout(fc6, 1.)#self.KEEP_PROB)
 
-        # Concatenate line type.
-        dropout7_with_line_types = tf.concat(
-            [flattened_dropout7, self.LINE_TYPES],
-            axis=1,
-            name='dropout7_with_line_types')
+            # 7th Layer: FC (w ReLu) -> Dropout.
+            fc7 = fc(dropout6, 4096, 4096, name='fc7')
+            dropout7 = dropout(fc7, 1.)#self.KEEP_PROB)
+            flattened_dropout7 = tf.reshape(dropout7, [-1, 4096])
 
-        # Concatenate geometric info.
-        dropout_with_geo_info = tf.concat(
-            [dropout7_with_line_types, self.GEOMETRIC_INFO],
-            axis=1,
-            name='dropout_with_geo_info')
+            # Concatenate line type.
+            dropout7_with_line_types = tf.concat(
+                [flattened_dropout7],  # , self.LINE_TYPES],
+                axis=1,
+                name='dropout7_with_line_types')
 
-        geo_info_length = self.GEOMETRIC_INFO.shape[1]
-        # 8th layer: FC (4101 x 4101 or 4103 x 4103, depending on the line
-        # parametrization, cf. train.py).
-        fc8 = fc(
-            dropout_with_geo_info,
-            4097 + geo_info_length,
-            4097 + geo_info_length,
-            relu=True,
-            name='fc8')
+            # Concatenate geometric info.
+            dropout_with_geo_info = tf.concat(
+                [dropout7_with_line_types, self.GEOMETRIC_INFO],
+                axis=1,
+                name='dropout_with_geo_info')
+
+            geo_info_length = self.GEOMETRIC_INFO.shape[1]
+            # 8th layer: FC (4101 x 4101 or 4103 x 4103, depending on the line
+            # parametrization, cf. train.py).
+            fc8 = fc(
+                dropout_with_geo_info,
+                4096 + geo_info_length,
+                500,
+                #4097 + geo_info_length,
+                relu=True,
+                name='fc8')
+
+            dropout8 = dropout(fc8, self.KEEP_PROB)
+            fc10 = fc(dropout8, 500, 600, relu=True, name='fc10')
+            dropout10 = dropout(fc10, self.KEEP_PROB)
+            fc11 = fc(dropout10, 600, 350, relu=True, name='fc11')
+            dropout11 = dropout(fc11, self.KEEP_PROB)
+
+        else:
+            geo_info_length = self.GEOMETRIC_INFO.shape[1]
+            # 8th layer: FC (4101 x 4101 or 4103 x 4103, depending on the line
+            # parametrization, cf. train.py).
+            fc8 = fc(
+                self.GEOMETRIC_INFO,
+                geo_info_length,
+                4097 + geo_info_length,
+                relu=True,
+                name='fc8')
+
 
         # 9th Layer: FC and return unscaled activations (for
         # tf.nn.softmax_cross_entropy_with_logits)
-        self.fc9 = fc(fc8, 4097 + geo_info_length, 64, relu=True, name='fc9')
+        #self.fc9 = fc(fc8, 4097 + geo_info_length, 64, relu=True, name='fc9')
+        self.fc9 = fc(dropout11, 350, 8, relu=True, name='fc9')
 
     def load_initial_weights(self, session):
         """
@@ -147,12 +170,20 @@ class AlexNet(object):
                             # Biases.
                             if len(data.shape) == 1:
                                 var = tf.compat.v1.get_variable('biases', trainable=False)
-                                session.run(var.assign(data))
+                                if op_name == 'fc6':
+                                    session.run(var.assign(data[:2*1*256]))
+                                    #print("Skip")
+                                else:
+                                    session.run(var.assign(data))
                             # Weights.
                             else:
                                 var = tf.compat.v1.get_variable(
                                     'weights', trainable=False)
-                                session.run(var.assign(data))
+                                if op_name == 'fc6':
+                                    #print("Skip")
+                                    session.run(var.assign(data[:2*1*256, :]))
+                                else:
+                                    session.run(var.assign(data))
 
 
 """
