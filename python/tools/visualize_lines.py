@@ -23,8 +23,6 @@ def render_lines(lines, cluster_colors):
     indices = np.hstack((np.arange(line_count).reshape(line_count, 1),
                          (np.arange(line_count) + line_count).reshape(line_count, 1)))
 
-    print(lines.shape)
-    print(cluster_colors.shape)
     colors = [cluster_colors[int(lines[i, 6]), :].tolist() for i in range(line_count)]
     line_set = o3d.geometry.LineSet(
         points=o3d.utility.Vector3dVector(points.astype(float).tolist()),
@@ -52,7 +50,7 @@ def render_normals(lines):
                 np.hstack((np.arange(line_count).reshape(line_count, 1),
                     (np.arange(line_count) + line_count*2).reshape(line_count, 1)))
     ))
-    colors = [[0, 0, 0] for i in range(line_count)]
+    colors = [[0.8, 0.8, 0.8] for i in range(line_count*2)]
     line_set = o3d.geometry.LineSet(
         points=o3d.utility.Vector3dVector(points.astype(float).tolist()),
         lines=o3d.utility.Vector2iVector(indices.astype(int).tolist()),
@@ -71,9 +69,18 @@ def load_lines(path):
 
 
 def switch_cluster(vis):
+    class_names = ["unknown", "wall", "floor", "cabinet", "bed", "chair", "sofa", "table", "door",
+     "window", "bookshelf", "picture", "counter", "blinds", "desk",
+     "shelves", "curtain", "dresser", "pillow", "mirror", "floor",
+     "clothes", "ceiling", "books", "refridgerator", "television", "paper", "towel",
+     "shower", "box", "whiteboard", "person", "night", "toilet", "sink",
+     "lamp", "bathtub", "bag", "otherstructure", "otherfurniture", "otherprop"]
+
     view = vis.get_view_control().convert_to_pinhole_camera_parameters()
     vis.clear_geometries()
     global index_, cluster_count_, indices_
+    print("Switching, index {} ({}/{})".format(indices_[index_], index_, cluster_count_))
+    print("Class: {}".format(class_names[indices_[index_]]))
     vis.add_geometry(render_lines_index(lines_, colors_, indices_[index_]))
     index_ = index_ + 1
     if index_ == cluster_count_:
@@ -100,6 +107,12 @@ def show_cluster(vis):
         index_ = cluster_count_ - 1
 
 
+def show_normal(vis):
+    view = vis.get_view_control().convert_to_pinhole_camera_parameters()
+    vis.add_geometry(render_normals(lines_))
+    vis.get_view_control().convert_from_pinhole_camera_parameters(view)
+
+
 def change_background_to_black(vis):
     opt = vis.get_render_option()
     opt.background_color = np.asarray([0, 0, 0])
@@ -112,19 +125,38 @@ def render_clusters(lines):
     key_to_callback[ord("B")] = change_background_to_black
     key_to_callback[ord("A")] = show_all
     key_to_callback[ord("S")] = show_cluster
+    key_to_callback[ord("N")] = show_cluster
 
     global lines_, index_, cluster_count_, colors_, indices_
     colors_ = get_colors()
     lines_ = lines
     index_ = 0
     indices_ = np.unique(lines[:, 6])
+    print(indices_)
     cluster_count_ = len(indices_)
-    o3d.visualization.draw_geometries_with_key_callbacks([render_lines(lines, colors_)], key_to_callback)
+    vis = o3d.visualization.VisualizerWithKeyCallback()
+    vis.create_window()
+    opt = vis.get_render_option()
+    opt.background_color = np.asarray([0, 0, 0])
+
+    vis.register_key_callback(ord(" "), switch_cluster)
+    vis.register_key_callback(ord("B"), change_background_to_black)
+    vis.register_key_callback(ord("A"), show_all)
+    vis.register_key_callback(ord("S"), show_cluster)
+    vis.register_key_callback(ord("N"), show_normal)
+
+
+    vis.add_geometry(render_lines(lines, colors_))
+    vis.run()
+    vis.destroy_window()
 
 
 if __name__ == '__main__':
     lines = load_lines("/home/felix/line_ws/data/line_tools/interiornet_lines_split/all_lines_with_line_endpoints.txt")
-    lines = lines[:, [1,2,3,4,5,6,8,9,10,11,12,13,14,15]]
+    # For types: 7
+    # For instances: 8
+    # For classes: 9
+    lines = lines[:, [1,2,3,4,5,6,9,10,11,12,13,14,15,16]]
     #colors = get_colors()
     #o3d.visualization.draw_geometries([render_lines(lines, colors),
     #                                   render_normals(lines)])
