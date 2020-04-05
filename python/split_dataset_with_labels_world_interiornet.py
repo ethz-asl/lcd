@@ -27,9 +27,9 @@ def transform_to_world_off_rot(vector, camera_origin, camera_rotation):
     e1 = camera_rotation[0]
     e2 = camera_rotation[1]
     e3 = camera_rotation[2]
-    T = np.array([[e0**2 + e1**2 - e2**2 - e3**2, 2 * e1 * e2 - 2 * e0 * e3, 2 * e0 * e2 + 2 * e1 * e3, x],
-                  [2 * e0 * e3 + 2 * e1 * e2, e0**2 - e1**2 + e2**2 - e3**2, 2 * e2 * e3 - 2 * e0 * e1, y],
-                  [2 * e1 * e3 - 2 * e0 * e2, 2 * e0 * e1 + 2 * e2 * e3, e0**2 - e1**2 - e2**2 + e3**2, z],
+    T = np.array([[e0 ** 2 + e1 ** 2 - e2 ** 2 - e3 ** 2, 2 * e1 * e2 - 2 * e0 * e3, 2 * e0 * e2 + 2 * e1 * e3, x],
+                  [2 * e0 * e3 + 2 * e1 * e2, e0 ** 2 - e1 ** 2 + e2 ** 2 - e3 ** 2, 2 * e2 * e3 - 2 * e0 * e1, y],
+                  [2 * e1 * e3 - 2 * e0 * e2, 2 * e0 * e1 + 2 * e2 * e3, e0 ** 2 - e1 ** 2 - e2 ** 2 + e3 ** 2, z],
                   [0, 0, 0, 1]])
     return T.dot(np.append(vector, [1.]))[0:3]
 
@@ -37,7 +37,7 @@ def transform_to_world_off_rot(vector, camera_origin, camera_rotation):
 def read_all_lines(line_path):
     # Count number of files in directory.
     file_count = len([name for name in os.listdir(line_path)
-                     if os.path.isfile(os.path.join(line_path, name))])
+                      if os.path.isfile(os.path.join(line_path, name))])
     # The number of frames is file_count / 3 because for
     # each frame 3 files are written.
     frame_count = int(file_count / 3)
@@ -59,29 +59,12 @@ def read_all_lines(line_path):
             data_lines = data_lines.values
             line_count = data_lines.shape[0]
         except pd.errors.EmptyDataError:
+            data_lines = np.zeros((0, 37))
             line_count = 0
 
         lines = np.vstack((lines, data_lines))
-        frame_idx = np.append(frame_idx, i*np.ones((line_count,)))
+        frame_idx = np.append(frame_idx, i * np.ones((line_count,)))
         line_idx = np.append(line_idx, np.arange(line_count))
-
-    # Lines are stored in format:
-    # 0 - 2: start point
-    # 3 - 5: end point
-    # 6 - 9: hessian 1
-    # 10-13: hessian 2
-    # 14-16: colors 1
-    # 17-19: colors 2
-    #    20: type
-    #    21: label
-    # 22-24: normal 1
-    # 25-27: normal 2
-    #    28: open 1
-    #    29: open 2
-    # 30-32: camera origin
-    # 33-36: camera rotation
-
-    print("Line count: {}".format(lines.shape))
 
     return lines, frame_count, frame_idx, line_idx
 
@@ -91,14 +74,13 @@ def read_lines_min_instance(line_path, min_lines_per_instance):
     instances = np.unique(lines[:, line_file_utils.label_index()])
 
 
-
 def split_dataset(line_files_path, virtual_images_path, output_path):
     train = []
     val = []
     test = []
 
-    train_prob = 3./5.
-    val_prob = 1./5.
+    train_prob = 3. / 5.
+    val_prob = 1. / 5.
     test_prob = 1. - train_prob - val_prob
 
     lines, frame_count, frame_idx, line_idx = read_all_lines(line_files_path)
@@ -144,16 +126,19 @@ def split_dataset(line_files_path, virtual_images_path, output_path):
                 continue
 
             line = lines[i, :]
-            start_point_camera = line_file_utils.read_start_point(line)
-            end_point_camera = line_file_utils.read_end_point(line)
-            line_type = line_file_utils.read_type(line)
-            label = line_file_utils.read_label(line)
-            normal_1_camera = line_file_utils.read_normal_1(line)
-            normal_2_camera = line_file_utils.read_normal_2(line)
-            start_open = line_file_utils.read_start_open(line)
-            end_open = line_file_utils.read_end_open(line)
-            camera_origin = line_file_utils.read_camera_origin(line)
-            camera_rotation = line_file_utils.read_camera_rotation(line)
+            line_dict = line_file_utils.read_line_detection_line(line)
+
+            start_point_camera = line_dict["start_point"]
+            end_point_camera = line_dict["end_point"]
+            line_type = line_dict["type"]
+            label = line_dict["label"]
+            class_id = line_dict["class"]
+            normal_1_camera = line_dict["normal_1"]
+            normal_2_camera = line_dict["normal_2"]
+            start_open = line_dict["start_open"]
+            end_open = line_dict["end_open"]
+            camera_origin = line_dict["camera_origin"]
+            camera_rotation = line_dict["camera_rotation"]
 
             line_start_point_world = transform_to_world_off_rot(
                 np.transpose(start_point_camera), camera_origin, camera_rotation)
@@ -166,6 +151,15 @@ def split_dataset(line_files_path, virtual_images_path, output_path):
                 np.transpose(normal_2_camera),
                 camera_rotation)
 
+            line_dict.update({
+                "image_path": path_to_write,
+                "start_point": line_start_point_world,
+                "end_point": line_end_point_world,
+                "normal_1": normal_1_world,
+                "normal_2": normal_2_world,
+                'frame_id': frame_id,
+            })
+
             # center_of_line = (
             #   line_start_point_world[:3] + line_end_point_world[:3]) / 2
 
@@ -175,26 +169,7 @@ def split_dataset(line_files_path, virtual_images_path, output_path):
                     os.path.join(output_path,
                                  key + '_with_line_endpoints.txt'),
                     'a') as f:
-                f.write(
-                    os.path.abspath(path_to_write) + ' ' +
-                    str(line_start_point_world[0]) + ' ' +
-                    str(line_start_point_world[1]) + ' ' +
-                    str(line_start_point_world[2]) + ' ' +
-                    str(line_end_point_world[0]) + ' ' +
-                    str(line_end_point_world[1]) + ' ' +
-                    str(line_end_point_world[2]) + ' ' +
-                    str(line_type) + ' ' +
-                    str(label) + ' ' +
-                    str(normal_1_world[0]) + ' ' +
-                    str(normal_1_world[1]) + ' ' +
-                    str(normal_1_world[2]) + ' ' +
-                    str(normal_2_world[0]) + ' ' +
-                    str(normal_2_world[1]) + ' ' +
-                    str(normal_2_world[2]) + ' ' +
-                    str(start_open) + ' ' +
-                    str(end_open) + ' ' +
-                    str(frame_id) + ' ' +
-                    '\n')
+                line_file_utils.write_line_split_line(f, line_dict)
 
     print("Found {} lines.".format(lines_found / 2))
 
@@ -202,7 +177,7 @@ def split_dataset(line_files_path, virtual_images_path, output_path):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Split frames in the input trajectory in train, test and '
-        'validation set.')
+                    'validation set.')
     parser.add_argument("-line_files_path",
                         help="Path to folder containing the line files.")
     parser.add_argument(

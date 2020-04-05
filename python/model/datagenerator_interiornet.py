@@ -208,6 +208,8 @@ class ImageDataGenerator:
         #print("Batch size: {}".format(batch_size))
         #print("Pointer location: {}".format(self.trajectories[0].pointer))
 
+        print("WARNING, IMAGES NOT LOADED!")
+
         # Read images.
         for i in range(len(paths)):
             if self.image_type == 'bgr':
@@ -216,8 +218,11 @@ class ImageDataGenerator:
             elif self.image_type == 'bgr-d':
                 path_rgb = paths[i]
                 path_depth = path_rgb.replace('rgb', 'depth')
-                img_bgr = cv2.imread(path_rgb, cv2.IMREAD_UNCHANGED)
-                img_depth = cv2.imread(path_depth, cv2.IMREAD_UNCHANGED)
+                #img_bgr = cv2.imread(path_rgb, cv2.IMREAD_UNCHANGED)
+                #img_depth = cv2.imread(path_depth, cv2.IMREAD_UNCHANGED)
+                img_bgr = np.zeros((90, 60, 3))
+                img_depth = np.zeros((90, 60, 1))
+
                 # BGR-D image.
                 img = np.dstack([img_bgr, img_depth])
 

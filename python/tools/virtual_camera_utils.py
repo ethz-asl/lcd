@@ -163,10 +163,12 @@ def virtual_camera_pose_from_file_line(line, distance):
         z (numpy array of shape (3, )): Optical axis of the virtual camera.
     """
 
+    line_dict = line_file_utils.read_line_detection_line(line)
+
     return virtual_camera_pose(
-        start3D=line_file_utils.read_start_point(line),
-        end3D=line_file_utils.read_end_point(line),
-        hessian_left=line_file_utils.read_normal_1(line),
-        hessian_right=line_file_utils.read_normal_2(line),
-        line_type=line_file_utils.read_type(line),
+        start3D=line_dict['start_point'],
+        end3D=line_dict['end_point'],
+        hessian_left=line_dict['normal_1'],
+        hessian_right=line_dict['normal_2'],
+        line_type=line_dict['type'],
         distance=distance)

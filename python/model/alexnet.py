@@ -38,7 +38,7 @@ class AlexNet(object):
         self.create()
 
     def create(self):
-        use_alex_net = True
+        use_alex_net = False
 
         if use_alex_net:
             # 1st Layer: Conv (w ReLu) -> Pool -> Lrn.
@@ -107,9 +107,15 @@ class AlexNet(object):
             fc8 = fc(
                 self.GEOMETRIC_INFO,
                 geo_info_length,
-                4097 + geo_info_length,
+                500,
                 relu=True,
                 name='fc8')
+
+            dropout8 = dropout(fc8, self.KEEP_PROB)
+            fc10 = fc(dropout8, 500, 600, relu=True, name='fc10')
+            dropout10 = dropout(fc10, self.KEEP_PROB)
+            fc11 = fc(dropout10, 600, 350, relu=True, name='fc11')
+            dropout11 = dropout(fc11, self.KEEP_PROB)
 
 
         # 9th Layer: FC and return unscaled activations (for

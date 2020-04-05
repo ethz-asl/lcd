@@ -23,7 +23,9 @@ sys.path.insert(0, python_root)
 # Configuration.
 # Cluster strategy. One of "kmeans", "aggr_clustering" and
 # "affinity_propagation".
-cluster_strategy = "kmeans"
+cluster_strategy = "affinity_propagation"
+# Only for "kmeans" and "aggr_clustering"
+num_clusters = 32
 
 # Visualizer of the lines coloured with the instances from clustering. Possible
 # values: 'open3d', 'matplotlib'.
@@ -50,20 +52,20 @@ read_felix = True
 use_ground_truth_instance_labels = True
 
 # Folder where the checkpoints and meta graph for the test are stored.
-log_files_folder = './logs/310320_0402/'
+log_files_folder = './logs/310320_1714/'
 #300320_2359
 
 sess = tf.InteractiveSession()
 saver = tf.train.import_meta_graph(
     os.path.join(log_files_folder,
-                 'triplet_loss_batch_all_wohlhart_lepetit_ckpt/bgr-d_model_epoch46.ckpt.meta'))
+                 'triplet_loss_batch_all_wohlhart_lepetit_ckpt/bgr-d_model_epoch200.ckpt.meta'))
 saver.restore(
     sess,
     os.path.join(log_files_folder,
-                 'triplet_loss_batch_all_wohlhart_lepetit_ckpt/bgr-d_model_epoch46.ckpt'))
+                 'triplet_loss_batch_all_wohlhart_lepetit_ckpt/bgr-d_model_epoch200.ckpt'))
 
 # Test dataset.
-test_files = ['/home/felix/line_ws/data/line_tools/interiornet_lines_split/train_with_line_endpoints.txt']
+test_files = ['/home/felix/line_ws/data/line_tools/interiornet_lines_split/test_with_line_endpoints.txt']
 name_test_file = test_files[0].split('/')[-1].split('.')[0]
 
 # Retrieve mean of the training set.
@@ -251,12 +253,10 @@ if (use_ground_truth_instance_labels):
 
 # Cluster lines.
 if cluster_strategy == "kmeans":
-    num_clusters = 20
     print("Clustering using K-means with {} clusters".format(num_clusters))
     cluster_labels = cluster_lines_kmeans(
         embeddings=test_embeddings_all, num_clusters=num_clusters)
 elif cluster_strategy == "aggr_clustering":
-    num_clusters = 7
     print("Clustering using Agglomerative Clustering with {} clusters".format(
         num_clusters))
     cluster_labels = cluster_lines_aggr_clustering(

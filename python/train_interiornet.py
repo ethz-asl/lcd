@@ -96,9 +96,9 @@ def train(read_as_pickle=True):
     batch_step_triplets_statistics = 10
 
     # Learning parameters.
-    learning_rate = 0.0004
-    num_epochs = 60
-    batch_size = 256
+    learning_rate = 0.001
+    num_epochs = 200
+    batch_size = 300
     # Margin of the triplet loss.
     margin = 0.8
     # Regularization hyperparameter required when using the loss based on
@@ -187,8 +187,10 @@ def train(read_as_pickle=True):
     # Get mean of training set if the training is just starting (i.e., if no
     # previous checkpoints are found).
     if latest_checkpoint is None:
-        train_set_mean = get_train_set_mean(
-            train_files, image_type, read_as_pickle=read_as_pickle)
+        #train_set_mean = get_train_set_mean(
+        #    train_files, image_type, read_as_pickle=read_as_pickle)
+        print("WARNING, IMAGES NOT LOADED!!")
+        train_set_mean = np.array([0, 0, 0, 0])
         train_set_mean_tensor = tf.convert_to_tensor(
             train_set_mean, dtype=np.float64)
         train_set_mean_variable = tf.Variable(

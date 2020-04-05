@@ -1,110 +1,74 @@
-import numpy as np
+# Lines are stored in format:
+# 0 - 2: start point
+# 3 - 5: end point
+# 6 - 9: hessian 1
+# 10-13: hessian 2
+# 14-16: colors 1
+# 17-19: colors 2
+#    20: type
+#    21: label
+#    22: class
+# 23-25: normal 1
+# 26-28: normal 2
+#    29: open 1
+#    30: open 2
+# 31-33: camera origin
+# 34-37: camera rotation
 
 
-def read_start_point(line):
-    """ Reads a line of a file line (in the format of an array) and returns its
-        start point.
-
-    Args:
-        line (numpy array of shape (22, )): The format of the line is the
-            following:
-                [start point (3, ), end point (3, ),
-                 left plane hessian form (4, ), right plane hessian form(4, ),
-                 left color (3, ), right color(3, ), line type (1, ),
-                 instance label(1, ), normal 1 (3, ), normal 2 (3, ), start open (1, ),
-                 end open (1, ), camera origin (3, ), camera rotation (4, )].
-
-    Returns:
-        start_point
-    """
-    return line[0:3]
-
-
-def read_end_point(line):
-    """ Reads a line of a file line (in the format of an array) and returns its
-        end point.
-    Returns:
-        end_point
-    """
-    return line[3:6]
+def read_line_detection_line(line):
+    return {
+        'start_point': line[0:3],
+        'end_point': line[3:6],
+        'hessian_1': line[6:10],
+        'hessian_2': line[10:14],
+        'type': int(line[20]),
+        'label': int(line[21]),
+        'class': int(line[22]),
+        'normal_1': line[23:26],
+        'normal_2': line[26:29],
+        'start_open': bool(line[29]),
+        'end_open': bool(line[30]),
+        'camera_origin': line[31:34],
+        'camera_rotation': line[34:38]
+    }
 
 
-def read_type(line):
-    """ Reads a line of a file line (in the format of an array) and returns its
-        type.
-    Returns:
-        type
-    """
-    return int(line[20])
+# Lines are stored in format:
+#     0: path to virtual image
+# 1 - 3: start point
+# 4 - 6: end point
+#     7: type
+#     8: label
+#     9: class
+# 10-12: normal 1
+# 13-15: normal 2
+#    16: open 1
+#    17: open 2
+#    18: frame id
 
 
-def read_label(line):
-    """ Reads a line of a file line (in the format of an array) and returns its
-        label.
-    Returns:
-        label
-    """
-    return int(line[21])
+def write_line_split_line(file, dict):
+    file.write(
+        dict['image_path'] + ' ' +
+        str(dict['start_point'][0]) + ' ' +
+        str(dict['start_point'][1]) + ' ' +
+        str(dict['start_point'][2]) + ' ' +
+        str(dict['end_point'][0]) + ' ' +
+        str(dict['end_point'][1]) + ' ' +
+        str(dict['end_point'][2]) + ' ' +
+        str(dict['type']) + ' ' +
+        str(dict['label']) + ' ' +
+        str(dict['class']) + ' ' +
+        str(dict['normal_1'][0]) + ' ' +
+        str(dict['normal_1'][1]) + ' ' +
+        str(dict['normal_1'][2]) + ' ' +
+        str(dict['normal_2'][0]) + ' ' +
+        str(dict['normal_2'][1]) + ' ' +
+        str(dict['normal_2'][2]) + ' ' +
+        str(dict['start_open']) + ' ' +
+        str(dict['end_open']) + ' ' +
+        str(dict['frame_id']) + '\n'
+    )
 
 
-def read_normal_1(line):
-    """ Reads a line of a file line (in the format of an array) and returns its
-        first normal.
-    Returns:
-        left normal
-    """
-    return line[22:25]
-
-
-def read_normal_2(line):
-    """ Reads a line of a file line (in the format of an array) and returns its
-        second normal.
-
-    Returns:
-        right normal
-    """
-    return line[25:28]
-
-
-def read_start_open(line):
-    """ Reads a line of a file line (in the format of an array) and returns
-        if the start point is open.
-
-    Returns:
-        start_open
-    """
-    return bool(line[28])
-
-
-def read_end_open(line):
-    """ Reads a line of a file line (in the format of an array) and returns
-        if the end point is open.
-
-    Returns:
-        end_open
-    """
-    return bool(line[29])
-
-
-def read_camera_origin(line):
-    """ Reads a line of a file line (in the format of an array) and returns
-        the origin of the camera.
-
-    Returns:
-        camera_origin
-    """
-    return line[30:33]
-
-
-def read_camera_rotation(line):
-    """ Reads a line of a file line (in the format of an array) and returns
-        the origin of the camera.
-
-    Returns:
-        camera_rotation
-    """
-    return line[33:37]
-
-
-def label_index():
-    return 21
