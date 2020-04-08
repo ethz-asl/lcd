@@ -317,6 +317,7 @@ namespace line_ros_utility {
         void labelLinesWithInstances(
                 const std::vector<line_detection::LineWithPlanes>& lines,
                 const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info,
+                const std::map<uint16_t, uint16_t>& instance_to_class_map,
                 std::vector<int>* labels);
 
 
@@ -488,6 +489,14 @@ namespace line_ros_utility {
         bool checkLineOpen(cv::Vec3f start_point, cv::Vec3f end_point,
                            const cv::Mat& depth_map, sensor_msgs::CameraInfoConstPtr camera_info);
 
+        // Helper function to check the class_id for each instance
+        void instanceToClassIDMap(const cv::Mat& instances, const cv::Mat& classes,
+                                 std::map<uint16_t, uint16_t>* instance_to_class_map);
+
+        void labelLinesWithClasses(const std::vector<int>& instance_labels,
+                const std::map<uint16_t, uint16_t>& instance_to_class_map,
+                std::vector<int>* class_labels);
+
 
     private:
         // True if lines should be displayed, once labelled, overlapped on the
@@ -524,6 +533,7 @@ namespace line_ros_utility {
         std::vector<line_detection::LineWithPlanes> lines3D_with_planes_;
         std::vector<int> labels_;
         std::vector<int> class_ids_;
+        std::map<uint16_t, uint16_t> instance_to_class_map_;
         std::vector<std::vector<int>> labels_left_right;
         std::vector<std::vector<cv::Vec3f>> line_normals_;
         std::vector<std::vector<bool>> line_opens_;

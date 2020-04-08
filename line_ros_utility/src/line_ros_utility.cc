@@ -9,6 +9,7 @@ namespace line_ros_utility {
     const std::string frame_id = "line_tools_id";
     const bool write_labeled_lines = true;
     const bool clustering_with_random_forest = false;
+    const std::vector<int> background_classes = {1, 2, 20, 22};
 
     std::vector<int> clusterLinesAfterClassification(
             const std::vector<line_detection::LineWithPlanes>& lines) {
@@ -261,6 +262,34 @@ namespace line_ros_utility {
     }
     ListenAndPublish::~ListenAndPublish() { delete sync_; }
 
+    void ListenAndPublish::instanceToClassIDMap(const cv::Mat& instances, const cv::Mat& classes,
+            std::map<uint16_t, uint16_t>* instance_to_class_map) {
+        CHECK_EQ(instances.type(), CV_16UC1);
+        CHECK_EQ(classes.type(), CV_16UC1);
+
+        instance_to_class_map->clear();
+
+        for (size_t i = 0u; i < instances.rows; i++) {
+            for (size_t j = 0u; j < instances.cols; j++) {
+                if (instance_to_class_map->count(instances.at<unsigned short>(i, j)) == 0) {
+                    instance_to_class_map->insert(std::pair<uint16_t, u_int16_t>(
+                            instances.at<unsigned short>(i, j), classes.at<unsigned short>(i, j)));
+                    std::cout << "Instance: " << instances.at<unsigned short>(i, j) << " Class: " << classes.at<unsigned short>(i, j) << std::endl;
+                }
+            }
+        }
+    }
+
+    void ListenAndPublish::labelLinesWithClasses(const std::vector<int>& instance_labels,
+                               const std::map<uint16_t, uint16_t>& instance_to_class_map,
+                               std::vector<int>* class_labels) {
+        class_labels->resize(instance_labels.size());
+
+        for (size_t i = 0u; i < instance_labels.size(); i++) {
+            class_labels->at(i) = instance_to_class_map.at(instance_labels[i]);
+        }
+    }
+
     void ListenAndPublish::writeMatToPclCloud(
             const cv::Mat& cv_cloud, const cv::Mat& image,
             pcl::PointCloud<pcl::PointXYZRGB>* pcl_cloud) {
@@ -422,6 +451,7 @@ namespace line_ros_utility {
         params_.max_cos_theta_hessian_computation =
                 config.max_cos_theta_hessian_computation;
         params_.min_length_line_3D = config.min_length_line_3D;
+        params_.extension_length_for_edge_or_intersection = config.extension_length_for_edge_or_intersection;
         params_.max_rating_valid_line = config.max_rating_valid_line;
         params_.canny_edges_threshold1 = config.canny_edges_threshold1;
         params_.canny_edges_threshold2 = config.canny_edges_threshold2;
@@ -494,12 +524,14 @@ namespace line_ros_utility {
         CHECK_EQ(static_cast<int>(lines3D_with_planes_.size()),
                  static_cast<int>(lines2D_kept_.size()));
 
+        instanceToClassIDMap(cv_instances_, cv_classes_, &instance_to_class_map_);
+
         printNumberOfLines();
         clusterKmeans();
-        labelLinesWithInstances(lines3D_with_planes_, cv_instances_, camera_info_,
+        labelLinesWithInstances(lines3D_with_planes_, cv_instances_, camera_info_, instance_to_class_map_,
                                 &labels_);
-        labelLinesWithInstances(lines3D_with_planes_, cv_classes_, camera_info_,
-                                &class_ids_);
+        //labelLinesWithInstances(lines3D_with_planes_, cv_classes_, camera_info_, instance_to_class_map_,
+        //                        &class_ids_);
 
         if (clustering_with_random_forest) {
             clusterKmedoid();
@@ -507,6 +539,7 @@ namespace line_ros_utility {
 
         extractNormalsFromLines(lines3D_with_planes_, &line_normals_);
         checkLinesOpen(lines3D_with_planes_, cv_depth_, camera_info_, &line_opens_);
+        labelLinesWithClasses(labels_, instance_to_class_map_, &class_ids_);
 
         if (write_labeled_lines) {
             std::string path =
@@ -618,6 +651,7 @@ namespace line_ros_utility {
     void ListenAndPublish::labelLinesWithInstances(
             const std::vector<line_detection::LineWithPlanes>& lines,
             const cv::Mat& instances, sensor_msgs::CameraInfoConstPtr camera_info,
+            const std::map<uint16_t, uint16_t>& instance_to_class_map,
             std::vector<int>* labels) {
         CHECK_NOTNULL(labels);
         CHECK_EQ(instances.type(), CV_16UC1);
@@ -809,9 +843,21 @@ namespace line_ros_utility {
                     }
                     if (total_occurrences_most_present_label_right <
                         total_occurrences_most_present_label_left) {
-                        labels->at(i) = most_present_label_right;
+                        // If this plane is a background plane, assign the label of the other plane to it.
+                        if (std::count(background_classes.begin(), background_classes.end(),
+                                instance_to_class_map.at(most_present_label_right))) {
+                            labels->at(i) = most_present_label_left;
+                        } else {
+                            labels->at(i) = most_present_label_right;
+                        }
                     } else {
-                        labels->at(i) = most_present_label_left;
+                        // If this plane is a background plane, assign the label of the other plane to it.
+                        if (std::count(background_classes.begin(), background_classes.end(),
+                                instance_to_class_map.at(most_present_label_left))) {
+                            labels->at(i) = most_present_label_right;
+                        } else {
+                            labels->at(i) = most_present_label_left;
+                        }
                     }
                     break;
                 case line_detection::LineType::EDGE:
