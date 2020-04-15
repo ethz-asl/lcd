@@ -1,39 +1,111 @@
 import numpy as np
 import open3d as o3d
-import os
 import pandas as pd
+import os
 import sys
 
 
+class LineRenderer:
+    def __init__(self, line_geometries, line_labels, label_colors):
+        self.line_geometries = line_geometries
+        self.line_labels = line_labels
+        self.label_colors = label_colors
+        self.render_normals = False
+        self.indices = np.unique(line_labels)
+        self.index_size = len(self.indices)
+        self.pointer = 0
+        self.render_single_cluster = False
+
+    def run(self):
+        vis = o3d.visualization.VisualizerWithKeyCallback()
+        vis.create_window()
+        opt = vis.get_render_option()
+        opt.background_color = np.asarray([0, 0, 0])
+
+        vis.register_key_callback(ord(" "), self.get_switch_index_callback())
+        vis.register_key_callback(ord("A"), self.get_toggle_show_all_callback())
+        vis.register_key_callback(ord("N"), self.get_toggle_normals_callback())
+
+        vis.add_geometry(render_lines(self.line_geometries, self.label_colors))
+        vis.run()
+        vis.destroy_window()
+
+    def update_render(self, vis):
+        view = vis.get_view_control().convert_to_pinhole_camera_parameters()
+        vis.clear_geometries()
+
+        if self.render_single_cluster:
+            vis.add_geometry(render_lines(
+                self.line_geometries[np.where(self.line_labels == self.indices[self.pointer]), :][0],
+                self.label_colors)
+            )
+        else:
+            vis.add_geometry(render_lines(self.line_geometries, self.label_colors))
+
+        if self.render_normals:
+            if self.render_single_cluster:
+                vis.add_geometry(render_normals(
+                    self.line_geometries[np.where(self.line_labels == self.indices[self.pointer]), :][0])
+                )
+            else:
+                vis.add_geometry(render_normals(self.line_geometries))
+        vis.update_renderer()
+        vis.get_view_control().convert_from_pinhole_camera_parameters(view)
+
+    def get_toggle_normals_callback(self):
+        def toggle_normals(vis):
+            self.render_normals = not self.render_normals
+            self.update_render(vis)
+
+        return toggle_normals
+
+    def get_toggle_show_all_callback(self):
+        def toggle_show_all(vis):
+            self.render_single_cluster = not self.render_single_cluster
+            self.update_render(vis)
+
+        return toggle_show_all
+
+    def get_switch_index_callback(self):
+        def switch_index(vis):
+            if not self.render_single_cluster:
+                self.render_single_cluster = True
+            else:
+                self.pointer = self.pointer + 1
+                if self.pointer == self.index_size:
+                    self.pointer = 0
+
+            print("Now showing index {} ({}/{})".format(self.indices[self.pointer], self.pointer + 1, self.index_size))
+            self.update_render(vis)
+
+        return switch_index
+
+
 def get_colors():
-    rgbs = np.zeros((500, 3))
+    colors = np.zeros((500, 3))
 
     for i in range(500):
         # Generate random numbers. With fixed seeds.
         np.random.seed(i)
         rgb = np.random.randint(255, size=(1, 3)) / 255.0
-        rgbs[i, :] = rgb
+        colors[i, :] = rgb
 
-    return rgbs
+    return colors
 
 
-def render_lines(lines, cluster_colors):
+def render_lines(lines, label_colors):
     points = np.vstack((lines[:, 0:3], lines[:, 3:6]))
     line_count = lines.shape[0]
     indices = np.hstack((np.arange(line_count).reshape(line_count, 1),
                          (np.arange(line_count) + line_count).reshape(line_count, 1)))
 
-    colors = [cluster_colors[int(lines[i, 6]), :].tolist() for i in range(line_count)]
+    colors = [label_colors[int(lines[i, 6]), :].tolist() for i in range(line_count)]
     line_set = o3d.geometry.LineSet(
         points=o3d.utility.Vector3dVector(points.astype(float).tolist()),
         lines=o3d.utility.Vector2iVector(indices.astype(int).tolist()),
     )
     line_set.colors = o3d.utility.Vector3dVector(colors)
     return line_set
-
-
-def render_lines_index(lines, cluster_colors, index):
-    return render_lines(lines[np.where(lines[:, 6] == index), :][0], cluster_colors)
 
 
 def render_normals(lines):
@@ -68,97 +140,23 @@ def load_lines(path):
     return data_lines
 
 
-def switch_cluster(vis):
-    class_names = ["unknown", "wall", "floor", "cabinet", "bed", "chair", "sofa", "table", "door",
-     "window", "bookshelf", "picture", "counter", "blinds", "desk",
-     "shelves", "curtain", "dresser", "pillow", "mirror", "floor",
-     "clothes", "ceiling", "books", "refridgerator", "television", "paper", "towel",
-     "shower", "box", "whiteboard", "person", "night", "toilet", "sink",
-     "lamp", "bathtub", "bag", "otherstructure", "otherfurniture", "otherprop"]
-
-    view = vis.get_view_control().convert_to_pinhole_camera_parameters()
-    vis.clear_geometries()
-    global index_, cluster_count_, indices_
-    print("Switching, index {} ({}/{})".format(indices_[index_], index_, cluster_count_))
-    print("Class: {}".format(class_names[indices_[index_]]))
-    vis.add_geometry(render_lines_index(lines_, colors_, indices_[index_]))
-    index_ = index_ + 1
-    if index_ == cluster_count_:
-        index_ = 0
-    vis.update_renderer()
-    vis.get_view_control().convert_from_pinhole_camera_parameters(view)
-    return False
-
-
-def show_all(vis):
-    view = vis.get_view_control().convert_to_pinhole_camera_parameters()
-    vis.clear_geometries()
-    vis.add_geometry(render_lines(lines_, colors_))
-    vis.get_view_control().convert_from_pinhole_camera_parameters(view)
-    return False
-
-
-def show_cluster(vis):
-    switch_cluster(vis)
-
-    global index_
-    index_ = index_ - 1
-    if index_ == -1:
-        index_ = cluster_count_ - 1
-
-
-def show_normal(vis):
-    view = vis.get_view_control().convert_to_pinhole_camera_parameters()
-    vis.add_geometry(render_normals(lines_))
-    vis.get_view_control().convert_from_pinhole_camera_parameters(view)
-
-
-def change_background_to_black(vis):
-    opt = vis.get_render_option()
-    opt.background_color = np.asarray([0, 0, 0])
-    return False
-
-
-def render_clusters(lines):
-    key_to_callback = {}
-    key_to_callback[ord(" ")] = switch_cluster
-    key_to_callback[ord("B")] = change_background_to_black
-    key_to_callback[ord("A")] = show_all
-    key_to_callback[ord("S")] = show_cluster
-    key_to_callback[ord("N")] = show_cluster
-
-    global lines_, index_, cluster_count_, colors_, indices_
-    colors_ = get_colors()
-    lines_ = lines
-    index_ = 0
-    indices_ = np.unique(lines[:, 6])
-    print(indices_)
-    cluster_count_ = len(indices_)
-    vis = o3d.visualization.VisualizerWithKeyCallback()
-    vis.create_window()
-    opt = vis.get_render_option()
-    opt.background_color = np.asarray([0, 0, 0])
-
-    vis.register_key_callback(ord(" "), switch_cluster)
-    vis.register_key_callback(ord("B"), change_background_to_black)
-    vis.register_key_callback(ord("A"), show_all)
-    vis.register_key_callback(ord("S"), show_cluster)
-    vis.register_key_callback(ord("N"), show_normal)
-
-
-    vis.add_geometry(render_lines(lines, colors_))
-    vis.run()
-    vis.destroy_window()
-
-
 if __name__ == '__main__':
     lines = load_lines("/home/felix/line_ws/data/line_tools/interiornet_lines_split/all_lines_with_line_endpoints.txt")
     # For types: 7
     # For instances: 8
     # For classes: 9
-    lines = lines[:, [1,2,3,4,5,6,9,10,11,12,13,14,15,16]]
-    #colors = get_colors()
-    #o3d.visualization.draw_geometries([render_lines(lines, colors),
-    #                                   render_normals(lines)])
-    render_clusters(lines)
+    what_to_show = 'classes'
+    if what_to_show == 'types':
+        index = 7
+    if what_to_show == 'instances':
+        index = 8
+    if what_to_show == 'classes':
+        index = 9
+
+    lines = lines[:, [1, 2, 3, 4, 5, 6, index, 10, 11, 12, 13, 14, 15, 16]]
+    labels = lines[:, 6]
+
     print("Number of lines is: {}".format(lines.shape[0]))
+
+    renderer = LineRenderer(lines, labels, get_colors())
+    renderer.run()
