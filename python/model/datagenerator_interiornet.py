@@ -186,6 +186,9 @@ class ImageDataGenerator:
                 line in the batch (0.: Discontinuity line, 1.: Planar line,
                 2.: Edge line, 3.: Intersection line).
         """
+        if self.data_size - self.trajectories[0].pointer < batch_size:
+            self.reset_pointer()
+
         # Allocate memory for the batch of images.
         if self.image_type == 'bgr':
             images = np.ndarray(
@@ -202,13 +205,13 @@ class ImageDataGenerator:
         paths = [self.lines_image_paths[i] for i in indices]
         labels = [self.lines_labels[i, :] for i in indices]
         line_types = [self.lines_geometry[i, -1] for i in indices]
-        geometries = [self.lines_geometry[i, 0:-1] for i in indices]
+        geometries = [np.array(self.lines_geometry[i, 0:-1], dtype=np.float32) for i in indices]
 
         #print("Number of indices: {}".format(len(indices)))
         #print("Batch size: {}".format(batch_size))
         #print("Pointer location: {}".format(self.trajectories[0].pointer))
 
-        print("WARNING, IMAGES NOT LOADED!")
+        #print("WARNING, IMAGES NOT LOADED!")
 
         # Read images.
         for i in range(len(paths)):
@@ -244,13 +247,13 @@ class ImageDataGenerator:
         self.trajectories[0].pointer += batch_size
 
         # Convert labels and line types to numpy arrays.
-        labels = np.array(labels, dtype=np.float32)
-        line_types = np.asarray(
-            line_types, dtype=np.float32).reshape(batch_size, -1)
-        geometries = np.array(geometries, dtype=np.float32)
+        labels = np.array(labels, dtype=np.int32)
+        #line_types = np.asarray(
+        #    line_types, dtype=np.float32).reshape(batch_size, -1)
+        #geometries = np.array(geometries, dtype=np.float32)
 
-        assert labels.shape == (batch_size, 4)
-        assert geometries.shape == (batch_size, 14)
+        #assert labels.shape == (batch_size, 4)
+        #assert geometries.shape == (batch_size, 14)
 
         # Return array of images, labels and line types.
-        return images, labels, line_types, geometries
+        return images, labels[:, -1], line_types, geometries
