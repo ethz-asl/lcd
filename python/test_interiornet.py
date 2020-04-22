@@ -300,7 +300,7 @@ if visualizer == 'open3d':
                                "Ground-truth instances")
 
 elif visualizer == 'felix':
-    from tools.visualize_lines import render_clusters
+    from line_net.visualize_lines import render_clusters
     lines_with_cluster_labels = np.hstack((data_lines_world[:, 0:6], cluster_labels.reshape(-1,1)))
     print("Displaying scene with obtained instances")
     render_clusters(lines_with_cluster_labels)

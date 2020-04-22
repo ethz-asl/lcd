@@ -16,5 +16,4 @@ python get_virtual_camera_images.py -linesandimagesfolder_path /home/felix/line_
 python get_virtual_camera_images.py -linesandimagesfolder_path /home/felix/line_ws/data/line_tools/ -dataset_name interiornet -interiornet_scene_path /home/felix/line_ws/data/interiorNet/data/HD1/3FO4K3112LAW -interiornet_light_type original -interiornet_trajectory 1
 
 Read and group lines:
-python split_dataset_with_labels_world_interiornet.py -line_files_path /home/felix/line_ws/data/line_tools/interiornet_lines/traj_1 -virtual_images_path /home/felix/line_ws/data/line_tools/interiornet/traj_1 -output_path /home/felix/line_ws/data/line_tools
-
+python split_dataset_framewise.py -line_files_path /home/felix/line_ws/data/line_tools/interiornet_lines/traj_1 -virtual_images_path /home/felix/line_ws/data/line_tools/interiornet/traj_1 -output_path /home/felix/line_ws/data/line_tools/interiornet_lines_split

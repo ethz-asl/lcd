@@ -14,9 +14,8 @@
 #    30: open 2
 # 31-33: camera origin
 # 34-37: camera rotation
-
-
 def read_line_detection_line(line):
+    # Changes here also need to happen in split_dataset_framewise.py
     return {
         'start_point': line[0:3],
         'end_point': line[3:6],
@@ -38,37 +37,35 @@ def read_line_detection_line(line):
 #     0: path to virtual image
 # 1 - 3: start point
 # 4 - 6: end point
-#     7: type
-#     8: label
-#     9: class
-# 10-12: normal 1
-# 13-15: normal 2
-#    16: open 1
-#    17: open 2
+# 7 - 9: normal 1
+# 10-12: normal 2
+#    13: open 1
+#    14: open 2
+#    15: label
+#    16: type
+#    17: class
 #    18: frame id
-
-
-def write_line_split_line(file, dict):
-    file.write(
-        dict['image_path'] + ' ' +
-        str(dict['start_point'][0]) + ' ' +
-        str(dict['start_point'][1]) + ' ' +
-        str(dict['start_point'][2]) + ' ' +
-        str(dict['end_point'][0]) + ' ' +
-        str(dict['end_point'][1]) + ' ' +
-        str(dict['end_point'][2]) + ' ' +
-        str(dict['type']) + ' ' +
-        str(dict['label']) + ' ' +
-        str(dict['class']) + ' ' +
-        str(dict['normal_1'][0]) + ' ' +
-        str(dict['normal_1'][1]) + ' ' +
-        str(dict['normal_1'][2]) + ' ' +
-        str(dict['normal_2'][0]) + ' ' +
-        str(dict['normal_2'][1]) + ' ' +
-        str(dict['normal_2'][2]) + ' ' +
-        str(dict['start_open']) + ' ' +
-        str(dict['end_open']) + ' ' +
-        str(dict['frame_id']) + '\n'
+def write_line_split_line(write_file, line_dict):
+    write_file.write(
+        line_dict['image_path'] + ' ' +
+        str(line_dict['start_point'][0]) + ' ' +
+        str(line_dict['start_point'][1]) + ' ' +
+        str(line_dict['start_point'][2]) + ' ' +
+        str(line_dict['end_point'][0]) + ' ' +
+        str(line_dict['end_point'][1]) + ' ' +
+        str(line_dict['end_point'][2]) + ' ' +
+        str(line_dict['normal_1'][0]) + ' ' +
+        str(line_dict['normal_1'][1]) + ' ' +
+        str(line_dict['normal_1'][2]) + ' ' +
+        str(line_dict['normal_2'][0]) + ' ' +
+        str(line_dict['normal_2'][1]) + ' ' +
+        str(line_dict['normal_2'][2]) + ' ' +
+        str(line_dict['start_open']) + ' ' +
+        str(line_dict['end_open']) + ' ' +
+        str(line_dict['label']) + ' ' +
+        str(line_dict['type']) + ' ' +
+        str(line_dict['class']) + ' ' +
+        str(line_dict['frame_id']) + '\n'
     )
 
 
