@@ -15,6 +15,7 @@
 #include <pcl/conversions.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl_ros/publisher.h>
+#include <std_msgs/String.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/PointCloud2.h>
@@ -497,6 +498,8 @@ namespace line_ros_utility {
                 const std::map<uint16_t, uint16_t>& instance_to_class_map,
                 std::vector<int>* class_labels);
 
+        void pathCallback(const std_msgs::String::ConstPtr& path_msg);
+
 
     private:
         // True if lines should be displayed, once labelled, overlapped on the
@@ -508,6 +511,7 @@ namespace line_ros_utility {
         bool verbose_mode_on_ = false;
 
         // Data storage.
+        std::string output_path_;
         size_t iteration_;
         size_t frame_step_;
         cv::Mat cv_image_;
@@ -546,6 +550,7 @@ namespace line_ros_utility {
         tf::Transform transform_;
         tf::TransformListener tf_listener_;
         ros::Publisher pcl_pub_;
+        ros::Subscriber path_sub_;
         message_filters::Synchronizer<MySyncPolicy>* sync_;
         message_filters::Subscriber<sensor_msgs::Image> image_sub_;
         message_filters::Subscriber<sensor_msgs::Image> depth_sub_;

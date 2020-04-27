@@ -108,9 +108,10 @@ class LineDataGenerator:
         # Subtract mean of start and end points.
         # Intuitively, the mean lies some where straight forward, i.e. [0., 0., 3.].
         line_geometries = subtract_mean(line_geometries, self.mean)
+        line_geometries = add_length(line_geometries)
 
         if self.data_augmentation:
-            # augment_flip(line_geometries)
+            augment_flip(line_geometries)
             augment_global(line_geometries, np.radians(20.), 0.5)
 
         valid_mask = np.zeros((batch_size,), dtype=bool)
@@ -126,6 +127,11 @@ class LineDataGenerator:
         out_bg[np.isin(out_classes, self.bg_classes)] = True
 
         return out_geometries, out_labels, valid_mask, out_bg
+
+
+def add_length(line_geometries):
+    return np.hstack([line_geometries, np.linalg.norm(line_geometries[:, 3:6] - line_geometries[:, 0:3], axis=1)
+                     .reshape((line_geometries.shape[0], 1))])
 
 
 def subtract_mean(line_geometries, mean):

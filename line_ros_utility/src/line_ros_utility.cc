@@ -241,6 +241,8 @@ namespace line_ros_utility {
         display_clusters_.initPublishing(node_handle_);
         display_lines_.initPublishing(node_handle_);
 
+        path_sub_ = node_handle_.subscribe("/line_tools/output_path", 10, &ListenAndPublish::pathCallback, this);
+
         image_sub_.subscribe(node_handle_, "/line_tools/image/rgb", 100);
         depth_sub_.subscribe(node_handle_, "/line_tools/image/depth", 100);
         info_sub_.subscribe(node_handle_, "/line_tools/camera_info", 100);
@@ -286,7 +288,12 @@ namespace line_ros_utility {
         class_labels->resize(instance_labels.size());
 
         for (size_t i = 0u; i < instance_labels.size(); i++) {
-            class_labels->at(i) = instance_to_class_map.at(instance_labels[i]);
+            if (instance_labels[i] == 0 && instance_to_class_map.count(0) == 0) {
+                ROS_INFO("Setting fake label.");
+                class_labels->at(i) = 0;
+            } else {
+                class_labels->at(i) = instance_to_class_map.at(instance_labels[i]);
+            }
         }
     }
 
@@ -542,19 +549,22 @@ namespace line_ros_utility {
         labelLinesWithClasses(labels_, instance_to_class_map_, &class_ids_);
 
         if (write_labeled_lines) {
-            std::string path =
-                    kWritePath_ + "/traj_" + kTrajectoryNumber_ + "/lines_with_labels_" +
-                    std::to_string(iteration_) + ".txt";
+            //std::string path =
+            //        kWritePath_ + "/traj_" + kTrajectoryNumber_ + "/lines_with_labels_" +
+            //        std::to_string(iteration_) + ".txt";
+            std::string path = output_path_ + "/lines_with_labels_" + std::to_string(iteration_) + ".txt";
             ROS_INFO("path is %s", path.c_str());
 
-            std::string path_2D_kept =
-                    kWritePath_ + "/traj_" + kTrajectoryNumber_ + "/lines_2D_kept_" +
-                    std::to_string(iteration_) + ".txt";
+            //std::string path_2D_kept =
+            //        kWritePath_ + "/traj_" + kTrajectoryNumber_ + "/lines_2D_kept_" +
+            //        std::to_string(iteration_) + ".txt";
+            std::string path_2D_kept = output_path_ + "/lines_2D_kept_" + std::to_string(iteration_) + ".txt";
             ROS_INFO("path_2D_kept is %s", path_2D_kept.c_str());
 
-            std::string path_2D =
-                    kWritePath_ + "/traj_" + kTrajectoryNumber_ + "/lines_2D_" +
-                    std::to_string(iteration_) + ".txt";
+            //std::string path_2D =
+            //        kWritePath_ + "/traj_" + kTrajectoryNumber_ + "/lines_2D_" +
+            //        std::to_string(iteration_) + ".txt";
+            std::string path_2D = output_path_ + "/lines_2D_" + std::to_string(iteration_) + ".txt";
             ROS_INFO("path_2D is %s", path_2D.c_str());
 
             // 3D lines data. NOTE: These lines are in the camera frame and should be
@@ -577,6 +587,12 @@ namespace line_ros_utility {
         ROS_INFO("**** Started publishing ****");
         publish();
         iteration_ += frame_step_;
+    }
+
+    void ListenAndPublish::pathCallback(const std_msgs::String::ConstPtr& path_msg) {
+        ROS_INFO("Changed line_file path to: [%s]", path_msg->data.c_str());
+        output_path_ = path_msg->data.c_str();
+        iteration_ = 0;
     }
 
     void ListenAndPublish::labelLinesWithInstancesByMajorityVoting(
@@ -859,6 +875,7 @@ namespace line_ros_utility {
                             labels->at(i) = most_present_label_left;
                         }
                     }
+
                     break;
                 case line_detection::LineType::EDGE:
                     // For edge lines the two planes, although not parallel to each other,
@@ -1368,7 +1385,11 @@ namespace line_ros_utility {
     }
 
     int InliersWithLabels::getLabelByMajorityVote() {
-        CHECK(inliers_with_labels_.size() > 0);
+        if (!(inliers_with_labels_.size() > 0)) {
+            ROS_INFO("WARNING: NO INLIERS FOUND FOR A LINE.");
+            return 0;
+        }
+        // CHECK(inliers_with_labels_.size() > 0);
         // Take majority vote of the instances of the inliers.
         std::map<unsigned short, size_t> labels_count;
         unsigned short instance_label;

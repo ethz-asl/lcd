@@ -29,6 +29,8 @@ class LineRenderer:
         vis.create_window()
         opt = vis.get_render_option()
         opt.background_color = np.asarray([0, 0, 0])
+        ctr = vis.get_view_control()
+        ctr.rotate(1100.0, 0.0)
 
         vis.register_key_callback(ord(" "), self.get_switch_index_callback())
         vis.register_key_callback(ord("A"), self.get_toggle_show_all_callback())
@@ -36,6 +38,8 @@ class LineRenderer:
         vis.register_key_callback(ord("E"), self.get_toggle_show_connections_callback())
         vis.register_key_callback(ord("Q"), self.get_toggle_show_results_callback())
         vis.register_key_callback(ord("C"), self.get_toggle_show_closest_callback())
+        vis.register_key_callback(ord("M"), self.get_increase_margin_callback())
+        vis.register_key_callback(ord("N"), self.get_decrease_margin_callback())
 
         print("Press space to switch label index.")
         print("Press 'A' to toggle between show all and show instance.")
@@ -43,6 +47,8 @@ class LineRenderer:
         print("Press 'E' to show ground truth connections.")
         print("Press 'Q' to show predicted connections.")
         print("Press 'C' to toggle between show closest and show margin.")
+        print("Press 'M' to increase margin.")
+        print("Press 'N' to decrease margin.")
 
         self.update_render(vis)
 
@@ -78,7 +84,7 @@ class LineRenderer:
         #
         if self.show_closest:
             max_results = np.zeros_like(result, dtype=bool)
-            max_result_sort = np.argsort(result, axis=-1)[:, -3:]
+            max_result_sort = np.argsort(result, axis=-1)[:, -1:]
             for i in range(result.shape[0]):
                 max_results[i, max_result_sort[i, :]] = True
             max_results[:, np.logical_not(self.valid_mask)] = False
@@ -114,6 +120,20 @@ class LineRenderer:
             self.update_render(vis)
 
         return toggle_show_all
+
+    def get_increase_margin_callback(self):
+        def increase_margin(vis):
+            self.margin = self.margin + 0.05
+            self.update_render(vis)
+
+        return increase_margin
+
+    def get_decrease_margin_callback(self):
+        def decrease_margin(vis):
+            self.margin = self.margin - 0.05
+            self.update_render(vis)
+
+        return decrease_margin
 
     def get_toggle_show_connections_callback(self):
         def toggle_show_connections(vis):

@@ -437,6 +437,9 @@ def get_virtual_camera_images_interiornet(scene_path, scene_type, trajectory, li
     elif scene_type < 7:
         path_to_photos = os.path.join(scene_path, "{}_{}_{}".format(light_type, trajectory, trajectory),
                                   "cam0/data")
+    else:
+        print("ERROR: Wrong scene_type chosen. Please choose a valid one.")
+        exit(1)
 
     # Depth paths as well.
     if scene_type == 7:
@@ -444,12 +447,16 @@ def get_virtual_camera_images_interiornet(scene_path, scene_type, trajectory, li
     elif scene_type < 7:
         path_to_depth = os.path.join(scene_path, "{}_{}_{}".format(light_type, trajectory, trajectory),
                                   "depth0/data")
+    else:
+        print("ERROR: Wrong scene_type chosen. Please choose a valid one.")
+        exit(1)
 
     print('Path to photos is {}'.format(path_to_photos))
 
     # TODO: this has to be fixed in the future. Each scene has a different name.
-    path_to_lines_root = os.path.join(linesfiles_path,
-                                      'traj_1/'.format(trajectory))
+    #path_to_lines_root = os.path.join(linesfiles_path,
+    #                                  'traj_1/'.format(trajectory))
+    path_to_lines_root = linesfiles_path
 
     print('Path to lines_root is {0}'.format(path_to_lines_root))
 
@@ -626,12 +633,12 @@ def get_virtual_camera_images_interiornet(scene_path, scene_type, trajectory, li
                 # Print images to file.
                 cv2.imwrite(
                     os.path.join(
-                        output_path, 'traj_{0}/frame_{1}/rgb/{2}.png'.format(
-                            trajectory, frame_id, i)), rgb_image_from_line_view)
+                        output_path, 'frame_{0}/rgb/{1}.png'.format(
+                            frame_id, i)), rgb_image_from_line_view)
                 cv2.imwrite(
                     os.path.join(output_path,
-                                 'traj_{0}/frame_{1}/depth/{2}.png'.format(
-                                     trajectory, frame_id, i)),
+                                 'frame_{0}/depth/{1}.png'.format(
+                                     frame_id, i)),
                     depth_image_from_line_view.astype(np.uint16))
 
         end_time = timer()

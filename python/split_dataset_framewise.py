@@ -37,7 +37,7 @@ def read_frame(path):
         data_lines = data_lines.values
         line_count = data_lines.shape[0]
     except pd.errors.EmptyDataError:
-        data_lines = np.zeros((0, 37))
+        data_lines = np.zeros((0, 38))
         line_count = 0
 
     return line_count, data_lines
@@ -100,6 +100,7 @@ def mean_shift_split(data_lines, label_index):
                                    np.arange(data_lines[i].shape[0]).reshape(data_lines[i].shape[0], 1)))
 
     radius = 1.7
+    max_iterations = 20
 
     data_lines = np.vstack(data_lines)
     label_indices = np.unique(data_lines[:, label_index])
@@ -124,20 +125,18 @@ def mean_shift_split(data_lines, label_index):
         iteration = 0
         while lines.shape[0] > 0:
             mean = (lines[0, 0:3] + lines[0, 3:6]) / 2.
+            in_radius = []
 
             # Find new mean iteratively.
-            while True:
+            mean_shift_iter = 0
+            while mean_shift_iter < max_iterations:
                 new_mean = np.zeros((3,))
                 weight_sum = 0.
-                in_radius = []
                 for i in range(lines.shape[0]):
                     start = lines[i, 0:3]
                     end = lines[i, 3:6]
                     d_start = np.linalg.norm(start - mean)
                     d_end = np.linalg.norm(end - mean)
-                    #if not np.isnan(min(d_start, d_end)):
-                    #    print(min(d_start, d_end))
-                    #    print(label)
                     if min(d_start, d_end) < radius:
                         length = np.linalg.norm(start - end)
                         # Weight the line start and end point with the length of the line.
@@ -145,17 +144,24 @@ def mean_shift_split(data_lines, label_index):
                         weight_sum = weight_sum + length
                         in_radius.append(i)
 
+                if len(in_radius) is 0:
+                    new_mean = (lines[0, 0:3] + lines[0, 3:6]) / 2.
+                    in_radius.append(0)
+
                 new_mean = new_mean / weight_sum
                 if np.equal(new_mean, mean).all():
                     break
 
                 mean = new_mean
 
+                mean_shift_iter = mean_shift_iter + 1
+
             # If first iteration, no changes to labels.
             # After that, change label to the biggest available
             if iteration > 0:
                 changes.append([lines[in_radius, -2:], max_label])
                 print("Added one instance split at instance {}.".format(int(max_label)))
+                #print(lines.shape[0])
                 max_label = max_label + 1
 
             lines = np.delete(lines, in_radius, axis=0)
@@ -165,15 +171,19 @@ def mean_shift_split(data_lines, label_index):
 
 
 def split_scene(line_path, vi_path, output_path):
+    if "{}" not in output_path:
+        print("Error, output_path needs to contain brackets for frame id formatting.")
+        exit(1)
+
     # Count number of files in directory.
     frames = [name for name in os.listdir(line_path)
-             if os.path.isfile(os.path.join(line_path, name)) and 'lines_with_labels' in name]
+              if os.path.isfile(os.path.join(line_path, name)) and 'lines_with_labels' in name]
     frame_count = len(frames)
 
-    train_prob = 4. / 5.
+    # train_prob = 4. / 5.
 
-    train_indices = list(range(int(frame_count * train_prob)))
-    val_indices = list(range(int(frame_count * train_prob), frame_count))
+    # train_indices = list(range(int(frame_count * train_prob)))
+    # val_indices = list(range(int(frame_count * train_prob), frame_count))
 
     line_counts = []
     data_lines = []
@@ -193,15 +203,8 @@ def split_scene(line_path, vi_path, output_path):
             data_lines[frame_id][line_id, label_index] = change[1]
 
     for i in range(frame_count):
-        if i in train_indices:
-            key = 'train'
-            out_index = train_indices.index(i)
-        else:
-            key = 'val'
-            out_index = val_indices.index(i)
-
         path_to_vcis = os.path.join(vi_path, "frame_{}".format(i))
-        path_to_output = os.path.join(output_path, key, "frame_{}.txt".format(out_index))
+        path_to_output = os.path.join(output_path.format(i))
 
         write_frame(line_counts[i], data_lines[i], path_to_vcis, i, path_to_output)
 
