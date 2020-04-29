@@ -182,11 +182,15 @@ def normalize_embeddings(input):
     return K.l2_normalize(input, axis=3)
 
 
-def multiply(factor):
-    def layer(input_tensor):
-        return input_tensor * factor
+def residual_bdlstm(units, merge_mode='concat'):
+    def rbdlstm_layer(input_tensor):
+        # Warning: Number of units must be half of the input tensors last dimension.
+        output = kl.Bidirectional(kl.CuDNNLSTM(units, return_sequences=True, return_state=False),
+                                  merge_mode=merge_mode)(input_tensor)
 
-    return layer
+        return output + input_tensor
+
+    return rbdlstm_layer
 
 
 def line_net_model(line_num_attr, num_lines, img_shape, margin):

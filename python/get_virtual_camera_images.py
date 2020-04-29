@@ -521,9 +521,7 @@ def get_virtual_camera_images_interiornet(scene_path, scene_type, trajectory, li
         # num_valid_lines = 0
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-            # TODO: Multithreading with ThreadPool.
             executor.map(get_process_line_func(output_path, data_lines, frame_id, real_camera, pcl), range(lines_count))
-        #for i in range(lines_count):
 
         end_time = timer()
         # if num_valid_lines > 0:
