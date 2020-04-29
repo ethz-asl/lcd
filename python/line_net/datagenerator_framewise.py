@@ -8,6 +8,7 @@ import sys
 def load_frame(path):
     try:
         data_lines = pd.read_csv(path, sep=" ", header=None)
+        line_vci_paths = data_lines.values[:, 0]
         line_geometries = data_lines.values[:, 1:15].astype(float)
         line_labels = data_lines.values[:, 15]
         line_class_ids = data_lines.values[:, 17]
@@ -17,27 +18,39 @@ def load_frame(path):
         line_labels = 0
         line_class_ids = 0
         line_count = 0
+        line_vci_paths = 0
 
-    return line_count, line_geometries, line_labels, line_class_ids
+    return line_count, line_geometries, line_labels, line_class_ids, line_vci_paths
 
 
 class Frame:
     def __init__(self, path):
         self.path = path
-        self.line_count, self.line_geometries, self.line_labels, self.line_class_ids = load_frame(path)
+        self.line_count, self.line_geometries, self.line_labels, self.line_class_ids, self.line_vci_paths = load_frame(path)
 
-    def get_batch(self, batch_size, shuffle):
+    def get_batch(self, batch_size, img_shape, shuffle):
         count = min(batch_size, self.line_count)
         indices = np.arange(count)
         if shuffle:
             np.random.shuffle(indices)
 
+        images = []
+        for i in range(len(indices)):
+            img = cv2.imread(self.line_vci_paths[i], cv2.IMREAD_UNCHANGED) / 255. * 2. - 1.
+            images.append(np.expand_dims(cv2.resize(img, dsize=(img_shape[1], img_shape[0]),
+                                                    interpolation=cv2.INTER_LINEAR), axis=0))
+            #print(img.shape)
+            #print(cv2.resize(img, dsize=(img_shape[1], img_shape[0]),
+            #                                        interpolation=cv2.INTER_LINEAR).shape)
+        images = np.concatenate(images, axis=0)
+
         return count, self.line_geometries[indices, :], \
-            self.line_labels[indices], self.line_class_ids[indices]
+            self.line_labels[indices], self.line_class_ids[indices], images
 
 
 class LineDataGenerator:
-    def __init__(self, files_dir, bg_classes, shuffle=False, data_augmentation=False, mean=np.zeros((3,))):
+    def __init__(self, files_dir, bg_classes,
+                 shuffle=False, data_augmentation=False, mean=np.zeros((3,)), img_shape=(224, 224, 3)):
         # Initialize parameters.
         self.shuffle = shuffle
         self.data_augmentation = data_augmentation
@@ -48,6 +61,7 @@ class LineDataGenerator:
         self.frame_indices = []
         self.load_frames(files_dir)
         self.mean = mean
+        self.img_shape = img_shape
 
         if self.shuffle:
             self.shuffle_data()
@@ -101,8 +115,8 @@ class LineDataGenerator:
         if self.pointer == self.frame_count:
             self.reset_pointer()
 
-        line_count, line_geometries, line_labels, line_class_ids = \
-            self.frames[self.frame_indices[self.pointer]].get_batch(batch_size, self.shuffle)
+        line_count, line_geometries, line_labels, line_class_ids, line_images = \
+            self.frames[self.frame_indices[self.pointer]].get_batch(batch_size, self.img_shape, self.shuffle)
         self.pointer = self.pointer + 1
 
         # Subtract mean of start and end points.
@@ -126,7 +140,16 @@ class LineDataGenerator:
         out_classes[:line_count] = line_class_ids
         out_bg[np.isin(out_classes, self.bg_classes)] = True
 
-        return out_geometries, out_labels, valid_mask, out_bg
+        out_images = line_images
+        if line_count < batch_size:
+            out_images = np.concatenate([out_images,
+                                         np.zeros((batch_size - line_count,
+                                                   self.img_shape[0],
+                                                   self.img_shape[1],
+                                                   self.img_shape[2]))],
+                                        axis=0)
+
+        return out_geometries, out_labels, valid_mask, out_bg, out_images
 
 
 def add_length(line_geometries):

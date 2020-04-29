@@ -44,6 +44,11 @@ def read_frame(path):
 
 
 def write_frame(line_count, data_lines, path_to_vcis, frame_id, path_write):
+    if os.path.exists(path_write):
+        print("File already exists: {}".format(path_write))
+        print("Skipping.")
+        return
+
     for i in range(line_count):
         path_to_vci = os.path.join(path_to_vcis, 'rgb/' + '{}.png'.format(i))
         # If the virtual-camera image associated to the line does not

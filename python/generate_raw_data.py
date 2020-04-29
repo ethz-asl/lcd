@@ -38,7 +38,7 @@ if __name__ == '__main__':
 
         file_count = len([name for name in os.listdir(line_path)
                          if os.path.isfile(os.path.join(line_path, name))])
-        if file_count < 20:
+        if file_count < 60:
             interiornet_to_rosbag.convert(
                 scene_path=dir_path,
                 scene_type=7,
@@ -50,8 +50,11 @@ if __name__ == '__main__':
                 publishers=publishers,
                 publish=True)
 
+        remake_vcis = False
         vci_path = os.path.join(vci_path_master, scene_id)
-        if not os.path.exists(vci_path):
+        if not os.path.exists(vci_path) or not len(os.listdir(os.path.join(vci_path, "frame_19", "rgb"))) > 0:
+            remake_vcis = True
+
             os.mkdir(vci_path)
             for i in range(20):
                 os.mkdir(os.path.join(vci_path, 'frame_{}'.format(i)))
@@ -68,7 +71,7 @@ if __name__ == '__main__':
             )
 
         train_path = os.path.join(train_path_master, scene_id + "_frame_{}")
-        if not os.path.exists(train_path.format(19)):
+        if remake_vcis or not os.path.exists(train_path.format(19)):
             split_dataset_framewise.split_scene(line_path, vci_path, train_path)
 
 

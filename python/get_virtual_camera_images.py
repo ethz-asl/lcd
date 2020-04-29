@@ -18,6 +18,8 @@ from tools import pathconfig
 from tools import get_protobuf_paths
 from tools import interiornet_utils
 
+import concurrent.futures
+
 
 def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path, dataset_name, scenenetscripts_path):
     impainting = True
@@ -422,10 +424,9 @@ def parse_frames(scene_path, scene_type, traj):
 
 # InteriorNet
 def get_virtual_camera_images_interiornet(scene_path, scene_type, trajectory, light_type, linesfiles_path, output_path):
-    impainting = True
+    inpainting = True
     show_line = False
 
-    # TODO: Frame step.
     times, view_poses = parse_frames(scene_path, scene_type, trajectory)
     num_views = np.shape(view_poses)[0]
 
@@ -453,9 +454,6 @@ def get_virtual_camera_images_interiornet(scene_path, scene_type, trajectory, li
 
     print('Path to photos is {}'.format(path_to_photos))
 
-    # TODO: this has to be fixed in the future. Each scene has a different name.
-    #path_to_lines_root = os.path.join(linesfiles_path,
-    #                                  'traj_1/'.format(trajectory))
     path_to_lines_root = linesfiles_path
 
     print('Path to lines_root is {0}'.format(path_to_lines_root))
@@ -463,25 +461,6 @@ def get_virtual_camera_images_interiornet(scene_path, scene_type, trajectory, li
     # Camera from which the images were taken, SceneNetRGBD (pinhole) camera
     # model.
     real_camera = interiornet_utils.get_camera_model()
-
-    # Distance between virtual camera origin and center of the line.
-    distance = 0.25
-    # Min fraction of nonempty pixels in the associated virtual-camera image for
-    # a line to be considered as valid.
-    min_fraction_nonempty_pixels = 0.0
-    # Min number of pixel per unit meter of the line. The more the line points
-    # toward or away from the camera, the less pixels per meter.
-    min_pixel_per_meter = 50.
-    # Min x resolution of the virtual camera image.
-    min_image_width = 40
-
-    # Write in a text file (that will store the histogram of percentages of
-    # nonempty pixels) the distance of the virtual camera from the lines and the
-    # threshold of nonempty pixels to discard lines.
-    with open('hist_percentages.txt', 'w') as f:
-        f.write("distance=%.3f\n" % distance)
-        f.write("fraction_nonempty_pixels_threshold=%.3f\n" %
-                min_fraction_nonempty_pixels)
 
     # Sliding window accumulator for point cloud, stored in world frame.
     pcl_world = np.zeros((0, 6))
@@ -539,37 +518,70 @@ def get_virtual_camera_images_interiornet(scene_path, scene_type, trajectory, li
         average_time_per_line = 0
         # A line is valid if the corresponding virtual-camera image has enough
         # nonempty pixels.
-        num_valid_lines = 0
-        # Initialize the histogram of the percentages of nonempty pixels.
-        hist_percentage_nonempty_pixels = []
-        for i in range(lines_count):
-            start_time_line = timer()
-            # Obtain the pose of the virtual camera for each line.
-            T, _ = virtual_camera_utils.virtual_camera_pose_from_file_line(
-                data_lines[i, :], distance)
-            # Draw the line in the virtual camera image.
-            start_point = data_lines[i, :3]
-            end_point = data_lines[i, 3:6]
-            line_length = np.linalg.norm(end_point - start_point)
+        # num_valid_lines = 0
 
-            start_point_2d = real_camera.project3dToPixel(start_point)
-            end_point_2d = real_camera.project3dToPixel(end_point)
-            line_length_pixels = np.linalg.norm(end_point_2d - start_point_2d)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            # TODO: Multithreading with ThreadPool.
+            executor.map(get_process_line_func(output_path, data_lines, frame_id, real_camera, pcl), range(lines_count))
+        #for i in range(lines_count):
+
+        end_time = timer()
+        # if num_valid_lines > 0:
+        #    average_time_per_line /= num_valid_lines
+
+        print('Generated virtual camera images for frame {0}'.format(frame_id))
+        # print('Number of valid lines is {}'.format(num_valid_lines))
+        print('Time elapsed: {:.3f} seconds'.format(end_time - start_time))
+        # if num_valid_lines > 0:
+        #     print('Average time per line total: {:.4f}'.format((end_time - start_time) / num_valid_lines))
+        print('Average time per line: {:.3f} seconds'.format(
+            average_time_per_line))
+        # print('Minimum fraction of required nonempty pixels is {}'.format(min_fraction_nonempty_pixels))
+        # print('Minimum number of pixels per meter is {}'.format(min_pixel_per_meter))
+        # print('Minimum virtual image width is {}'.format(min_image_width))
+        # print('Number of lines discarded is {}'.format(lines_count - num_valid_lines))
+
+
+def get_process_line_func(output_path, data_lines, frame_id, real_camera, pcl):
+    inpainting = True
+    show_line = False
+    # Distance between virtual camera origin and center of the line.
+    cam_distance = 0.25
+    # Min number of pixel per unit meter of the line. The more the line points
+    # toward or away from the camera, the less pixels per meter.
+    min_pixel_per_meter = 50.
+    # Min x resolution of the virtual camera image.
+    min_image_width = 40
+    max_image_width = 200
+
+    def process_line(i):
+        T, _ = virtual_camera_utils.virtual_camera_pose_from_file_line(
+            data_lines[i, :], cam_distance)
+        # Draw the line in the virtual camera image.
+        start_point = data_lines[i, :3]
+        end_point = data_lines[i, 3:6]
+        line_length = np.linalg.norm(end_point - start_point)
+
+        start_point_2d = real_camera.project3dToPixel(start_point)
+        end_point_2d = real_camera.project3dToPixel(end_point)
+        line_length_pixels = np.linalg.norm(end_point_2d - start_point_2d)
+        if line_length_pixels * 1.5 > min_image_width and \
+                line_length_pixels / line_length > min_pixel_per_meter:
 
             if show_line:
-                line_3D = np.hstack([start_point, [0, 0, 255]])
+                line_3d = np.hstack([start_point, [0, 0, 255]])
 
                 num_points_in_line = 200
                 for idx in range(num_points_in_line):
-                    line_3D = np.vstack([
-                        line_3D,
+                    line_3d = np.vstack([
+                        line_3d,
                         np.hstack([(start_point + idx / float(num_points_in_line) *
                                     (end_point - start_point)), [0, 0, 255]])
                     ])
                 # Transform the point cloud so as to make it appear as seen from
                 # the virtual camera pose.
                 pcl_from_line_view = cloud_utils.pcl_transform(
-                    np.vstack([pcl, line_3D]), T)
+                    np.vstack([pcl, line_3d]), T)
                 # Move line points directly to the image plane, so that it is never occluded.
                 pcl_from_line_view[-1000:, 2] = 0
             else:
@@ -577,89 +589,59 @@ def get_virtual_camera_images_interiornet(scene_path, scene_type, trajectory, li
             # Obtain the RGB and depth virtual camera images by reprojecting the
             # point cloud on the image plane, under the view of the virtual
             # camera. Also obtain the number of nonempty pixels.
-            (rgb_image_from_line_view, depth_image_from_line_view,
-             num_nonempty_pixels) = cloud_utils.project_pcl_to_image_orthogonal(
+            img_width = min(max_image_width, int(line_length_pixels * 1.5))
+            img_height = int(max_image_width / 1.5)
+            (rgb_image_from_line_view, depth_image_from_line_view
+             ) = cloud_utils.project_pcl_to_image_orthogonal(
                 pcl_from_line_view,
                 line_length * 1.5,
                 line_length * 1, 0.5,
-                int(line_length_pixels * 1.5),
-                int(line_length_pixels))
-            # cloud_utils.project_pcl_to_image(pcl_from_line_view, virtual_camera)
-            # Discard lines that have less than the specified fraction of
-            # nonempty pixels.
-            fraction_nonempty_pixels = num_nonempty_pixels / float(
-                rgb_image_from_line_view.shape[0] * rgb_image_from_line_view.
-                shape[1])
-            # Add the percentage of nonempty pixels to the histogram.
-            percentage_nonempty_pixels = 100. * fraction_nonempty_pixels
-            hist_percentage_nonempty_pixels.append(percentage_nonempty_pixels)
-            if fraction_nonempty_pixels > min_fraction_nonempty_pixels and \
-                    line_length_pixels * 1.5 > min_image_width and \
-                    line_length_pixels / line_length > min_pixel_per_meter:
-                num_valid_lines += 1
-                if impainting:
-                    # Inpaint the virtual camera image.
-                    reds = rgb_image_from_line_view[:, :, 2]
-                    greens = rgb_image_from_line_view[:, :, 1]
-                    blues = rgb_image_from_line_view[:, :, 0]
+                img_width,
+                img_height)
 
-                    mask = ((greens != 0) | (reds != 0) | (blues != 0)) * 1
-                    mask = np.array(mask, dtype=np.uint8)
-                    kernel = np.ones((5, 5), np.uint8)
-                    kernel[0, 0] = 0
-                    kernel[0, -1] = 0
-                    kernel[-1, 0] = 0
-                    kernel[-1, -1] = 0
-                    erosion_kernel = np.ones((1, 3), np.uint8)
-                    # Opening to remove salt and pepper pixels.
-                    eroded_mask = cv2.erode(mask, erosion_kernel, iterations=1)
-                    opened_mask = cv2.dilate(eroded_mask, erosion_kernel, iterations=1)
-                    dilated_mask = cv2.dilate(opened_mask, kernel, iterations=1) - opened_mask
+            if inpainting:
+                # Inpaint the virtual camera image.
+                reds = rgb_image_from_line_view[:, :, 2]
+                greens = rgb_image_from_line_view[:, :, 1]
+                blues = rgb_image_from_line_view[:, :, 0]
 
-                    rgb_image_from_line_view = cv2.bitwise_and(rgb_image_from_line_view,
-                                                               rgb_image_from_line_view, mask=opened_mask)
-                    depth_image_from_line_view = cv2.bitwise_and(depth_image_from_line_view,
-                                                                 depth_image_from_line_view, mask=opened_mask)
+                mask = ((greens != 0) | (reds != 0) | (blues != 0)) * 1
+                mask = np.array(mask, dtype=np.uint8)
+                kernel = np.ones((5, 5), np.uint8)
+                kernel[0, 0] = 0
+                kernel[0, -1] = 0
+                kernel[-1, 0] = 0
+                kernel[-1, -1] = 0
+                erosion_kernel = np.ones((1, 3), np.uint8)
+                # Opening to remove salt and pepper pixels.
+                eroded_mask = cv2.erode(mask, erosion_kernel, iterations=1)
+                opened_mask = cv2.dilate(eroded_mask, erosion_kernel, iterations=1)
+                dilated_mask = cv2.dilate(opened_mask, kernel, iterations=1) - opened_mask
 
-                    rgb_image_from_line_view = cv2.inpaint(
-                        rgb_image_from_line_view, dilated_mask, 10,
-                        cv2.INPAINT_NS)
-                    depth_image_from_line_view = cv2.inpaint(
-                        depth_image_from_line_view, dilated_mask, 10,
-                        cv2.INPAINT_NS)
-                end_time_line = timer()
-                average_time_per_line += (end_time_line - start_time_line)
+                rgb_image_from_line_view = cv2.bitwise_and(rgb_image_from_line_view,
+                                                           rgb_image_from_line_view, mask=opened_mask)
+                depth_image_from_line_view = cv2.bitwise_and(depth_image_from_line_view,
+                                                             depth_image_from_line_view, mask=opened_mask)
 
-                # Print images to file.
-                cv2.imwrite(
-                    os.path.join(
-                        output_path, 'frame_{0}/rgb/{1}.png'.format(
-                            frame_id, i)), rgb_image_from_line_view)
-                cv2.imwrite(
-                    os.path.join(output_path,
-                                 'frame_{0}/depth/{1}.png'.format(
-                                     frame_id, i)),
-                    depth_image_from_line_view.astype(np.uint16))
+                rgb_image_from_line_view = cv2.inpaint(
+                    rgb_image_from_line_view, dilated_mask, 10,
+                    cv2.INPAINT_NS)
+                depth_image_from_line_view = cv2.inpaint(
+                    depth_image_from_line_view, dilated_mask, 10,
+                    cv2.INPAINT_NS)
 
-        end_time = timer()
-        if num_valid_lines > 0:
-            average_time_per_line /= num_valid_lines
+            # Print images to file.
+            cv2.imwrite(
+                os.path.join(
+                    output_path, 'frame_{0}/rgb/{1}.png'.format(
+                        frame_id, i)), rgb_image_from_line_view)
+            cv2.imwrite(
+                os.path.join(output_path,
+                             'frame_{0}/depth/{1}.png'.format(
+                                 frame_id, i)),
+                depth_image_from_line_view.astype(np.uint16))
 
-        # Append the histogram for the frame to the output text file.
-        with open('hist_percentages.txt', 'aw') as f:
-            for item in hist_percentage_nonempty_pixels:
-                f.write("%s\n" % item)
-
-        print('Generated virtual camera images for frame {0}'.format(frame_id))
-        print('Number of valid lines is {}'.format(num_valid_lines))
-        print('Time elapsed: {:.3f} seconds'.format(end_time - start_time))
-        print('Average time per line total: {:.4f}'.format((end_time - start_time) / num_valid_lines))
-        print('Average time per line: {:.3f} seconds'.format(
-            average_time_per_line))
-        print('Minimum fraction of required nonempty pixels is {}'.format(min_fraction_nonempty_pixels))
-        print('Minimum number of pixels per meter is {}'.format(min_pixel_per_meter))
-        print('Minimum virtual image width is {}'.format(min_image_width))
-        print('Number of lines discarded is {}'.format(lines_count - num_valid_lines))
+    return process_line
 
 
 if __name__ == '__main__':

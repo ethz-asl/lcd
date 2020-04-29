@@ -3,6 +3,7 @@ np.random.seed(123)
 
 import time
 
+import keras
 from keras.models import Sequential, Model
 import keras.layers as kl
 from keras.engine.input_layer import Input
@@ -38,16 +39,16 @@ def drop_diagonal_and_mask(shape, validity_mask):
     return layer
 
 
-def get_n_max_neighbors(norm_tensor, n=3):
+def get_n_max_neighbors(norm_tensor, num_lines, n=3):
     n = tf.constant(n)
 
     def layer(feature_tensor):
         indices = tf.argsort(tf.squeeze(norm_tensor, axis=-1), axis=-1, direction='DESCENDING')
-        indices = tf.reshape(indices[:, :, :n], (-1, 150, n))
+        indices = tf.reshape(indices[:, :, :n], (-1, num_lines, n))
         # Get coordinate grid for indexing with argsort indices.
         # This might be an issue with a batchsize greater than 1.
         # Edit: I think i fixed it now.
-        index_grid = tf.repeat(tf.expand_dims(tf.repeat(tf.expand_dims(tf.range(0, 150), axis=-1), repeats=n, axis=-1), axis=0), repeats=tf.shape(indices)[0], axis=0)
+        index_grid = tf.repeat(tf.expand_dims(tf.repeat(tf.expand_dims(tf.range(0, num_lines), axis=-1), repeats=n, axis=-1), axis=0), repeats=tf.shape(indices)[0], axis=0)
         indices = tf.stack([indices, index_grid], axis=-1)
         max_features = tf.gather_nd(feature_tensor, indices, batch_dims=1)
         tensors = tf.unstack(max_features, axis=-2)
@@ -56,7 +57,8 @@ def get_n_max_neighbors(norm_tensor, n=3):
     return layer
 
 
-def get_losses_and_metrics(norm_tensor, norm_tensor_2, instancing_tensor, labels_tensor, validity_mask, bg_mask, num_lines, margin):
+def get_losses_and_metrics(norm_tensor, norm_tensor_2, instancing_tensor,
+                           labels_tensor, validity_mask, bg_mask, num_lines, margin):
     # eye = K.expand_dims(K.eye(size=(num_lines, num_lines), dtype='float32'), axis=-1)
 
     labels = K.expand_dims(K.expand_dims(labels_tensor, axis=-1), axis=-1)
@@ -78,14 +80,19 @@ def get_losses_and_metrics(norm_tensor, norm_tensor_2, instancing_tensor, labels
     mask_not_equal = (1. - mask_equal) * mask_non_bg
     mask_equal = drop_diagonal_and_mask((num_lines, num_lines), validity_mask)(mask_equal) * mask_non_bg
 
+    num_total = tf.constant(num_lines, dtype='float32')
+    num_valid = tf.reduce_sum(tf.cast(validity_mask, dtype='float'))
+
     # norms = K.expand_dims(K.sqrt(K.sum(K.square(compare_tensor), axis=3)), -1)
 
     # Losses:
 
     def compare_norm_loss(y_true, y_pred):
-        loss_layer = K.maximum(0., K.square(1. - norm_tensor) - 0.04) * mask_equal + \
-                     K.maximum(0., K.square(norm_tensor - 0.) - 0.04) * mask_not_equal
-        return loss_layer  # tf.reduce_max(loss_layer, axis=-1) +
+        #loss_layer = K.maximum(0., K.square(1. - norm_tensor) - 0.04) * mask_equal + \
+        #             K.maximum(0., K.square(norm_tensor - 0.) - 0.04) * mask_not_equal
+        loss_layer = tf.nn.sigmoid_cross_entropy_with_logits(K.ones_like(norm_tensor), norm_tensor) * mask_equal + \
+                     tf.nn.sigmoid_cross_entropy_with_logits(K.zeros_like(norm_tensor), norm_tensor) * mask_not_equal
+        return loss_layer * num_total / num_valid  # tf.reduce_max(loss_layer, axis=-1) +
 
     def compare_norm_loss_2(y_true, y_pred):
         loss_layer = K.maximum(0., K.square(1. - norm_tensor_2) - 0.04) * mask_equal + \
@@ -101,13 +108,13 @@ def get_losses_and_metrics(norm_tensor, norm_tensor_2, instancing_tensor, labels
         return K.identity(K.sum(loss_layer, axis=3) / 32., name='kl_cross_div_loss')
 
     def loss(y_true, y_pred):
-        return compare_norm_loss(y_true, y_pred) + compare_norm_loss_2(y_true, y_pred)
+        return compare_norm_loss(y_true, y_pred)#  + compare_norm_loss_2(y_true, y_pred)
         # + kl_cross_div_loss(y_true, y_pred) * 0.
 
     # Metrics:
 
-    positives = K.cast(K.greater(norm_tensor_2, 0.8), dtype='float32')
-    negatives = K.cast(K.greater(0.2, norm_tensor_2), dtype='float32')
+    positives = K.cast(K.greater(K.sigmoid(norm_tensor), 0.8), dtype='float32')
+    negatives = K.cast(K.greater(0.2, K.sigmoid(norm_tensor)), dtype='float32')
 
     num_equal = K.sum(mask_equal, axis=(0, 1, 2, 3))
     num_not_equal = K.sum(mask_not_equal, axis=(0, 1, 2, 3))
@@ -152,6 +159,25 @@ def expand_lines(num_lines):
     return expand_lines_layer
 
 
+def img_compare_features(num_lines):
+    def img_compare_layer(img_features):
+        expanded = tf.expand_dims(img_features, axis=-2)
+        expanded = tf.repeat(expanded, num_lines, axis=-2)
+        x1 = expanded
+        x2 = tf.transpose(expanded, perm=(0, 2, 1, 3))
+
+        f1 = tf.square(x1 - x2)
+        f2 = tf.square(x1) - tf.square(x2)
+
+        feature_layer = tf.concat([f1, f2], axis=-1)
+        out = kl.Dense(100, activation='relu')(feature_layer)
+        out = kl.Dense(1, activation=None)(out)
+
+        return out
+
+    return img_compare_layer
+
+
 def normalize_embeddings(input):
     return K.l2_normalize(input, axis=3)
 
@@ -163,7 +189,7 @@ def multiply(factor):
     return layer
 
 
-def line_net_model(line_num_attr, num_lines, margin):
+def line_net_model(line_num_attr, num_lines, img_shape, margin):
     """
     Model architecture
     """
@@ -175,10 +201,23 @@ def line_net_model(line_num_attr, num_lines, margin):
     n_neighbors = 5
 
     # Inputs for geometric line information.
+    img_inputs = Input(shape=(num_lines, img_shape[0], img_shape[1], img_shape[2]), dtype='float32', name='images')
     line_inputs = Input(shape=(num_lines, line_num_attr), dtype='float32', name='lines')
     label_input = Input(shape=(num_lines,), dtype='int32', name='labels')
     validity_input = Input(shape=(num_lines,), dtype='bool', name='valid_input_mask')
     bg_input = Input(shape=(num_lines,), dtype='bool', name='background_mask')
+
+    # Image classifier:
+    # img_shape = Input(shape=(224, 224, 3), dtype='float32')
+    back_bone = keras.applications.vgg16.VGG16(include_top=False, weights='imagenet',
+                                               input_shape=(img_shape[0], img_shape[1], img_shape[2]))
+    img_emb = kl.Concatenate(axis=-1)([kl.GlobalMaxPool2D()(back_bone.output),
+                                       kl.GlobalAveragePooling2D()(back_bone.output)])
+    img_emb = kl.Dense(100, activation='relu')(img_emb)
+    img_model = keras.models.Model(inputs=back_bone.input, outputs=img_emb)
+
+    img_features = kl.TimeDistributed(img_model)(img_inputs)
+    img_norms = kl.Lambda(img_compare_features(num_lines), name='img_norms')(img_features)
 
     expanded_input = kl.Lambda(expand_lines(num_lines), name='expand_input')(line_inputs)
 
@@ -187,8 +226,8 @@ def line_net_model(line_num_attr, num_lines, margin):
     compare_model = Sequential(name='first_order_compare')
     compare_model.add(kl.Conv2D(1024, kernel_size=(1, 1),
                                 input_shape=(num_lines, num_lines, line_num_attr * 2), activation='relu'))
-    compare_model.add(kl.Conv2D(1024, kernel_size=(1, 1), activation='relu'))
-    compare_model.add(kl.Conv2D(1024, kernel_size=(1, 1), activation='relu'))
+    # compare_model.add(kl.Conv2D(1024, kernel_size=(1, 1), activation='relu'))
+    # compare_model.add(kl.Conv2D(1024, kernel_size=(1, 1), activation='relu'))
     compare_model.add(kl.Conv2D(first_order_size, kernel_size=(1, 1), activation='relu'))
 
     first_order_norm_model = Sequential(name='first_order_norm')
@@ -204,7 +243,7 @@ def line_net_model(line_num_attr, num_lines, margin):
                                   activation='relu'))
     #compare_model_2.add(kl.Conv2D(600, kernel_size=(1, 1), activation='relu'))
     #compare_model_2.add(kl.Conv2D(600, kernel_size=(1, 1), activation='relu'))
-    compare_model_2.add(kl.Conv2D(1024, kernel_size=(1, 1), activation='relu'))
+    # compare_model_2.add(kl.Conv2D(1024, kernel_size=(1, 1), activation='relu'))
     #compare_model_2.add(kl.Conv2D(32, kernel_size=(1, 1), activation='relu'))
     compare_model_2.add(kl.Conv2D(1, kernel_size=(1, 1), activation='sigmoid'))
 
@@ -221,12 +260,13 @@ def line_net_model(line_num_attr, num_lines, margin):
     compare_embeddings = compare_model(expanded_input)
     first_order_norm = first_order_norm_model(compare_embeddings)
     line_embeddings = instancing_model(compare_embeddings)
-    first_order_max_neighbors = kl.Lambda(get_n_max_neighbors(first_order_norm, n=n_neighbors))(compare_embeddings)
+    first_order_max_neighbors = kl.Lambda(get_n_max_neighbors(first_order_norm, num_lines, n=n_neighbors))(compare_embeddings)
     expanded_neighbours = kl.Lambda(expand_lines(num_lines), name="expand_neighbors")(first_order_max_neighbors)
     second_order_input = kl.Concatenate(axis=-1)([compare_embeddings, expanded_neighbours])
     second_order_norm = compare_model_2(second_order_input)
 
-    losses, metrics = get_losses_and_metrics(first_order_norm,
+    losses, metrics = get_losses_and_metrics(#first_order_norm,
+                                             img_norms,
                                              second_order_norm,
                                              line_embeddings,
                                              label_input,
@@ -235,8 +275,8 @@ def line_net_model(line_num_attr, num_lines, margin):
                                              num_lines,
                                              margin)
 
-    line_model = Model(inputs=[line_inputs, label_input, validity_input, bg_input],
-                       outputs=second_order_norm,  # line_embeddings,
+    line_model = Model(inputs=[img_inputs, line_inputs, label_input, validity_input, bg_input],
+                       outputs=img_norms, #second_order_norm,  # line_embeddings,
                        name='line_net_model')
     sgd = SGD(lr=0.0001, momentum=0.9)
     line_model.compile(loss=losses,
@@ -252,25 +292,28 @@ def data_generator(image_data_generator, max_line_count, line_num_attr, batch_si
         batch_labels = []
         batch_valid_mask = []
         batch_bg_mask = []
+        batch_images = []
 
         for i in range(batch_size):
-            geometries, labels, valid_mask, bg_mask = image_data_generator.next_batch(max_line_count)
+            geometries, labels, valid_mask, bg_mask, images = image_data_generator.next_batch(max_line_count)
 
             batch_labels.append(labels.reshape((1, max_line_count)))
             batch_geometries.append(geometries.reshape((1, max_line_count, line_num_attr)))
             batch_valid_mask.append(valid_mask.reshape((1, max_line_count)))
             batch_bg_mask.append(bg_mask.reshape((1, max_line_count)))
+            batch_images.append(np.expand_dims(images, axis=0))
 
         geometries = np.concatenate(batch_geometries, axis=0)
         labels = np.concatenate(batch_labels, axis=0)
         valid_mask = np.concatenate(batch_valid_mask, axis=0)
         bg_mask = np.concatenate(batch_bg_mask, axis=0)
+        images = np.concatenate(batch_images, axis=0)
 
         yield {'lines': geometries,
-                'labels': labels,
-                'valid_input_mask': valid_mask,
-                'background_mask': bg_mask}, labels
-
+               'labels': labels,
+               'valid_input_mask': valid_mask,
+               'background_mask': bg_mask,
+               'images': images}, labels
 
 
 def train():
@@ -281,22 +324,26 @@ def train():
 
     # The length of the geometry vector of a line.
     line_num_attr = 15
+    img_shape = (120, 180, 3)
     max_line_count = 150
-    batch_size = 10
+    batch_size = 1
     margin = 1.0
     bg_classes = [0, 1, 2, 20, 22]
 
-    train_data_generator = LineDataGenerator(train_files, bg_classes, shuffle=True, data_augmentation=True)
+    train_data_generator = LineDataGenerator(train_files, bg_classes,
+                                             shuffle=True,
+                                             data_augmentation=True,
+                                             img_shape=img_shape)
     train_set_mean = train_data_generator.get_mean()
     train_data_generator.set_mean(train_set_mean)
     print(train_set_mean)
-    val_data_generator = LineDataGenerator(val_files, bg_classes, mean=train_set_mean)
+    val_data_generator = LineDataGenerator(val_files, bg_classes, mean=train_set_mean, img_shape=img_shape)
 
     train_generator = data_generator(train_data_generator, max_line_count, line_num_attr, batch_size)
     val_generator = data_generator(val_data_generator, max_line_count, line_num_attr, batch_size)
 
     # Create line net Keras model.
-    line_model = line_net_model(line_num_attr, max_line_count, margin)
+    line_model = line_net_model(line_num_attr, max_line_count, img_shape, margin)
     line_model.summary()
 
     line_model.fit_generator(generator=train_generator,

@@ -80,12 +80,13 @@ def project_pcl_to_image(pointcloud,
 
     return rgb_image, depth_image, num_nonempty_pixels
 
+
 def project_pcl_to_image_orthogonal(pointcloud,
-                         camera_width,
-                         camera_height,
-                         camera_depth,
-                         image_width=320,
-                         image_height=240):
+                                    camera_width,
+                                    camera_height,
+                                    camera_depth,
+                                    image_width=320,
+                                    image_height=240):
 
     """ Projects a pointcloud to a orthogonal camera image.
 
@@ -155,9 +156,4 @@ def project_pcl_to_image_orthogonal(pointcloud,
     rgb_image[pixel[1], pixel[0]] = pcl_inside_view[:, 3:]
     depth_image[pixel[1], pixel[0]] = pcl_inside_view[:, 2] * 1000.0  # m to mm
 
-    for idx in range(len(pixel[0])):
-        if pixel_is_empty[pixel[1, idx], pixel[0, idx]]:
-            pixel_is_empty[pixel[1, idx], pixel[0, idx]] = False
-            num_nonempty_pixels += 1
-
-    return rgb_image, depth_image.astype(np.uint8), num_nonempty_pixels
+    return rgb_image, depth_image.astype(np.uint8)
