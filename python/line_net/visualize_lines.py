@@ -22,7 +22,8 @@ class LineRenderer:
         self.render_result_connections = False
         self.show_closest = False
 
-        self.line_geometries, self.line_labels, self.valid_mask, self.bg_mask = self.line_data_generator.next_batch(150)
+        self.line_geometries, self.line_labels, self.valid_mask, self.bg_mask, images = \
+            self.line_data_generator.next_batch(150, False)
 
     def run(self):
         vis = o3d.visualization.VisualizerWithKeyCallback()
@@ -161,8 +162,8 @@ class LineRenderer:
             # if not self.render_single_cluster:
             #     self.render_single_cluster = True
             # else:
-            self.line_geometries, self.line_labels, self.valid_mask, self.bg_mask = \
-                self.line_data_generator.next_batch(150)
+            self.line_geometries, self.line_labels, self.valid_mask, self.bg_mask, images = \
+                self.line_data_generator.next_batch(150, load_images=False)
             self.pointer = (self.pointer + 1) % self.index_size
 
             print("Now showing index {} ({}/{})".format(self.indices[self.pointer], self.pointer + 1, self.index_size))
@@ -299,14 +300,14 @@ def load_lines(path):
 
 
 if __name__ == '__main__':
-    data_path = "/home/felix/line_ws/data/line_tools/interiornet_lines_split/val"
+    data_path = "/nvme/line_ws/train_data/val"
     result_path = "output"
     results = []
 
     data_generator = LineDataGenerator(data_path,
                                        [0, 1, 2, 20, 22])
 
-    for i in range(data_generator.frame_count):
+    for i in range(10):
         results.append(np.load(os.path.join(result_path, "output_frame_{}.npy".format(i))))
 
     renderer = LineRenderer(data_generator, results, 0.7, get_colors())

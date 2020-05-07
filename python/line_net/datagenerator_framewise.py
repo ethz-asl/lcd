@@ -26,31 +26,37 @@ def load_frame(path):
 class Frame:
     def __init__(self, path):
         self.path = path
-        self.line_count, self.line_geometries, self.line_labels, self.line_class_ids, self.line_vci_paths = load_frame(path)
+        self.line_count, self.line_geometries, self.line_labels, self.line_class_ids, self.line_vci_paths = \
+            load_frame(path)
 
-    def get_batch(self, batch_size, img_shape, shuffle):
+    def get_batch(self, batch_size, img_shape, shuffle, load_images):
         count = min(batch_size, self.line_count)
         indices = np.arange(count)
         if shuffle:
             np.random.shuffle(indices)
 
         images = []
-        for i in range(len(indices)):
-            img = cv2.imread(self.line_vci_paths[i], cv2.IMREAD_UNCHANGED) / 255. * 2. - 1.
-            images.append(np.expand_dims(cv2.resize(img, dsize=(img_shape[1], img_shape[0]),
-                                                    interpolation=cv2.INTER_LINEAR), axis=0))
-            #print(img.shape)
-            #print(cv2.resize(img, dsize=(img_shape[1], img_shape[0]),
-            #                                        interpolation=cv2.INTER_LINEAR).shape)
-        images = np.concatenate(images, axis=0)
 
+        if load_images:
+            for i in range(len(indices)):
+                img = cv2.imread(self.line_vci_paths[i], cv2.IMREAD_UNCHANGED)
+                if img is None:
+                    print("WARNING: VIRTUAL CAMERA IMAGE NOT FOUND AT {}".format(self.line_vci_paths[i]))
+                    images.append(np.expand_dims(np.zeros(img_shape), axis=0))
+                else:
+                    images.append(np.expand_dims(cv2.resize(img / 255. * 2. - 1., dsize=(img_shape[1], img_shape[0]),
+                                                            interpolation=cv2.INTER_LINEAR), axis=0))
+            images = np.concatenate(images, axis=0)
+
+        # print("Path: {}".format(self.line_vci_paths[0]))
         return count, self.line_geometries[indices, :], \
             self.line_labels[indices], self.line_class_ids[indices], images
 
 
 class LineDataGenerator:
     def __init__(self, files_dir, bg_classes,
-                 shuffle=False, data_augmentation=False, mean=np.zeros((3,)), img_shape=(224, 224, 3)):
+                 shuffle=False, data_augmentation=False, mean=np.zeros((3,)), img_shape=(224, 224, 3),
+                 sort=False):
         # Initialize parameters.
         self.shuffle = shuffle
         self.data_augmentation = data_augmentation
@@ -62,6 +68,12 @@ class LineDataGenerator:
         self.load_frames(files_dir)
         self.mean = mean
         self.img_shape = img_shape
+        self.sort = sort
+        self.cluster_counts = []
+        self.line_counts = []
+        self.cluster_count_file = "cluster_counts"
+        self.line_count_file = "line_counts"
+        self.skipped_frames = 0
 
         if self.shuffle:
             self.shuffle_data()
@@ -103,6 +115,10 @@ class LineDataGenerator:
         if self.shuffle:
             self.shuffle_data()
 
+        print("Dataset completed. Number of skipped frames: {}".format(self.skipped_frames))
+        np.save(self.cluster_count_file, np.array(self.cluster_counts))
+        np.save(self.line_count_file, np.array(self.line_counts))
+
     def set_pointer(self, index):
         """ Sets the internal pointer to point to the given index.
 
@@ -111,22 +127,54 @@ class LineDataGenerator:
         """
         self.pointer = index
 
-    def next_batch(self, batch_size):
+    def next_batch(self, batch_size, load_images):
         if self.pointer == self.frame_count:
             self.reset_pointer()
 
         line_count, line_geometries, line_labels, line_class_ids, line_images = \
-            self.frames[self.frame_indices[self.pointer]].get_batch(batch_size, self.img_shape, self.shuffle)
+            self.frames[self.frame_indices[self.pointer]].get_batch(batch_size,
+                                                                    self.img_shape,
+                                                                    self.shuffle,
+                                                                    load_images)
         self.pointer = self.pointer + 1
+
+        cluster_count = len(np.unique(line_labels[np.isin(line_class_ids, self.bg_classes, invert=True)]))
+
+        # Write line counts and cluster counts for histogram:
+        self.cluster_counts.append(cluster_count)
+        self.line_counts.append(line_count)
+
+        if line_count < 15:
+            # print("Skipping frame because it does not have enough lines")
+            self.skipped_frames += 1
+            return self.next_batch(batch_size, load_images)
+
+        if cluster_count == 0 or cluster_count > 15:
+            # print("Skipping frame because it has 0 or too many instances.")
+            self.skipped_frames += 1
+            return self.next_batch(batch_size, load_images)
+
+        out_k = np.zeros((31,))
+        out_k[min(30, cluster_count)] = 1.
 
         # Subtract mean of start and end points.
         # Intuitively, the mean lies some where straight forward, i.e. [0., 0., 3.].
         line_geometries = subtract_mean(line_geometries, self.mean)
+        line_geometries = normalize(line_geometries, 4.)
         line_geometries = add_length(line_geometries)
 
         if self.data_augmentation:
             augment_flip(line_geometries)
             augment_global(line_geometries, np.radians(20.), 0.5)
+
+        # Sort by x value of leftest point:
+        if self.sort:
+            sorted_ids = np.argsort(np.min(line_geometries[:, [0, 3]], axis=1))
+            line_geometries = line_geometries[sorted_ids, :]
+            line_labels = line_labels[sorted_ids]
+            line_class_ids = line_class_ids[sorted_ids]
+            if load_images:
+                line_images = line_images[sorted_ids, :, :, :]
 
         valid_mask = np.zeros((batch_size,), dtype=bool)
         out_geometries = np.zeros((batch_size, line_geometries.shape[1]))
@@ -139,17 +187,22 @@ class LineDataGenerator:
         out_labels[:line_count] = line_labels
         out_classes[:line_count] = line_class_ids
         out_bg[np.isin(out_classes, self.bg_classes)] = True
+        out_bg[line_count:batch_size] = False
 
-        out_images = line_images
-        if line_count < batch_size:
-            out_images = np.concatenate([out_images,
-                                         np.zeros((batch_size - line_count,
-                                                   self.img_shape[0],
-                                                   self.img_shape[1],
-                                                   self.img_shape[2]))],
-                                        axis=0)
+        if load_images:
+            # TODO: Sort images too.
+            out_images = line_images
+            if line_count < batch_size:
+                out_images = np.concatenate([out_images,
+                                             np.zeros((batch_size - line_count,
+                                                       self.img_shape[0],
+                                                       self.img_shape[1],
+                                                       self.img_shape[2]))],
+                                            axis=0)
+        else:
+            out_images = np.zeros((batch_size, self.img_shape[0], self.img_shape[1], self.img_shape[2]))
 
-        return out_geometries, out_labels, valid_mask, out_bg, out_images
+        return out_geometries, out_labels, valid_mask, out_bg, out_images, out_k
 
 
 def add_length(line_geometries):
@@ -163,6 +216,12 @@ def subtract_mean(line_geometries, mean):
     mean_vec[0, :3] = mean
     mean_vec[0, 3:6] = mean
     line_geometries = line_geometries - mean_vec
+
+    return line_geometries
+
+
+def normalize(line_geometries, std_dev):
+    line_geometries[:, 0:6] = line_geometries[:, 0:6] / 2
 
     return line_geometries
 

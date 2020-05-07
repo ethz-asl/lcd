@@ -198,6 +198,13 @@ def split_scene(line_path, vi_path, output_path):
         line_counts.append(line_count)
         data_lines.append(frame_lines)
 
+    if len(data_lines) == 0:
+        path_to_output = os.path.join(output_path.format('ERROR'))
+        print("ERROR: NO DATA FOUND.")
+        with open(path_to_output) as f:
+            f.write("LOL ERROR")
+        return
+
     # The index of the label column in the line data is 21.
     label_index = 21
     changes = mean_shift_split(data_lines, label_index)
