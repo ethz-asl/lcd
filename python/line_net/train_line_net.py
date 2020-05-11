@@ -162,36 +162,31 @@ def get_kl_losses_and_metrics(instancing_tensor, labels_tensor, validity_mask, b
     # mask_non_bg = 1. - h_bg * v_bg
 
     mask_equal = tf.equal(h_labels, v_labels)
-    mask_not_equal = tf.not_equal(h_labels, v_labels) #(1. - mask_equal) * mask_non_bg
-    # mask_equal = tf.cast(tf.expand_dims(mask_equal, axis=-1), dtype='float32')
-    # mask_not_equal = tf.cast(tf.expand_dims(mask_not_equal, axis=-1), dtype='float32')
-    mask_equal = tf.cast(mask_equal, dtype='float32')
+    mask_not_equal = tf.not_equal(h_labels, v_labels)
+    # mask_equal = tf.cast(mask_equal, dtype='float32')
     print("EQUAL SHAPE")
     print(mask_equal.shape)
-    mask_not_equal = tf.cast(mask_not_equal, dtype='float32')
+    # mask_not_equal = tf.cast(mask_not_equal, dtype='float32')
     print("NOT EQUAL SHAPE")
     print(mask_not_equal.shape)
 
-    h_bg = tf.cast(tf.expand_dims(tf.logical_not(bg_mask), axis=-1), dtype='float32')
+    h_bg = tf.expand_dims(tf.logical_not(bg_mask), axis=-1)
     v_bg = tf.transpose(h_bg, perm=(0, 2, 1))
-    mask_not_bg_unexpanded = h_bg * v_bg
-    # mask_not_bg = tf.expand_dims(h_bg * v_bg, -1)
-    mask_not_bg = mask_not_bg_unexpanded
+    mask_not_bg = tf.logical_and(h_bg, v_bg)
 
-    h_val = tf.cast(tf.expand_dims(validity_mask, axis=-1), dtype='float32')
+    h_val = tf.expand_dims(validity_mask, axis=-1)
     v_val = tf.transpose(h_val, perm=(0, 2, 1))
-    mask_val = h_val * v_val
-    mask_val_unexpanded = tf.linalg.set_diag(mask_val, tf.zeros(tf.shape(mask_val)[0:-1]))
-    # mask_val = tf.expand_dims(mask_val_unexpanded, -1)
-    mask_val = mask_val_unexpanded
+    mask_val = tf.logical_and(h_val, v_val)
+    mask_val = tf.linalg.set_diag(mask_val, tf.zeros(tf.shape(mask_val)[0:-1], dtype='bool'))
     print("VAL SHAPE")
     print(mask_val.shape)
 
-    num_valid = tf.reduce_sum(mask_val * mask_not_bg, axis=(1, 2), keepdims=True)
+    loss_mask = tf.logical_and(mask_val, mask_not_bg)
+
+    num_valid = tf.reduce_sum(tf.cast(loss_mask, dtype='float32'), axis=(1, 2), keepdims=True)
     # num_total = tf.ones_like(num_valid) * num_lines * num_lines
 
     #def k_cross_div_same(y_true, y_pred):
-
 
     def kl_cross_div_loss(y_true, y_pred):
         # Drop diagonal and mask:#  * mask_equal * h_mask_drop * v_mask_drop * mask_non_bg
@@ -208,42 +203,54 @@ def get_kl_losses_and_metrics(instancing_tensor, labels_tensor, validity_mask, b
         # num_equal = K.sum(mask_equal, axis=(1, 2))
         # num_not_equal = K.sum(mask_not_equal, axis=(1, 2))
 
-        # repeated_pred = K.repeat_elements(K.expand_dims(instancing_tensor, axis=2), num_lines, axis=2)
         extended_pred = K.expand_dims(instancing_tensor, axis=2)
         h_pred = extended_pred  # K.permute_dimensions(extended_pred, (0, 1, 2, 3))
         v_pred = tf.transpose(extended_pred, perm=(0, 2, 1, 3))
-        d = h_pred * tf.math.log(tf.math.divide_no_nan(h_pred, v_pred + 0.00001) + 0.000001)
+        d = h_pred * tf.math.log(tf.math.divide_no_nan(h_pred, v_pred) + 0.000001)
         d = tf.reduce_sum(d, axis=-1, keepdims=False)
         print("D SHAPE")
         print(d.shape)
-        where_mask = mask_val * mask_not_bg
-        # equal_loss = mask_equal * d
-        equal_loss = tf.where(tf.logical_and(tf.greater(mask_equal, 0.), tf.greater(where_mask, 0.)), d, 0.)
-        # not_equal_loss = mask_not_equal * tf.math.maximum(0., 2.0 - d)
-        not_equal_loss = tf.where(tf.logical_and(tf.greater(mask_not_equal, 0.), tf.greater(where_mask, 0.)),
+        equal_loss = tf.where(tf.logical_and(mask_equal, loss_mask), d, 0.)
+        not_equal_loss = tf.where(tf.logical_and(mask_not_equal, loss_mask),
                                   tf.maximum(0., 2.0 - d), 0.)
-        print("LOSS 1 SHAPE")
-        # print(loss_layer.shape)
-        # loss_layer = tf.reduce_sum(loss_layer * mask_val * mask_not_bg, axis=-1)
-        print("LOSS SHAPE")
-        # print(loss_layer.shape)
-        print("NUM_VALID SHAPE")
-        # print(num_valid.shape)
-        print("NUM_TOTAL SHAPE")
-        # print(num_total.shape)
-        # out_loss = tf.math.divide_no_nan(loss_layer, num_valid) * num_total
-        # out_loss = tf.where(tf.greater(where_mask, 0.), not_equal_loss + equal_loss, tf.zeros_like(d))
-        # out_loss = tf.where(tf.greater(where_mask, 0.))
         print("FINAL LOSS SHAPE")
         # print(out_loss.shape)
         return (equal_loss + not_equal_loss) / num_valid * 150. * 150.  # equal_loss * mask_val * mask_not_bg + not_equal_loss * mask_val * mask_not_bg
 
-    pred_labels = K.argmax(instancing_tensor, axis=-1)
+    pred_labels = tf.argmax(instancing_tensor, axis=-1)
+    print("PRED_LABELS SHAPE")
+    print(pred_labels.shape)
+    h_pred_labels = tf.expand_dims(pred_labels, axis=-1)
+    print("PRED_LABELS_EXP SHAPE")
+    print(h_pred_labels.shape)
+    v_pred_labels = tf.transpose(h_pred_labels, perm=(0, 2, 1))
+
+    pred_equals = tf.equal(h_pred_labels, v_pred_labels)
+    pred_not_equals = tf.not_equal(h_pred_labels, v_pred_labels)
 
     def tp_over_gt_p(y_true, y_pred):
-        print("lol")
+        pred_p = tf.cast(tf.logical_and(pred_equals, tf.logical_and(loss_mask, mask_equal)), dtype='float32')
+        pred_p = tf.reduce_sum(pred_p, axis=(1, 2))
 
-    return kl_cross_div_loss
+        gt_p = tf.cast(tf.logical_and(loss_mask, mask_equal), dtype='float32')
+        gt_p = tf.reduce_sum(gt_p, axis=(1, 2))
+        print("GT_P")
+        print(gt_p.shape)
+
+        return tf.reduce_mean(pred_p / gt_p)
+
+    def tn_over_gt_n(y_true, y_pred):
+        pred_n = tf.cast(tf.logical_and(pred_not_equals, tf.logical_and(loss_mask, mask_not_equal)), dtype='float32')
+        pred_n = tf.reduce_sum(pred_n, axis=(1, 2))
+        print("PRED_N")
+        print(pred_n.shape)
+
+        gt_n = tf.cast(tf.logical_and(loss_mask, mask_not_equal), dtype='float32')
+        gt_n = tf.reduce_sum(gt_n, axis=(1, 2))
+
+        return tf.reduce_mean(pred_n / gt_n)
+
+    return kl_cross_div_loss, [tp_over_gt_p, tn_over_gt_n]
 
 
 def kl_loss_np(prediction, labels, val_mask, bg_mask):
@@ -418,16 +425,14 @@ def line_net_model(line_num_attr, num_lines, img_shape, margin):
     line_features = line_inputs
     # line_features = kl.Lambda(lambda x: K.expand_dims(K.cast(x, dtype='float32') / 300., axis=-1))(label_input)
     debug = fake_input
-    line_features = fake_input
+    # line_features = fake_input
     line_features = kl.Masking(mask_value=0.0)(line_features)
-    # line_features = kl.TimeDistributed(kl.Dense(15, activation='relu', name='embedding_layer'),
-    #                                    input_shape=(150, 15))(line_features)
+    line_features = kl.TimeDistributed(kl.Dense(1000, activation='relu', name='embedding_layer'),
+                                       input_shape=(150, 15))(line_features)
     print("LINE FEATURES SHAPE")
     print(line_features.shape)
-    # line_features = kl.TimeDistributed(kl.Dense(1000, activation='relu', name='embedding_layer'))(line_features)
-    # line_features = kl.TimeDistributed(kl.Dense(1000, activation='relu', name='embedding_layer'))(line_features)
-    line_f1 = kl.Bidirectional(kl.LSTM(500, return_sequences=True, return_state=False, name="lstm_1"),
-                               merge_mode='concat')(line_features)
+    # line_f1 = kl.Bidirectional(kl.LSTM(500, return_sequences=True, return_state=False, name="lstm_1"),
+    #                           merge_mode='concat')(line_features)
     # line_f1 = kl.TimeDistributed(kl.BatchNormalization())(line_f1)
     # line_f1 = kl.Add()([line_features, line_f1])
     # line_f2 = kl.Bidirectional(kl.LSTM(500, return_sequences=True, return_state=False, name="lstm_2"),
@@ -536,8 +541,8 @@ def line_net_model(line_num_attr, num_lines, img_shape, margin):
                                              num_lines,
                                              margin)
 
-    kl_losses = get_kl_losses_and_metrics(line_idist_logits, label_input, validity_input, bg_input, num_lines)
-    kl_test_metric = get_kl_losses_and_metrics(fake_input, label_input, validity_input, bg_input, num_lines)
+    kl_losses, real_metrics = get_kl_losses_and_metrics(line_idist_logits, label_input, validity_input, bg_input, num_lines)
+    # kl_test_metric, more_test_metrics = get_kl_losses_and_metrics(fake_input, label_input, validity_input, bg_input, num_lines)
     # kl_losses = get_losses_test(line_idist_logits)
 
     line_model = Model(inputs=[img_inputs, line_inputs, label_input, validity_input, bg_input, fake_input],
@@ -546,8 +551,8 @@ def line_net_model(line_num_attr, num_lines, img_shape, margin):
     opt = SGD(lr=0.03, momentum=0.9)
     # opt = keras.optimizers.RMSprop(learning_rate=0.018)
     line_model.compile(loss=kl_losses,# {'cl_cnt': 'categorical_crossentropy', 'cl_dis': kl_losses},#losses,#masked_binary_cross_entropy(bg_input, validity_input, num_lines), #losses,
-                       optimizer='adam',
-                       metrics=[argmax_metric(), kl_test_metric] + debug_metrics(debug),
+                       optimizer=opt,
+                       metrics=real_metrics,# + debug_metrics(debug),[kl_test_metric] +
                        # metrics={'cl_cnt': cluster_count_metrics()},
                        experimental_run_tf_function=False)#[masked_binary_accuracy(validity_input), bg_percentage_metric(bg_input, validity_input)])
 
@@ -657,7 +662,7 @@ def train():
                                  max_queue_size=1,
                                  workers=1,
                                  use_multiprocessing=False,
-                                 epochs=400,
+                                 epochs=10,
                                  steps_per_epoch=np.floor(train_data_generator.frame_count / batch_size) * 100,
                                  validation_data=val_generator,
                                  validation_steps=np.floor(val_data_generator.frame_count / batch_size),
@@ -671,6 +676,7 @@ def train():
         geometries, labels, valid_mask, bg_mask, images, k = \
             train_data_generator.next_batch(max_line_count, load_images=False)
 
+        fake = get_fake_instancing(labels, valid_mask, bg_mask)
         labels = labels.reshape((1, max_line_count))
         geometries = geometries.reshape((1, max_line_count, line_num_attr))
         valid_mask = valid_mask.reshape((1, max_line_count))
@@ -681,10 +687,11 @@ def train():
                                      'labels': labels,
                                      'valid_input_mask': valid_mask,
                                      'background_mask': bg_mask,
-                                     'images': images})
+                                     'images': images,
+                                     'fake': fake})
 
         predictions.append(output)
-        gts.append(k)
+        gts.append(fake)
 
         print("Frame {}/{}".format(i, train_data_generator.frame_count))
         # np.save("output/output_frame_{}".format(i), output)
