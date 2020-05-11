@@ -116,6 +116,7 @@ class LineDataGenerator:
             self.shuffle_data()
 
         print("Dataset completed. Number of skipped frames: {}".format(self.skipped_frames))
+        self.skipped_frames = 0
         np.save(self.cluster_count_file, np.array(self.cluster_counts))
         np.save(self.line_count_file, np.array(self.line_counts))
 
@@ -160,7 +161,7 @@ class LineDataGenerator:
         # Subtract mean of start and end points.
         # Intuitively, the mean lies some where straight forward, i.e. [0., 0., 3.].
         line_geometries = subtract_mean(line_geometries, self.mean)
-        line_geometries = normalize(line_geometries, 4.)
+        line_geometries = normalize(line_geometries, 1.5)
         line_geometries = add_length(line_geometries)
 
         if self.data_augmentation:
@@ -221,7 +222,7 @@ def subtract_mean(line_geometries, mean):
 
 
 def normalize(line_geometries, std_dev):
-    line_geometries[:, 0:6] = line_geometries[:, 0:6] / 2
+    line_geometries[:, 0:6] = line_geometries[:, 0:6] / std_dev
 
     return line_geometries
 

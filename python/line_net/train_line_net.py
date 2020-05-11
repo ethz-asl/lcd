@@ -9,6 +9,7 @@ import tensorflow.keras.layers as kl
 from tensorflow.keras.optimizers import SGD, Adam
 
 from tensorflow.keras import backend as K
+from tensorflow.python import debug as tf_debug
 
 from datagenerator_framewise import LineDataGenerator
 
@@ -149,7 +150,7 @@ def get_kl_losses_and_metrics(instancing_tensor, labels_tensor, validity_mask, b
     # labels = K.repeat_elements(K.cast(labels, dtype='int32'), num_lines, -2)
 
     h_labels = K.expand_dims(labels_tensor, axis=-1)
-    v_labels = K.permute_dimensions(h_labels, (0, 2, 1))
+    v_labels = tf.transpose(h_labels, perm=(0, 2, 1))
 
     # Background interconnections are loss free, to prevent trying to fit on background clusters. These are
     # typically very far apart and obviously hard to cluster.
@@ -160,26 +161,37 @@ def get_kl_losses_and_metrics(instancing_tensor, labels_tensor, validity_mask, b
     # v_bg = K.permute_dimensions(h_bg, (0, 2, 1, 3))
     # mask_non_bg = 1. - h_bg * v_bg
 
-    mask_equal = K.equal(h_labels, v_labels)
-    mask_not_equal = tf.logical_not(mask_equal) #(1. - mask_equal) * mask_non_bg
-    mask_equal = tf.cast(tf.expand_dims(mask_equal, axis=-1), dtype='float32')
-    mask_not_equal = tf.cast(tf.expand_dims(mask_not_equal, axis=-1), dtype='float32')
+    mask_equal = tf.equal(h_labels, v_labels)
+    mask_not_equal = tf.not_equal(h_labels, v_labels) #(1. - mask_equal) * mask_non_bg
+    # mask_equal = tf.cast(tf.expand_dims(mask_equal, axis=-1), dtype='float32')
+    # mask_not_equal = tf.cast(tf.expand_dims(mask_not_equal, axis=-1), dtype='float32')
+    mask_equal = tf.cast(mask_equal, dtype='float32')
+    print("EQUAL SHAPE")
+    print(mask_equal.shape)
+    mask_not_equal = tf.cast(mask_not_equal, dtype='float32')
+    print("NOT EQUAL SHAPE")
+    print(mask_not_equal.shape)
 
     h_bg = tf.cast(tf.expand_dims(tf.logical_not(bg_mask), axis=-1), dtype='float32')
     v_bg = tf.transpose(h_bg, perm=(0, 2, 1))
     mask_not_bg_unexpanded = h_bg * v_bg
-    mask_not_bg = tf.expand_dims(h_bg * v_bg, -1)
+    # mask_not_bg = tf.expand_dims(h_bg * v_bg, -1)
+    mask_not_bg = mask_not_bg_unexpanded
 
     h_val = tf.cast(tf.expand_dims(validity_mask, axis=-1), dtype='float32')
     v_val = tf.transpose(h_val, perm=(0, 2, 1))
     mask_val = h_val * v_val
     mask_val_unexpanded = tf.linalg.set_diag(mask_val, tf.zeros(tf.shape(mask_val)[0:-1]))
-    mask_val = tf.expand_dims(mask_val_unexpanded, -1)
+    # mask_val = tf.expand_dims(mask_val_unexpanded, -1)
+    mask_val = mask_val_unexpanded
     print("VAL SHAPE")
     print(mask_val.shape)
 
-    num_valid = tf.reduce_sum(mask_val_unexpanded * mask_not_bg_unexpanded, axis=(1, 2), keepdims=True)
-    num_total = tf.ones_like(num_valid) * num_lines * num_lines
+    num_valid = tf.reduce_sum(mask_val * mask_not_bg, axis=(1, 2), keepdims=True)
+    # num_total = tf.ones_like(num_valid) * num_lines * num_lines
+
+    #def k_cross_div_same(y_true, y_pred):
+
 
     def kl_cross_div_loss(y_true, y_pred):
         # Drop diagonal and mask:#  * mask_equal * h_mask_drop * v_mask_drop * mask_non_bg
@@ -198,25 +210,33 @@ def get_kl_losses_and_metrics(instancing_tensor, labels_tensor, validity_mask, b
 
         # repeated_pred = K.repeat_elements(K.expand_dims(instancing_tensor, axis=2), num_lines, axis=2)
         extended_pred = K.expand_dims(instancing_tensor, axis=2)
-        h_pred = K.permute_dimensions(extended_pred, (0, 1, 2, 3))
-        v_pred = K.permute_dimensions(extended_pred, (0, 2, 1, 3))
-        d = h_pred * tf.math.log(tf.math.divide_no_nan(h_pred, v_pred) + 0.0001)
+        h_pred = extended_pred  # K.permute_dimensions(extended_pred, (0, 1, 2, 3))
+        v_pred = tf.transpose(extended_pred, perm=(0, 2, 1, 3))
+        d = h_pred * tf.math.log(tf.math.divide_no_nan(h_pred, v_pred + 0.00001) + 0.000001)
+        d = tf.reduce_sum(d, axis=-1, keepdims=False)
         print("D SHAPE")
         print(d.shape)
-        loss_layer = (mask_equal * d + mask_not_equal * K.maximum(0., 1.3 - d))
+        where_mask = mask_val * mask_not_bg
+        # equal_loss = mask_equal * d
+        equal_loss = tf.where(tf.logical_and(tf.greater(mask_equal, 0.), tf.greater(where_mask, 0.)), d, 0.)
+        # not_equal_loss = mask_not_equal * tf.math.maximum(0., 2.0 - d)
+        not_equal_loss = tf.where(tf.logical_and(tf.greater(mask_not_equal, 0.), tf.greater(where_mask, 0.)),
+                                  tf.maximum(0., 2.0 - d), 0.)
         print("LOSS 1 SHAPE")
-        print(loss_layer.shape)
-        loss_layer = tf.reduce_sum(loss_layer * mask_val * mask_not_bg, axis=-1)
+        # print(loss_layer.shape)
+        # loss_layer = tf.reduce_sum(loss_layer * mask_val * mask_not_bg, axis=-1)
         print("LOSS SHAPE")
-        print(loss_layer.shape)
+        # print(loss_layer.shape)
         print("NUM_VALID SHAPE")
-        print(num_valid.shape)
+        # print(num_valid.shape)
         print("NUM_TOTAL SHAPE")
-        print(num_total.shape)
-        out_loss = tf.math.divide_no_nan(loss_layer, num_valid) * num_total
+        # print(num_total.shape)
+        # out_loss = tf.math.divide_no_nan(loss_layer, num_valid) * num_total
+        # out_loss = tf.where(tf.greater(where_mask, 0.), not_equal_loss + equal_loss, tf.zeros_like(d))
+        # out_loss = tf.where(tf.greater(where_mask, 0.))
         print("FINAL LOSS SHAPE")
-        print(out_loss.shape)
-        return out_loss
+        # print(out_loss.shape)
+        return (equal_loss + not_equal_loss) / num_valid * 150. * 150.  # equal_loss * mask_val * mask_not_bg + not_equal_loss * mask_val * mask_not_bg
 
     pred_labels = K.argmax(instancing_tensor, axis=-1)
 
@@ -226,11 +246,42 @@ def get_kl_losses_and_metrics(instancing_tensor, labels_tensor, validity_mask, b
     return kl_cross_div_loss
 
 
-def get_losses_test(test_tensor):
-    def loss(y_true, y_pred):
-        return test_tensor
+def kl_loss_np(prediction, labels, val_mask, bg_mask):
+    h_labels = np.expand_dims(labels, axis=-1)
+    v_labels = np.transpose(h_labels, axes=(1, 0))
 
-    return loss
+    mask_equal = np.equal(h_labels, v_labels)
+    mask_not_equal = np.logical_not(mask_equal)
+    # mask_equal = np.expand_dims(mask_equal, axis=-1).astype(float)
+    # mask_not_equal = np.expand_dims(mask_not_equal, axis=-1).astype(float)
+    mask_equal = mask_equal.astype(float)
+    mask_not_equal = mask_not_equal.astype(float)
+
+    h_bg = np.expand_dims(np.logical_not(bg_mask), axis=-1).astype(float)
+    v_bg = np.transpose(h_bg, axes=(1, 0))
+    mask_not_bg_unexpanded = h_bg * v_bg
+    # mask_not_bg = np.expand_dims(h_bg * v_bg, -1)
+    mask_not_bg = mask_not_bg_unexpanded
+
+    h_val = np.expand_dims(val_mask, axis=-1).astype(float)
+    v_val = np.transpose(h_val, axes=(1, 0))
+    mask_val = h_val * v_val
+    mask_val_unexpanded = np.copy(mask_val)
+    np.fill_diagonal(mask_val_unexpanded, 0.)
+    # mask_val = np.expand_dims(mask_val_unexpanded, axis=-1)
+    mask_val = mask_val_unexpanded
+
+    h_pred = np.expand_dims(prediction, axis=0)
+    v_pred = np.transpose(h_pred, axes=(1, 0, 2))
+
+    d = h_pred * np.log(np.nan_to_num(h_pred / v_pred) + 0.000001)
+    d = np.sum(d, axis=-1, keepdims=False)
+
+    equal_loss_layer = mask_equal * d
+    not_equal_loss_layer = mask_not_equal * np.maximum(0., 2.0 - d)
+    # print(np.max(loss_layer * mask_val * mask_not_bg))
+    # print("Compare:")
+    # print(np.sum(not_equal_loss_layer * mask_val * mask_not_bg) + np.sum(equal_loss_layer * mask_val * mask_not_bg))
 
 
 def expand_lines(num_lines):
@@ -278,18 +329,6 @@ def normalize_embeddings(input):
     return K.l2_normalize(input, axis=3)
 
 
-def residual_bdlstm(units, merge_mode='concat'):
-    def rbdlstm_layer(input_tensor):
-        # Warning: Number of units must be half of the input tensors last dimension.
-        output = kl.Bidirectional(kl.LSTM(int(units / 2), return_sequences=True, return_state=False),
-                                  merge_mode=merge_mode)(input_tensor)
-        output = kl.LSTM(int(units), return_sequences=True, return_state=False)(input_tensor)
-
-        return output# + input_tensor
-
-    return rbdlstm_layer
-
-
 def masked_binary_cross_entropy(bg_mask, validity_mask, num_lines):
     def loss(y_true, y_pred):
         out = K.binary_crossentropy(y_true, y_pred, from_logits=True)
@@ -323,6 +362,32 @@ def bg_percentage_metric(bg_mask, validity_mask):
     return bg_percentage
 
 
+def debug_metrics(tensor):
+    def debug_sum(y_true, y_pred):
+        return K.sum(tensor, axis=-1)
+
+    def debug_l1(y_true, y_pred):
+        return K.sum(K.abs(tensor), axis=-1)
+
+    def debug_std(y_true, y_pred):
+        return K.std(tensor, axis=-1)
+
+    def debug_max(y_true, y_pred):
+        return K.max(tensor, axis=-1)
+
+    def debug_min(y_true, y_pred):
+        return K.min(tensor, axis=-1)
+
+    return [debug_sum, debug_l1, debug_std, debug_max, debug_min]
+
+
+def argmax_metric():
+    def argmax(y_true, y_pred):
+        return K.argmax(y_pred, axis=-1)
+
+    return argmax
+
+
 def line_net_model(line_num_attr, num_lines, img_shape, margin):
     """
     Model architecture
@@ -340,6 +405,7 @@ def line_net_model(line_num_attr, num_lines, img_shape, margin):
     label_input = kl.Input(shape=(num_lines,), dtype='int32', name='labels')
     validity_input = kl.Input(shape=(num_lines,), dtype='bool', name='valid_input_mask')
     bg_input = kl.Input(shape=(num_lines,), dtype='bool', name='background_mask')
+    fake_input = kl.Input(shape=(num_lines, 15), dtype='float32', name='fake')
 
     # img_inputs = kl.ZeroPadding3D(padding=(0, 0, 0))
 
@@ -349,41 +415,53 @@ def line_net_model(line_num_attr, num_lines, img_shape, margin):
     # line_features = kl.Dense(1000, activation='relu')(line_inputs)
     # line_features = kl.Multiply()([line_features, expanded_val])
 
-    # line_features = line_inputs
-    line_features = kl.Masking(mask_value=0.0)(line_inputs)
-    line_features = kl.TimeDistributed(kl.Dense(1000, activation='relu', name='embedding_layer'))(line_features)
+    line_features = line_inputs
+    # line_features = kl.Lambda(lambda x: K.expand_dims(K.cast(x, dtype='float32') / 300., axis=-1))(label_input)
+    debug = fake_input
+    line_features = fake_input
+    line_features = kl.Masking(mask_value=0.0)(line_features)
+    # line_features = kl.TimeDistributed(kl.Dense(15, activation='relu', name='embedding_layer'),
+    #                                    input_shape=(150, 15))(line_features)
+    print("LINE FEATURES SHAPE")
+    print(line_features.shape)
+    # line_features = kl.TimeDistributed(kl.Dense(1000, activation='relu', name='embedding_layer'))(line_features)
+    # line_features = kl.TimeDistributed(kl.Dense(1000, activation='relu', name='embedding_layer'))(line_features)
     line_f1 = kl.Bidirectional(kl.LSTM(500, return_sequences=True, return_state=False, name="lstm_1"),
                                merge_mode='concat')(line_features)
-    line_f1 = kl.TimeDistributed(kl.BatchNormalization())(line_f1)
-    line_f1 = kl.Add()([line_features, line_f1])
-    line_f2 = kl.Bidirectional(kl.LSTM(500, return_sequences=True, return_state=False, name="lstm_2"),
-                               merge_mode='concat')(line_f1)
-    line_f2 = kl.TimeDistributed(kl.BatchNormalization())(line_f2)
-    line_f2 = kl.Add()([line_f2, line_f1])
-    line_f3 = kl.Bidirectional(kl.LSTM(500, return_sequences=True, return_state=False),
-                               merge_mode='concat')(line_f2)
-    line_f3 = kl.Add()([line_f3, line_f2])
+    # line_f1 = kl.TimeDistributed(kl.BatchNormalization())(line_f1)
+    # line_f1 = kl.Add()([line_features, line_f1])
+    # line_f2 = kl.Bidirectional(kl.LSTM(500, return_sequences=True, return_state=False, name="lstm_2"),
+    #                            merge_mode='concat')(line_f1)
+    # line_f2 = kl.TimeDistributed(kl.BatchNormalization())(line_f2)
+    # line_f2 = kl.Add()([line_f2, line_f1])
+    # line_f3 = kl.Bidirectional(kl.LSTM(500, return_sequences=True, return_state=False),
+    #                            merge_mode='concat')(line_f2)
+    # line_f3 = kl.Add()([line_f3, line_f2])
     # line_idist is the sequence output for clustering, line_ic is the output for the cluster count.
-    line_idist, _, line_ic_0, _, line_ic_1 = \
-        kl.Bidirectional(kl.LSTM(500, return_sequences=True, return_state=True, name="lstm_1"),
-                         merge_mode='concat')(line_f3)
-    line_ic = kl.Concatenate()([line_ic_0, line_ic_1])
+    # line_idist, _, line_ic_0, _, line_ic_1 = \
+    #     kl.Bidirectional(kl.LSTM(500, return_sequences=True, return_state=True, name="lstm_1"),
+    #                      merge_mode='concat')(line_f3)
+    # line_ic = kl.Concatenate()([line_ic_0, line_ic_1])
 
-    line_idist = kl.TimeDistributed(kl.BatchNormalization())(line_idist)
-    line_idist = kl.Add()([line_idist, line_f3])
-    line_idist = kl.TimeDistributed(kl.Dense(500, use_bias=False))(line_idist)
-    line_idist = kl.TimeDistributed(kl.BatchNormalization())(line_idist)
-    line_idist = kl.TimeDistributed(kl.Activation('relu'))(line_idist)
-    line_idist = kl.TimeDistributed(kl.Dense(15, activation=None))(line_idist)
-    line_idist_logits = kl.Softmax(axis=-1, name='cl_dis')(line_idist)
+    # line_idist = kl.TimeDistributed(kl.BatchNormalization())(line_idist)
+    line_idist = line_features  # kl.Add()([line_idist, line_f3])
+    # line_idist = kl.TimeDistributed(kl.Dense(500, use_bias=False))(line_idist)
+    # line_idist = kl.TimeDistributed(kl.BatchNormalization())(line_idist)
+    # line_idist = kl.TimeDistributed(kl.Activation('relu'))(line_idist)
+    # debug = line_idist
+    line_idist = kl.TimeDistributed(kl.Dense(15, activation='softmax',
+                                             activity_regularizer=keras.regularizers.l1(l=0.0001)))(line_features)
+    # line_idist = kl.TimeDistributed(kl.BatchNormalization())(line_idist)
+    line_idist_logits = line_idist  # kl.TimeDistributed(kl.Softmax(axis=-1), name='cl_dis')(line_idist)
     print("line_idist")
     print(line_idist_logits.shape)
 
-    line_ic = kl.Dense(500, use_bias=False)(line_ic)
-    line_ic = kl.BatchNormalization()(line_ic)
-    line_ic = kl.Activation('relu')(line_ic)
-    line_ic = kl.Dense(31, activation=None)(line_ic)
-    line_ic_logits = kl.Softmax(name='cl_cnt')(line_ic)
+    # line_ic = kl.Dense(500, use_bias=False)(line_ic)
+    # line_ic = kl.BatchNormalization()(line_ic)
+    # line_ic = kl.Activation('relu')(line_ic)
+    # line_ic = kl.Dense(31, activation=None)(line_ic)
+    # line_ic = kl.BatchNormalization()(line_ic)
+    # line_ic_logits = kl.Softmax(name='cl_cnt')(line_ic)
 
     # Image classifier:
     # img_shape = Input(shape=(224, 224, 3), dtype='float32')
@@ -459,19 +537,38 @@ def line_net_model(line_num_attr, num_lines, img_shape, margin):
                                              margin)
 
     kl_losses = get_kl_losses_and_metrics(line_idist_logits, label_input, validity_input, bg_input, num_lines)
+    kl_test_metric = get_kl_losses_and_metrics(fake_input, label_input, validity_input, bg_input, num_lines)
     # kl_losses = get_losses_test(line_idist_logits)
 
-    line_model = Model(inputs=[img_inputs, line_inputs, label_input, validity_input, bg_input],
-                       outputs=[line_ic_logits, line_idist_logits], #img_logits, #second_order_norm,  # line_embeddings,
+    line_model = Model(inputs=[img_inputs, line_inputs, label_input, validity_input, bg_input, fake_input],
+                       outputs=line_idist_logits,# [line_ic_logits, line_idist_logits], #img_logits, #second_order_norm,  # line_embeddings,
                        name='line_net_model')
-    opt = SGD(lr=0.0003, momentum=0.9)
-    opt = keras.optimizers.RMSprop(learning_rate=0.0003)
-    line_model.compile(loss={'cl_cnt': 'categorical_crossentropy', 'cl_dis': kl_losses},#losses,#masked_binary_cross_entropy(bg_input, validity_input, num_lines), #losses,
-                       optimizer=opt,
-                       metrics={'cl_cnt': cluster_count_metrics()},
+    opt = SGD(lr=0.03, momentum=0.9)
+    # opt = keras.optimizers.RMSprop(learning_rate=0.018)
+    line_model.compile(loss=kl_losses,# {'cl_cnt': 'categorical_crossentropy', 'cl_dis': kl_losses},#losses,#masked_binary_cross_entropy(bg_input, validity_input, num_lines), #losses,
+                       optimizer='adam',
+                       metrics=[argmax_metric(), kl_test_metric] + debug_metrics(debug),
+                       # metrics={'cl_cnt': cluster_count_metrics()},
                        experimental_run_tf_function=False)#[masked_binary_accuracy(validity_input), bg_percentage_metric(bg_input, validity_input)])
 
     return line_model
+
+
+def get_fake_instancing(labels, valid_mask, bg_mask):
+    valid_count = np.where(valid_mask == 1)[0].shape[0]
+    unique_labels = np.unique(labels[np.where(np.logical_and(valid_mask, np.logical_not(bg_mask)))])
+    out = np.zeros((150, 15), dtype=float)
+
+    for i, label in enumerate(unique_labels):
+        out[np.where(labels == label), i] = 1.
+
+    # out[:, :] = 0.
+    # out[:, 0] = 1.
+
+    kl_loss_np(out, labels, valid_mask, bg_mask)
+
+    return np.expand_dims(out, axis=0)
+
 
 
 def data_generator(image_data_generator, max_line_count, line_num_attr, batch_size=1):
@@ -484,8 +581,10 @@ def data_generator(image_data_generator, max_line_count, line_num_attr, batch_si
         batch_bg_mask = []
         batch_images = []
         batch_k = []
+        batch_fake = []
 
         for i in range(batch_size):
+            # image_data_generator.reset_pointer()
             geometries, labels, valid_mask, bg_mask, images, k = image_data_generator.next_batch(max_line_count,
                                                                                                  load_images=False)
             batch_labels.append(labels.reshape((1, max_line_count)))
@@ -494,6 +593,7 @@ def data_generator(image_data_generator, max_line_count, line_num_attr, batch_si
             batch_bg_mask.append(bg_mask.reshape((1, max_line_count)))
             batch_images.append(np.expand_dims(images, axis=0))
             batch_k.append(np.expand_dims(k, axis=0))
+            batch_fake.append(get_fake_instancing(labels, valid_mask, bg_mask))
 
         geometries = np.concatenate(batch_geometries, axis=0)
         labels = np.concatenate(batch_labels, axis=0)
@@ -501,6 +601,7 @@ def data_generator(image_data_generator, max_line_count, line_num_attr, batch_si
         bg_mask = np.concatenate(batch_bg_mask, axis=0)
         images = np.concatenate(batch_images, axis=0)
         batch_k = np.concatenate(batch_k, axis=0)
+        batch_fake = np.concatenate(batch_fake, axis=0)
 
         # print("Data generation took {} seconds.".format(time.perf_counter() - tic))
 
@@ -508,7 +609,8 @@ def data_generator(image_data_generator, max_line_count, line_num_attr, batch_si
                'labels': labels,
                'valid_input_mask': valid_mask,
                'background_mask': bg_mask,
-               'images': images}, [batch_k, batch_k]
+               'images': images,
+               'fake': batch_fake}, batch_k
 
 
 def train():
@@ -530,7 +632,7 @@ def train():
     line_model.summary()
 
     train_data_generator = LineDataGenerator(train_files, bg_classes,
-                                             shuffle=True,
+                                             shuffle=False,
                                              data_augmentation=False,
                                              img_shape=img_shape,
                                              sort=True)
@@ -555,8 +657,8 @@ def train():
                                  max_queue_size=1,
                                  workers=1,
                                  use_multiprocessing=False,
-                                 epochs=100,
-                                 steps_per_epoch=np.floor(train_data_generator.frame_count / batch_size),
+                                 epochs=400,
+                                 steps_per_epoch=np.floor(train_data_generator.frame_count / batch_size) * 100,
                                  validation_data=val_generator,
                                  validation_steps=np.floor(val_data_generator.frame_count / batch_size),
                                  callbacks=[save_weights_callback, tensorboard_callback])

@@ -22,7 +22,7 @@ class LineRenderer:
         self.render_result_connections = False
         self.show_closest = False
 
-        self.line_geometries, self.line_labels, self.valid_mask, self.bg_mask, images = \
+        self.line_geometries, self.line_labels, self.valid_mask, self.bg_mask, images, k = \
             self.line_data_generator.next_batch(150, False)
 
     def run(self):
@@ -81,19 +81,20 @@ class LineRenderer:
 
         vis.add_geometry(render_lines(self.line_geometries, self.line_labels, self.label_colors))
 
-        result = self.results[self.pointer]
-        #
-        if self.show_closest:
-            max_results = np.zeros_like(result, dtype=bool)
-            max_result_sort = np.argsort(result, axis=-1)[:, -1:]
-            for i in range(result.shape[0]):
-                max_results[i, max_result_sort[i, :]] = True
-            max_results[:, np.logical_not(self.valid_mask)] = False
-            max_results[np.logical_not(self.valid_mask)] = False
-            # max_results[np.where(result < self.margin)] = False
-            result_connections = max_results
-        else:
-            result_connections = np.where(result > self.margin, True, False)
+        if self.results is not None:
+            result = self.results[self.pointer]
+
+            if self.show_closest:
+                max_results = np.zeros_like(result, dtype=bool)
+                max_result_sort = np.argsort(result, axis=-1)[:, -1:]
+                for i in range(result.shape[0]):
+                    max_results[i, max_result_sort[i, :]] = True
+                max_results[:, np.logical_not(self.valid_mask)] = False
+                max_results[np.logical_not(self.valid_mask)] = False
+                # max_results[np.where(result < self.margin)] = False
+                result_connections = max_results
+            else:
+                result_connections = np.where(result > self.margin, True, False)
 
         if self.render_result_connections and self.render_gt_connections:
             vis.add_geometry(render_compare(self.line_geometries, self.line_labels, self.bg_mask, result_connections))
@@ -162,7 +163,7 @@ class LineRenderer:
             # if not self.render_single_cluster:
             #     self.render_single_cluster = True
             # else:
-            self.line_geometries, self.line_labels, self.valid_mask, self.bg_mask, images = \
+            self.line_geometries, self.line_labels, self.valid_mask, self.bg_mask, images, k = \
                 self.line_data_generator.next_batch(150, load_images=False)
             self.pointer = (self.pointer + 1) % self.index_size
 
@@ -300,15 +301,15 @@ def load_lines(path):
 
 
 if __name__ == '__main__':
-    data_path = "/nvme/line_ws/train_data/val"
-    result_path = "output"
-    results = []
+    data_path = "/nvme/line_ws/train_data/train"
+    # result_path = "output"
+    # results = []
 
     data_generator = LineDataGenerator(data_path,
                                        [0, 1, 2, 20, 22])
 
-    for i in range(10):
-        results.append(np.load(os.path.join(result_path, "output_frame_{}.npy".format(i))))
+    # for i in range(10):
+        # results.append(np.load(os.path.join(result_path, "output_frame_{}.npy".format(i))))
 
-    renderer = LineRenderer(data_generator, results, 0.7, get_colors())
+    renderer = LineRenderer(data_generator, None, 0.7, get_colors())
     renderer.run()
