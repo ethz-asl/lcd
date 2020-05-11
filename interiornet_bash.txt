@@ -1,5 +1,8 @@
 source devel/setup.bash
 
+Train docker:
+sudo docker run --gpus all -it -p 8888:8888 -v /nvme:/nvme -v /home/felix/line_ws/src/line_tools/python/line_net:/home/felix/line_ws/src/line_tools/python/line_net tensorflow/tensorflow:latest-gpu
+
 Line detection:
 roslaunch line_ros_utility detect_and_save_lines.launch write_path:=/home/felix/line_ws/data/line_tools/interiornet_lines/ scenenet_true_scenenn_false:=true interiornet:=true
 

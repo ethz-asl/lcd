@@ -2,18 +2,18 @@ import numpy as np
 np.random.seed(123)
 
 import time
+import datetime
+import os
 
 import tensorflow.keras as keras
 from tensorflow.keras.models import Sequential, Model
 import tensorflow.keras.layers as kl
 from tensorflow.keras.optimizers import SGD, Adam
-
 from tensorflow.keras import backend as K
-from tensorflow.python import debug as tf_debug
-
-from datagenerator_framewise import LineDataGenerator
 
 import tensorflow as tf
+
+from datagenerator_framewise import LineDataGenerator
 
 def initialize_bias(shape, dtype=float, name=None):
     """
@@ -206,7 +206,7 @@ def get_kl_losses_and_metrics(instancing_tensor, labels_tensor, validity_mask, b
         extended_pred = K.expand_dims(instancing_tensor, axis=2)
         h_pred = extended_pred  # K.permute_dimensions(extended_pred, (0, 1, 2, 3))
         v_pred = tf.transpose(extended_pred, perm=(0, 2, 1, 3))
-        d = h_pred * tf.math.log(tf.math.divide_no_nan(h_pred, v_pred) + 0.000001)
+        d = h_pred * tf.math.log(tf.math.divide_no_nan(h_pred, v_pred + 1e-100) + 1e-100)
         d = tf.reduce_sum(d, axis=-1, keepdims=False)
         print("D SHAPE")
         print(d.shape)
@@ -215,7 +215,7 @@ def get_kl_losses_and_metrics(instancing_tensor, labels_tensor, validity_mask, b
                                   tf.maximum(0., 2.0 - d), 0.)
         print("FINAL LOSS SHAPE")
         # print(out_loss.shape)
-        return (equal_loss + not_equal_loss) / num_valid * 150. * 150.  # equal_loss * mask_val * mask_not_bg + not_equal_loss * mask_val * mask_not_bg
+        return tf.math.divide_no_nan((equal_loss + not_equal_loss), num_valid) * 150. * 150.  # equal_loss * mask_val * mask_not_bg + not_equal_loss * mask_val * mask_not_bg
 
     pred_labels = tf.argmax(instancing_tensor, axis=-1)
     print("PRED_LABELS SHAPE")
@@ -228,29 +228,34 @@ def get_kl_losses_and_metrics(instancing_tensor, labels_tensor, validity_mask, b
     pred_equals = tf.equal(h_pred_labels, v_pred_labels)
     pred_not_equals = tf.not_equal(h_pred_labels, v_pred_labels)
 
-    def tp_over_gt_p(y_true, y_pred):
-        pred_p = tf.cast(tf.logical_and(pred_equals, tf.logical_and(loss_mask, mask_equal)), dtype='float32')
-        pred_p = tf.reduce_sum(pred_p, axis=(1, 2))
+    true_p = tf.cast(tf.logical_and(pred_equals, tf.logical_and(loss_mask, mask_equal)), dtype='float32')
+    true_p = tf.reduce_sum(true_p, axis=(1, 2))
 
-        gt_p = tf.cast(tf.logical_and(loss_mask, mask_equal), dtype='float32')
-        gt_p = tf.reduce_sum(gt_p, axis=(1, 2))
-        print("GT_P")
-        print(gt_p.shape)
+    true_n = tf.cast(tf.logical_and(pred_not_equals, tf.logical_and(loss_mask, mask_not_equal)), dtype='float32')
+    true_n = tf.reduce_sum(true_n, axis=(1, 2))
 
-        return tf.reduce_mean(pred_p / gt_p)
+    gt_p = tf.cast(tf.logical_and(loss_mask, mask_equal), dtype='float32')
+    gt_p = tf.reduce_sum(gt_p, axis=(1, 2))
 
-    def tn_over_gt_n(y_true, y_pred):
-        pred_n = tf.cast(tf.logical_and(pred_not_equals, tf.logical_and(loss_mask, mask_not_equal)), dtype='float32')
-        pred_n = tf.reduce_sum(pred_n, axis=(1, 2))
-        print("PRED_N")
-        print(pred_n.shape)
+    gt_n = tf.cast(tf.logical_and(loss_mask, mask_not_equal), dtype='float32')
+    gt_n = tf.reduce_sum(gt_n, axis=(1, 2))
 
-        gt_n = tf.cast(tf.logical_and(loss_mask, mask_not_equal), dtype='float32')
-        gt_n = tf.reduce_sum(gt_n, axis=(1, 2))
+    pred_p = tf.cast(tf.logical_and(pred_equals, loss_mask), dtype='float32')
+    pred_n = tf.cast(tf.logical_and(pred_not_equals, loss_mask), dtype='float32')
 
-        return tf.reduce_mean(pred_n / gt_n)
+    def tp_gt_p(y_true, y_pred):
+        return tf.reduce_mean(tf.math.divide_no_nan(true_p, gt_p))
 
-    return kl_cross_div_loss, [tp_over_gt_p, tn_over_gt_n]
+    def tn_gt_n(y_true, y_pred):
+        return tf.reduce_mean(tf.math.divide_no_nan(true_n, gt_n))
+
+    def fp_pd_p(y_true, y_pred):
+        return tf.reduce_mean(tf.math.divide_no_nan(true_p, pred_p))
+
+    def fn_pd_n(y_true, y_pred):
+        return tf.reduce_mean(tf.math.divide_no_nan(true_n, pred_n))
+
+    return kl_cross_div_loss, [tp_gt_p, tn_gt_n, fp_pd_p, fn_pd_n]
 
 
 def kl_loss_np(prediction, labels, val_mask, bg_mask):
@@ -370,22 +375,22 @@ def bg_percentage_metric(bg_mask, validity_mask):
 
 
 def debug_metrics(tensor):
-    def debug_sum(y_true, y_pred):
+    def d_sum(y_true, y_pred):
         return K.sum(tensor, axis=-1)
 
-    def debug_l1(y_true, y_pred):
+    def d_l1(y_true, y_pred):
         return K.sum(K.abs(tensor), axis=-1)
 
-    def debug_std(y_true, y_pred):
+    def d_std(y_true, y_pred):
         return K.std(tensor, axis=-1)
 
-    def debug_max(y_true, y_pred):
+    def d_max(y_true, y_pred):
         return K.max(tensor, axis=-1)
 
-    def debug_min(y_true, y_pred):
+    def d_min(y_true, y_pred):
         return K.min(tensor, axis=-1)
 
-    return [debug_sum, debug_l1, debug_std, debug_max, debug_min]
+    return [d_sum, d_l1, d_std, d_max, d_min]
 
 
 def argmax_metric():
@@ -427,18 +432,19 @@ def line_net_model(line_num_attr, num_lines, img_shape, margin):
     debug = fake_input
     # line_features = fake_input
     line_features = kl.Masking(mask_value=0.0)(line_features)
-    line_features = kl.TimeDistributed(kl.Dense(1000, activation='relu', name='embedding_layer'),
+    line_features = kl.TimeDistributed(kl.Dense(1000, activation=None, name='embedding_layer'),
                                        input_shape=(150, 15))(line_features)
+    line_features = kl.LeakyReLU()(line_features)
     print("LINE FEATURES SHAPE")
     print(line_features.shape)
-    # line_f1 = kl.Bidirectional(kl.LSTM(500, return_sequences=True, return_state=False, name="lstm_1"),
-    #                           merge_mode='concat')(line_features)
+    line_f1 = kl.Bidirectional(kl.LSTM(500, return_sequences=True, return_state=False, name="lstm_1"),
+                              merge_mode='concat')(line_features)
     # line_f1 = kl.TimeDistributed(kl.BatchNormalization())(line_f1)
-    # line_f1 = kl.Add()([line_features, line_f1])
-    # line_f2 = kl.Bidirectional(kl.LSTM(500, return_sequences=True, return_state=False, name="lstm_2"),
-    #                            merge_mode='concat')(line_f1)
+    line_f1 = kl.Add()([line_features, line_f1])
+    line_f2 = kl.Bidirectional(kl.LSTM(500, return_sequences=True, return_state=False, name="lstm_2"),
+                               merge_mode='concat')(line_f1)
     # line_f2 = kl.TimeDistributed(kl.BatchNormalization())(line_f2)
-    # line_f2 = kl.Add()([line_f2, line_f1])
+    line_f2 = kl.Add()([line_f2, line_f1])
     # line_f3 = kl.Bidirectional(kl.LSTM(500, return_sequences=True, return_state=False),
     #                            merge_mode='concat')(line_f2)
     # line_f3 = kl.Add()([line_f3, line_f2])
@@ -449,14 +455,16 @@ def line_net_model(line_num_attr, num_lines, img_shape, margin):
     # line_ic = kl.Concatenate()([line_ic_0, line_ic_1])
 
     # line_idist = kl.TimeDistributed(kl.BatchNormalization())(line_idist)
-    line_idist = line_features  # kl.Add()([line_idist, line_f3])
+    line_idist = line_f2  # kl.Add()([line_idist, line_f3])
     # line_idist = kl.TimeDistributed(kl.Dense(500, use_bias=False))(line_idist)
     # line_idist = kl.TimeDistributed(kl.BatchNormalization())(line_idist)
     # line_idist = kl.TimeDistributed(kl.Activation('relu'))(line_idist)
     # debug = line_idist
-    line_idist = kl.TimeDistributed(kl.Dense(15, activation='softmax',
-                                             activity_regularizer=keras.regularizers.l1(l=0.0001)))(line_features)
-    # line_idist = kl.TimeDistributed(kl.BatchNormalization())(line_idist)
+    line_idist = kl.TimeDistributed(kl.BatchNormalization())(line_idist)
+    line_idist = kl.TimeDistributed(kl.Dense(15, activation=None))(line_idist)
+    line_idist = kl.TimeDistributed(kl.BatchNormalization())(line_idist)
+    debug = line_idist
+    line_idist = kl.TimeDistributed(kl.Softmax())(line_idist)
     line_idist_logits = line_idist  # kl.TimeDistributed(kl.Softmax(axis=-1), name='cl_dis')(line_idist)
     print("line_idist")
     print(line_idist_logits.shape)
@@ -548,11 +556,11 @@ def line_net_model(line_num_attr, num_lines, img_shape, margin):
     line_model = Model(inputs=[img_inputs, line_inputs, label_input, validity_input, bg_input, fake_input],
                        outputs=line_idist_logits,# [line_ic_logits, line_idist_logits], #img_logits, #second_order_norm,  # line_embeddings,
                        name='line_net_model')
-    opt = SGD(lr=0.03, momentum=0.9)
+    opt = SGD(lr=0.0001, momentum=0.9)
     # opt = keras.optimizers.RMSprop(learning_rate=0.018)
     line_model.compile(loss=kl_losses,# {'cl_cnt': 'categorical_crossentropy', 'cl_dis': kl_losses},#losses,#masked_binary_cross_entropy(bg_input, validity_input, num_lines), #losses,
                        optimizer=opt,
-                       metrics=real_metrics,# + debug_metrics(debug),[kl_test_metric] +
+                       metrics=real_metrics + debug_metrics(debug),# [kl_test_metric] +
                        # metrics={'cl_cnt': cluster_count_metrics()},
                        experimental_run_tf_function=False)#[masked_binary_accuracy(validity_input), bg_percentage_metric(bg_input, validity_input)])
 
@@ -637,7 +645,7 @@ def train():
     line_model.summary()
 
     train_data_generator = LineDataGenerator(train_files, bg_classes,
-                                             shuffle=False,
+                                             shuffle=True,
                                              data_augmentation=False,
                                              img_shape=img_shape,
                                              sort=True)
@@ -650,10 +658,11 @@ def train():
     train_generator = data_generator(train_data_generator, max_line_count, line_num_attr, batch_size)
     val_generator = data_generator(val_data_generator, max_line_count, line_num_attr, batch_size)
 
-    save_weights_callback = keras.callbacks.ModelCheckpoint("./logs/weights.h5")
-    tensorboard_callback = keras.callbacks.TensorBoard(log_dir="./logs")
+    log_path = "./logs/{}".format(datetime.date.today().strftime("%d%m%y_%H%M"))
+    save_weights_callback = keras.callbacks.ModelCheckpoint(os.path.join(log_path, "weights.h5"))
+    tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_path)
 
-    # line_model.load_weights("./logs/weights.h5", by_name=True)
+    line_model.load_weights(os.path.join(log_path, "weights.h5"), by_name=True)
 
     train = True
     if train:
@@ -662,8 +671,8 @@ def train():
                                  max_queue_size=1,
                                  workers=1,
                                  use_multiprocessing=False,
-                                 epochs=10,
-                                 steps_per_epoch=np.floor(train_data_generator.frame_count / batch_size) * 100,
+                                 epochs=20,
+                                 steps_per_epoch=np.floor(train_data_generator.frame_count / batch_size),
                                  validation_data=val_generator,
                                  validation_steps=np.floor(val_data_generator.frame_count / batch_size),
                                  callbacks=[save_weights_callback, tensorboard_callback])
@@ -672,7 +681,7 @@ def train():
     gts = []
 
     train_data_generator.set_pointer(0)
-    for i in range(train_data_generator.frame_count):
+    for i in range(20): # train_data_generator.frame_count):
         geometries, labels, valid_mask, bg_mask, images, k = \
             train_data_generator.next_batch(max_line_count, load_images=False)
 
