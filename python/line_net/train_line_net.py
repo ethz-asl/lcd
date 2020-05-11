@@ -241,7 +241,10 @@ def get_kl_losses_and_metrics(instancing_tensor, labels_tensor, validity_mask, b
     gt_n = tf.reduce_sum(gt_n, axis=(1, 2))
 
     pred_p = tf.cast(tf.logical_and(pred_equals, loss_mask), dtype='float32')
+    pred_p = tf.reduce_sum(pred_p, axis=(1, 2))
+
     pred_n = tf.cast(tf.logical_and(pred_not_equals, loss_mask), dtype='float32')
+    pred_n = tf.reduce_sum(pred_n, axis=(1, 2))
 
     def tp_gt_p(y_true, y_pred):
         return tf.reduce_mean(tf.math.divide_no_nan(true_p, gt_p))
