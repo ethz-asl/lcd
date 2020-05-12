@@ -14,7 +14,7 @@ if __name__ == '__main__':
     path_to_data = "/nvme/datasets/interiornet/*"
     line_path_master = "/nvme/line_ws/line_files"
     vci_path_master = "/nvme/line_ws/virtual_camera_images"
-    train_path_master = "/nvme/line_ws/train_data"
+    train_path_master = "/nvme/line_ws/all_data"
 
     rospy.init_node('interiornet_node', anonymous=True)
 

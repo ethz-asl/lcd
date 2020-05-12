@@ -56,7 +56,7 @@ class Frame:
 class LineDataGenerator:
     def __init__(self, files_dir, bg_classes,
                  shuffle=False, data_augmentation=False, mean=np.zeros((3,)), img_shape=(224, 224, 3),
-                 sort=False):
+                 sort=False, min_line_count=15, max_cluster_count=15):
         # Initialize parameters.
         self.shuffle = shuffle
         self.data_augmentation = data_augmentation
@@ -74,6 +74,8 @@ class LineDataGenerator:
         self.cluster_count_file = "cluster_counts"
         self.line_count_file = "line_counts"
         self.skipped_frames = 0
+        self.min_line_count = min_line_count
+        self.max_cluster_count = max_cluster_count
 
         if self.shuffle:
             self.shuffle_data()
@@ -145,12 +147,12 @@ class LineDataGenerator:
         self.cluster_counts.append(cluster_count)
         self.line_counts.append(line_count)
 
-        if line_count < 15:
+        if line_count < self.min_line_count:
             # print("Skipping frame because it does not have enough lines")
             self.skipped_frames += 1
             return self.next_batch(batch_size, load_images)
 
-        if cluster_count == 0 or cluster_count > 15:
+        if cluster_count == 0 or cluster_count > self.max_cluster_count:
             # print("Skipping frame because it has 0 or too many instances.")
             self.skipped_frames += 1
             return self.next_batch(batch_size, load_images)

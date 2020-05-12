@@ -8,6 +8,7 @@ import os
 import tensorflow.keras as keras
 from tensorflow.keras.models import Sequential, Model
 import tensorflow.keras.layers as kl
+import tensorflow.keras.regularizers as kr
 from tensorflow.keras.optimizers import SGD, Adam
 from tensorflow.keras import backend as K
 
@@ -252,13 +253,13 @@ def get_kl_losses_and_metrics(instancing_tensor, labels_tensor, validity_mask, b
     def tn_gt_n(y_true, y_pred):
         return tf.reduce_mean(tf.math.divide_no_nan(true_n, gt_n))
 
-    def fp_pd_p(y_true, y_pred):
+    def tp_pd_p(y_true, y_pred):
         return tf.reduce_mean(tf.math.divide_no_nan(true_p, pred_p))
 
-    def fn_pd_n(y_true, y_pred):
+    def tn_pd_n(y_true, y_pred):
         return tf.reduce_mean(tf.math.divide_no_nan(true_n, pred_n))
 
-    return kl_cross_div_loss, [tp_gt_p, tn_gt_n, fp_pd_p, fn_pd_n]
+    return kl_cross_div_loss, [tp_gt_p, tn_gt_n, tp_pd_p, tn_pd_n]
 
 
 def kl_loss_np(prediction, labels, val_mask, bg_mask):
@@ -559,7 +560,7 @@ def line_net_model(line_num_attr, num_lines, img_shape, margin):
     line_model = Model(inputs=[img_inputs, line_inputs, label_input, validity_input, bg_input, fake_input],
                        outputs=line_idist_logits,# [line_ic_logits, line_idist_logits], #img_logits, #second_order_norm,  # line_embeddings,
                        name='line_net_model')
-    opt = SGD(lr=0.0001, momentum=0.9)
+    opt = SGD(lr=0.0005, momentum=0.9)
     # opt = keras.optimizers.RMSprop(learning_rate=0.018)
     line_model.compile(loss=kl_losses,# {'cl_cnt': 'categorical_crossentropy', 'cl_dis': kl_losses},#losses,#masked_binary_cross_entropy(bg_input, validity_input, num_lines), #losses,
                        optimizer=opt,
@@ -567,6 +568,50 @@ def line_net_model(line_num_attr, num_lines, img_shape, margin):
                        # metrics={'cl_cnt': cluster_count_metrics()},
                        experimental_run_tf_function=False)#[masked_binary_accuracy(validity_input), bg_percentage_metric(bg_input, validity_input)])
 
+    return line_model
+
+
+def line_net_model_2(line_num_attr, num_lines, img_shape):
+    # Inputs for geometric line information.
+    img_inputs = kl.Input(shape=(num_lines, img_shape[0], img_shape[1], img_shape[2]), dtype='float32', name='images')
+    line_inputs = kl.Input(shape=(num_lines, line_num_attr), dtype='float32', name='lines')
+    label_input = kl.Input(shape=(num_lines,), dtype='int32', name='labels')
+    validity_input = kl.Input(shape=(num_lines,), dtype='bool', name='valid_input_mask')
+    bg_input = kl.Input(shape=(num_lines,), dtype='bool', name='background_mask')
+    fake_input = kl.Input(shape=(num_lines, 15), dtype='float32', name='fake')
+
+    # The embedding layer:
+    line_embeddings = kl.Masking(mask_value=0.0)(line_inputs)
+    line_embeddings = kl.TimeDistributed(kl.Dense(100))(line_embeddings)
+    line_embeddings = kl.TimeDistributed(kl.BatchNormalization())(line_embeddings)
+    line_embeddings = kl.LeakyReLU()(line_embeddings)
+
+    line_f1 = kl.Bidirectional(kl.LSTM(100, return_sequences=True),
+                               merge_mode='concat', name='bdlstm_1')(line_embeddings)
+    line_f1 = kl.TimeDistributed(kl.BatchNormalization(center=False))(line_f1)
+    line_f1 = kl.Concatenate()([line_embeddings, line_f1])
+
+    line_f2 = kl.Bidirectional(kl.LSTM(200, return_sequences=True),
+                               merge_mode='concat', name='bdlstm_2')(line_f1)
+    line_f2 = kl.TimeDistributed(kl.BatchNormalization())(line_f2)
+    line_f2 = kl.Concatenate()([line_f1, line_f2])
+
+    line_ins = kl.Bidirectional(kl.LSTM(500, return_sequences=True),
+                                merge_mode='concat', name='bdlstm_3')(line_f2)
+    line_ins = kl.TimeDistributed(kl.Dense(15))(line_ins)  # , activity_regularizer=kr.l1(l=0.001)
+    line_ins = kl.TimeDistributed(kl.BatchNormalization(center=False))(line_ins)
+    debug_layer = line_ins
+    line_ins = kl.Softmax(name='instance_distribution')(line_ins)
+
+    loss, metrics = get_kl_losses_and_metrics(line_ins, label_input, validity_input, bg_input, num_lines)
+    opt = SGD(lr=0.0005, momentum=0.9)
+    line_model = Model(inputs=[img_inputs, line_inputs, label_input, validity_input, bg_input, fake_input],
+                       outputs=line_ins,
+                       name='line_net_model')
+    line_model.compile(loss=loss,
+                       optimizer=opt,
+                       metrics=metrics + debug_metrics(debug_layer),
+                       experimental_run_tf_function=False)
     return line_model
 
 
@@ -584,7 +629,6 @@ def get_fake_instancing(labels, valid_mask, bg_mask):
     kl_loss_np(out, labels, valid_mask, bg_mask)
 
     return np.expand_dims(out, axis=0)
-
 
 
 def data_generator(image_data_generator, max_line_count, line_num_attr, batch_size=1):
@@ -631,20 +675,21 @@ def data_generator(image_data_generator, max_line_count, line_num_attr, batch_si
 
 def train():
     # Paths to line files.
-    train_files = "/nvme/line_ws/train_data/train"
-
-    val_files = "/nvme/line_ws/train_data/val"
+    train_files = "/nvme/line_ws/train"
+    val_files = "/nvme/line_ws/val"
+    test_files = "/nvme/line_ws/test"
 
     # The length of the geometry vector of a line.
     line_num_attr = 15
     img_shape = (120, 180, 3)
     max_line_count = 150
     batch_size = 20
-    margin = 1.0
+    num_epochs = 50
     bg_classes = [0, 1, 2, 20, 22]
 
     # Create line net Keras model.
-    line_model = line_net_model(line_num_attr, max_line_count, img_shape, margin)
+    # line_model = line_net_model(line_num_attr, max_line_count, img_shape, margin)
+    line_model = line_net_model_2(line_num_attr, max_line_count, img_shape)
     line_model.summary()
 
     train_data_generator = LineDataGenerator(train_files, bg_classes,
@@ -661,11 +706,11 @@ def train():
     train_generator = data_generator(train_data_generator, max_line_count, line_num_attr, batch_size)
     val_generator = data_generator(val_data_generator, max_line_count, line_num_attr, batch_size)
 
-    log_path = "./logs/{}".format(datetime.date.today().strftime("%d%m%y_%H%M"))
+    log_path = "./logs/{}".format(datetime.datetime.now().strftime("%d%m%y_%H%M"))
     save_weights_callback = keras.callbacks.ModelCheckpoint(os.path.join(log_path, "weights.h5"))
     tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_path)
 
-    line_model.load_weights(os.path.join(log_path, "weights.h5"), by_name=True)
+    # line_model.load_weights(os.path.join(log_path, "weights.h5"), by_name=True)
 
     train = True
     if train:
@@ -674,7 +719,7 @@ def train():
                                  max_queue_size=1,
                                  workers=1,
                                  use_multiprocessing=False,
-                                 epochs=20,
+                                 epochs=num_epochs,
                                  steps_per_epoch=np.floor(train_data_generator.frame_count / batch_size),
                                  validation_data=val_generator,
                                  validation_steps=np.floor(val_data_generator.frame_count / batch_size),
@@ -683,12 +728,14 @@ def train():
     predictions = []
     gts = []
 
-    train_data_generator.set_pointer(0)
-    for i in range(20): # train_data_generator.frame_count):
+    test_data_generator = LineDataGenerator(test_files, bg_classes,
+                                            mean=train_set_mean, img_shape=img_shape, sort=True,
+                                            min_line_count=0, max_cluster_count=100000)
+    for i in range(test_data_generator.frame_count):
         geometries, labels, valid_mask, bg_mask, images, k = \
-            train_data_generator.next_batch(max_line_count, load_images=False)
+            test_data_generator.next_batch(max_line_count, load_images=False)
 
-        fake = get_fake_instancing(labels, valid_mask, bg_mask)
+        fake = np.zeros((1, max_line_count, 15))
         labels = labels.reshape((1, max_line_count))
         geometries = geometries.reshape((1, max_line_count, line_num_attr))
         valid_mask = valid_mask.reshape((1, max_line_count))
@@ -705,11 +752,13 @@ def train():
         predictions.append(output)
         gts.append(fake)
 
-        print("Frame {}/{}".format(i, train_data_generator.frame_count))
+        print("Frame {}/{}".format(i, test_data_generator.frame_count))
         # np.save("output/output_frame_{}".format(i), output)
 
-    np.save("predictions_train", np.array(predictions))
-    np.save("ground_truths_train", np.array(gts))
+    results_path = os.path.join(log_path, "results")
+    os.mkdir(results_path)
+    np.save(os.path.join(results_path, "predictions_train"), np.array(predictions))
+    np.save(os.path.join(results_path, "ground_truths_train"), np.array(gts))
 
 
 if __name__ == '__main__':
