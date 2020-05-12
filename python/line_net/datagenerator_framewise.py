@@ -83,7 +83,8 @@ class LineDataGenerator:
     def load_frames(self, files_dir):
         frame_paths = [os.path.join(files_dir, name) for name in os.listdir(files_dir)
                        if os.path.isfile(os.path.join(files_dir, name))]
-        frame_paths.sort()
+        if not self.shuffle:
+            frame_paths.sort()
 
         self.frame_count = len(frame_paths)
         self.frames = [Frame(path) for path in frame_paths]

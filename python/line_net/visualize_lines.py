@@ -79,10 +79,15 @@ class LineRenderer:
         #     else:
         #         vis.add_geometry(render_normals(self.line_geometries))
 
-        vis.add_geometry(render_lines(self.line_geometries, self.line_labels, self.label_colors))
+        if self.render_result_connections and self.render_gt_connections:
+            vis.add_geometry(render_lines(self.line_geometries,
+                                          np.argmax(self.results[self.pointer, :, :], axis=-1), self.label_colors))
+        else:
+            vis.add_geometry(render_lines(self.line_geometries, self.line_labels, self.label_colors))
 
         if self.results is not None:
-            result = self.results[self.pointer]
+            result = self.results[self.pointer, :, :]
+            # result = self.results[0, :, :]
 
             if self.show_closest:
                 max_results = np.zeros_like(result, dtype=bool)
@@ -96,8 +101,16 @@ class LineRenderer:
             else:
                 result_connections = np.where(result > self.margin, True, False)
 
+                for i in range(150):
+                    for j in range(150):
+                        if self.bg_mask[i] or self.bg_mask[j] or not self.valid_mask[i] or not self.valid_mask[j]:
+                            result_connections[i, j] = False
+
+                print_metrics(result_connections, self.line_labels, self.bg_mask, self.valid_mask)
+
         if self.render_result_connections and self.render_gt_connections:
-            vis.add_geometry(render_compare(self.line_geometries, self.line_labels, self.bg_mask, result_connections))
+            # vis.add_geometry(render_compare(self.line_geometries, self.line_labels, self.bg_mask, result_connections))
+            print("Currently not rendering")
         elif self.render_gt_connections:
             vis.add_geometry(render_gt_connections(self.line_geometries, self.line_labels, self.bg_mask))
         elif self.render_result_connections:
@@ -291,6 +304,29 @@ def render_connections(lines, connections):
     return line_set
 
 
+def print_metrics(predictions, gt, bg, valid):
+    v_bg = np.expand_dims(bg, axis=-1)
+    h_bg = np.transpose(v_bg)
+    not_bg_mask = np.logical_not(np.logical_and(v_bg, h_bg))
+
+    v_valid = np.expand_dims(valid, axis=-1)
+    h_valid = np.transpose(v_valid)
+    valid_mask = np.logical_and(v_valid, h_valid)
+
+    loss_mask = np.logical_and(not_bg_mask, valid_mask)
+
+    v_gt = np.expand_dims(gt, axis=-1)
+    h_gt = np.transpose(v_gt, axes=(1, 0))
+    gt_equals = np.logical_and(np.equal(v_gt, h_gt), loss_mask)
+
+    true_p = np.sum(np.logical_and(predictions, gt_equals).astype(float))
+    gt_p = np.sum(gt_equals.astype(float))
+    pred_p = np.sum(predictions.astype(float))
+
+    print("tp_gt_p: {}".format(true_p / gt_p))
+    print("tp_pd_p: {}".format(true_p / pred_p))
+
+
 def load_lines(path):
     try:
         data_lines = pd.read_csv(path, sep=" ", header=None)
@@ -301,15 +337,22 @@ def load_lines(path):
 
 
 if __name__ == '__main__':
-    data_path = "/nvme/line_ws/train_data/train"
-    # result_path = "output"
-    # results = []
+    data_path = "/nvme/line_ws/test"
+    result_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/110520_2158/results"
 
     data_generator = LineDataGenerator(data_path,
-                                       [0, 1, 2, 20, 22])
+                                       [0, 1, 2, 20, 22],
+                                       sort=True,
+                                       min_line_count=0,
+                                       max_cluster_count=1000000)
 
-    # for i in range(10):
-        # results.append(np.load(os.path.join(result_path, "output_frame_{}.npy".format(i))))
+    predictions = np.load(os.path.join(result_path, "predictions_train.npy"))
+    predictions = np.squeeze(predictions)
+    predictions = np.argmax(predictions, axis=-1)
+    h_pred = np.expand_dims(predictions, axis=-1)
+    v_pred = np.transpose(h_pred, axes=(0, 2, 1))
+    results = np.equal(h_pred, v_pred).astype(float)
+    print(predictions[0, :])
 
-    renderer = LineRenderer(data_generator, None, 0.7, get_colors())
+    renderer = LineRenderer(data_generator, results, 0.7, get_colors())
     renderer.run()

@@ -16,6 +16,7 @@ import tensorflow as tf
 
 from datagenerator_framewise import LineDataGenerator
 
+
 def initialize_bias(shape, dtype=float, name=None):
     """
         The paper, http://www.cs.utoronto.ca/~gkoch/files/msc-thesis.pdf
@@ -692,28 +693,30 @@ def train():
     line_model = line_net_model_2(line_num_attr, max_line_count, img_shape)
     line_model.summary()
 
-    train_data_generator = LineDataGenerator(train_files, bg_classes,
-                                             shuffle=True,
-                                             data_augmentation=False,
-                                             img_shape=img_shape,
-                                             sort=True)
-    # train_set_mean = train_data_generator.get_mean()
+    log_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/110520_2158"
+    line_model.load_weights("/home/felix/line_ws/src/line_tools/python/line_net/logs/110520_2158/weights.h5", by_name=True)
     train_set_mean = np.array([-0.00246431839, 0.0953982015,  3.15564408])
-    train_data_generator.set_mean(train_set_mean)
-    print("Train set mean is: {}".format(train_set_mean))
-    val_data_generator = LineDataGenerator(val_files, bg_classes, mean=train_set_mean, img_shape=img_shape, sort=True)
 
-    train_generator = data_generator(train_data_generator, max_line_count, line_num_attr, batch_size)
-    val_generator = data_generator(val_data_generator, max_line_count, line_num_attr, batch_size)
+    train_ = False
+    if train_:
 
-    log_path = "./logs/{}".format(datetime.datetime.now().strftime("%d%m%y_%H%M"))
-    save_weights_callback = keras.callbacks.ModelCheckpoint(os.path.join(log_path, "weights.h5"))
-    tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_path)
+        train_data_generator = LineDataGenerator(train_files, bg_classes,
+                                                 shuffle=True,
+                                                 data_augmentation=False,
+                                                 img_shape=img_shape,
+                                                 sort=True)
+        # train_set_mean = train_data_generator.get_mean()
+        train_data_generator.set_mean(train_set_mean)
+        print("Train set mean is: {}".format(train_set_mean))
+        val_data_generator = LineDataGenerator(val_files, bg_classes, mean=train_set_mean, img_shape=img_shape, sort=True)
 
-    # line_model.load_weights(os.path.join(log_path, "weights.h5"), by_name=True)
+        train_generator = data_generator(train_data_generator, max_line_count, line_num_attr, batch_size)
+        val_generator = data_generator(val_data_generator, max_line_count, line_num_attr, batch_size)
 
-    train = True
-    if train:
+        log_path = "./logs/{}".format(datetime.datetime.now().strftime("%d%m%y_%H%M"))
+        save_weights_callback = keras.callbacks.ModelCheckpoint(os.path.join(log_path, "weights.h5"))
+        tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_path)
+
         line_model.fit_generator(generator=train_generator,
                                  verbose=1,
                                  max_queue_size=1,
@@ -750,7 +753,7 @@ def train():
                                      'fake': fake})
 
         predictions.append(output)
-        gts.append(fake)
+        gts.append(labels)
 
         print("Frame {}/{}".format(i, test_data_generator.frame_count))
         # np.save("output/output_frame_{}".format(i), output)
