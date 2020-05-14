@@ -275,59 +275,112 @@ def augment_flip(line_geometries):
             line_geometries[i, 13] = buffer_open_start
 
 
+def kl_loss_np(prediction, labels, val_mask, bg_mask):
+    h_labels = np.expand_dims(labels, axis=-1)
+    v_labels = np.transpose(h_labels, axes=(1, 0))
+
+    mask_equal = np.equal(h_labels, v_labels)
+    mask_not_equal = np.logical_not(mask_equal)
+    # mask_equal = np.expand_dims(mask_equal, axis=-1).astype(float)
+    # mask_not_equal = np.expand_dims(mask_not_equal, axis=-1).astype(float)
+    mask_equal = mask_equal.astype(float)
+    mask_not_equal = mask_not_equal.astype(float)
+
+    h_bg = np.expand_dims(np.logical_not(bg_mask), axis=-1).astype(float)
+    v_bg = np.transpose(h_bg, axes=(1, 0))
+    mask_not_bg_unexpanded = h_bg * v_bg
+    # mask_not_bg = np.expand_dims(h_bg * v_bg, -1)
+    mask_not_bg = mask_not_bg_unexpanded
+
+    h_val = np.expand_dims(val_mask, axis=-1).astype(float)
+    v_val = np.transpose(h_val, axes=(1, 0))
+    mask_val = h_val * v_val
+    mask_val_unexpanded = np.copy(mask_val)
+    np.fill_diagonal(mask_val_unexpanded, 0.)
+    # mask_val = np.expand_dims(mask_val_unexpanded, axis=-1)
+    mask_val = mask_val_unexpanded
+
+    h_pred = np.expand_dims(prediction, axis=0)
+    v_pred = np.transpose(h_pred, axes=(1, 0, 2))
+
+    d = h_pred * np.log(np.nan_to_num(h_pred / v_pred) + 0.000001)
+    d = np.sum(d, axis=-1, keepdims=False)
+
+    equal_loss_layer = mask_equal * d
+    not_equal_loss_layer = mask_not_equal * np.maximum(0., 2.0 - d)
+    # print(np.max(loss_layer * mask_val * mask_not_bg))
+    # print("Compare:")
+    # print(np.sum(not_equal_loss_layer * mask_val * mask_not_bg) + np.sum(equal_loss_layer * mask_val * mask_not_bg))
+
+
+def get_fake_instancing(labels, valid_mask, bg_mask):
+    valid_count = np.where(valid_mask == 1)[0].shape[0]
+    unique_labels = np.unique(labels[np.where(np.logical_and(valid_mask, np.logical_not(bg_mask)))])
+    out = np.zeros((150, 15), dtype=float)
+
+    for i, label in enumerate(unique_labels):
+        out[np.where(labels == label), i] = 1.
+
+    kl_loss_np(out, labels, valid_mask, bg_mask)
+
+    return np.expand_dims(out, axis=0)
+
+
+def generate_data(image_data_generator, max_line_count, line_num_attr, batch_size=1):
+    batch_geometries = []
+    batch_labels = []
+    batch_valid_mask = []
+    batch_bg_mask = []
+    batch_images = []
+    batch_k = []
+    batch_fake = []
+    batch_unique = []
+    batch_counts = []
+
+    for i in range(batch_size):
+        # image_data_generator.reset_pointer()
+        geometries, labels, valid_mask, bg_mask, images, k = image_data_generator.next_batch(max_line_count,
+                                                                                             load_images=False)
+        batch_labels.append(labels.reshape((1, max_line_count)))
+        batch_geometries.append(geometries.reshape((1, max_line_count, line_num_attr)))
+        batch_valid_mask.append(valid_mask.reshape((1, max_line_count)))
+        batch_bg_mask.append(bg_mask.reshape((1, max_line_count)))
+        batch_images.append(np.expand_dims(images, axis=0))
+        batch_k.append(np.expand_dims(k, axis=0))
+        batch_fake.append(np.zeros((1, max_line_count, 15)))
+
+        unique_labels = np.unique(labels[np.logical_and(np.logical_not(bg_mask), valid_mask)])
+        cluster_count = unique_labels.shape[0]
+        if cluster_count > 15:
+            unique_labels = unique_labels[:15]
+        else:
+            unique_labels = np.pad(unique_labels, (0, 15 - cluster_count), mode='constant', constant_values=-1)
+        unique_labels = np.expand_dims(unique_labels, axis=0)
+        cluster_count = np.expand_dims(cluster_count, axis=0)
+        batch_unique.append(unique_labels)
+        batch_counts.append(cluster_count)
+
+    geometries = np.concatenate(batch_geometries, axis=0)
+    labels = np.concatenate(batch_labels, axis=0)
+    valid_mask = np.concatenate(batch_valid_mask, axis=0)
+    bg_mask = np.concatenate(batch_bg_mask, axis=0)
+    images = np.concatenate(batch_images, axis=0)
+    batch_k = np.concatenate(batch_k, axis=0)
+    batch_fake = np.concatenate(batch_fake, axis=0)
+
+    batch_unique = np.concatenate(batch_unique, axis=0)
+    batch_counts = np.concatenate(batch_counts, axis=0)
+
+    return {'lines': geometries,
+            'labels': labels,
+            'valid_input_mask': valid_mask,
+            'background_mask': bg_mask,
+            # 'images': images,
+            'unique_labels': batch_unique,
+            'cluster_count': batch_counts,
+            'fake': batch_fake}, batch_k
+
+
 def data_generator(image_data_generator, max_line_count, line_num_attr, batch_size=1):
     while True:
-        tic = time.perf_counter()
-
-        batch_geometries = []
-        batch_labels = []
-        batch_valid_mask = []
-        batch_bg_mask = []
-        batch_images = []
-        batch_k = []
-        batch_fake = []
-        batch_unique = []
-        batch_counts = []
-
-        for i in range(batch_size):
-            # image_data_generator.reset_pointer()
-            geometries, labels, valid_mask, bg_mask, images, k = image_data_generator.next_batch(max_line_count,
-                                                                                                 load_images=False)
-            batch_labels.append(labels.reshape((1, max_line_count)))
-            batch_geometries.append(geometries.reshape((1, max_line_count, line_num_attr)))
-            batch_valid_mask.append(valid_mask.reshape((1, max_line_count)))
-            batch_bg_mask.append(bg_mask.reshape((1, max_line_count)))
-            batch_images.append(np.expand_dims(images, axis=0))
-            batch_k.append(np.expand_dims(k, axis=0))
-            batch_fake.append(get_fake_instancing(labels, valid_mask, bg_mask))
-
-            unique_labels = np.unique(labels[np.logical_and(np.logical_not(bg_mask), valid_mask)])
-            cluster_count = unique_labels.shape[0]
-            assert(cluster_count <= 15)
-            unique_labels = np.pad(unique_labels, (0, 15 - cluster_count), mode='constant', constant_values=-1)
-            unique_labels = np.expand_dims(unique_labels, axis=0)
-            cluster_count = np.expand_dims(cluster_count, axis=0)
-            batch_unique.append(unique_labels)
-            batch_counts.append(cluster_count)
-
-        geometries = np.concatenate(batch_geometries, axis=0)
-        labels = np.concatenate(batch_labels, axis=0)
-        valid_mask = np.concatenate(batch_valid_mask, axis=0)
-        bg_mask = np.concatenate(batch_bg_mask, axis=0)
-        images = np.concatenate(batch_images, axis=0)
-        batch_k = np.concatenate(batch_k, axis=0)
-        batch_fake = np.concatenate(batch_fake, axis=0)
-
-        batch_unique = np.concatenate(batch_unique, axis=0)
-        batch_counts = np.concatenate(batch_counts, axis=0)
-
-        # print("Data generation took {} seconds.".format(time.perf_counter() - tic))
-
-        yield {'lines': geometries,
-               'labels': labels,
-               'valid_input_mask': valid_mask,
-               'background_mask': bg_mask,
-               # 'images': images,
-               'unique_labels': batch_unique,
-               'cluster_count': batch_counts,
-               'fake': batch_fake}, batch_k
+        yield generate_data(image_data_generator, max_line_count, line_num_attr, batch_size)

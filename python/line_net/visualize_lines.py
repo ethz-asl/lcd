@@ -81,9 +81,11 @@ class LineRenderer:
         #         vis.add_geometry(render_normals(self.line_geometries))
 
         if self.render_result_connections and self.render_gt_connections:
+            print("Rendering predictions.")
             vis.add_geometry(render_lines(self.line_geometries,
                                           np.argmax(self.results[self.pointer, :, :], axis=-1), self.label_colors))
         else:
+            print("Rendering ground truth.")
             vis.add_geometry(render_lines(self.line_geometries, self.line_labels, self.label_colors))
 
         if self.results is not None:
@@ -114,8 +116,10 @@ class LineRenderer:
             # vis.add_geometry(render_compare(self.line_geometries, self.line_labels, self.bg_mask, result_connections))
             print("Currently not rendering")
         elif self.render_gt_connections:
+            print("Rendering ground truth connections.")
             vis.add_geometry(render_gt_connections(self.line_geometries, self.line_labels, self.bg_mask))
         elif self.render_result_connections:
+            print("Rendering predictions connections.")
             vis.add_geometry(render_connections(self.line_geometries, result_connections))
 
         if self.render_normals:
@@ -370,7 +374,7 @@ def load_lines(path):
 
 if __name__ == '__main__':
     data_path = "/nvme/line_ws/test"
-    result_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/120520_2010/results"
+    result_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/130520_2315/results"
 
     data_generator = LineDataGenerator(data_path,
                                        [0, 1, 2, 20, 22],
