@@ -1,6 +1,3 @@
-import numpy as np
-np.random.seed(123)
-
 import time
 import datetime
 import os
@@ -11,8 +8,12 @@ import tensorflow.keras.layers as kl
 import tensorflow.keras.regularizers as kr
 from tensorflow.keras.optimizers import SGD, Adam
 from tensorflow.keras import backend as K
+from keras.models import load_model
 
 import tensorflow as tf
+
+import numpy as np
+np.random.seed(123)
 
 from datagenerator_framewise import LineDataGenerator
 
@@ -405,6 +406,35 @@ def argmax_metric():
     return argmax
 
 
+def iou_metric(labels, unique_labels, cluster_counts, bg_mask, valid_mask, max_clusters):
+    def iou(y_true, y_pred):
+        mask = tf.logical_and(tf.logical_not(bg_mask), valid_mask)
+        mask = tf.expand_dims(tf.expand_dims(mask, axis=-1), axis=-1)
+
+        gt_labels = tf.expand_dims(tf.expand_dims(labels, axis=-1), axis=-1)
+        unique_gt_labels = tf.expand_dims(tf.expand_dims(unique_labels, axis=1), axis=-1)
+        pred_labels = tf.expand_dims(tf.expand_dims(tf.argmax(y_pred, axis=-1, output_type=tf.dtypes.int32),
+                                                    axis=-1), axis=-1)
+        unique_pred_labels = tf.expand_dims(tf.expand_dims(tf.expand_dims(tf.range(0, 15, dtype='int32'),
+                                                                          axis=0), axis=0), axis=0)
+
+        gt_matrix = tf.equal(gt_labels, unique_gt_labels)
+        pred_matrix = tf.equal(pred_labels, unique_pred_labels)
+
+        intersections = tf.cast(tf.logical_and(tf.logical_and(gt_matrix, pred_matrix), mask), dtype='float32')
+
+        unions = tf.cast(tf.logical_and(tf.logical_or(gt_matrix, pred_matrix), mask), dtype='float32')
+        intersections = tf.reduce_sum(intersections, axis=1)
+        unions = tf.reduce_sum(unions, axis=1)
+
+        iou_out = tf.reduce_max(tf.math.divide_no_nan(intersections, unions), axis=-1)
+        iou_out = tf.reduce_sum(iou_out, axis=-1, keepdims=True) / tf.cast(cluster_counts, dtype='float32')
+
+        return tf.reduce_mean(iou_out)
+
+    return iou
+
+
 def line_net_model(line_num_attr, num_lines, img_shape, margin):
     """
     Model architecture
@@ -616,6 +646,126 @@ def line_net_model_2(line_num_attr, num_lines, img_shape):
     return line_model
 
 
+def get_multi_head_attention_model(input_shape, dropout=0.2, idx=0, key_size=128, n_multi=2, n_add=2):
+    assert n_multi + n_add > 0
+
+    output_size = input_shape[1]
+
+    model_input = kl.Input(shape=input_shape)
+
+    outputs_multi = []
+    for i in range(n_multi):
+        # More layers can be added here.
+        keys = kl.TimeDistributed(kl.Dense(key_size))(model_input)
+        keys = kl.TimeDistributed(kl.BatchNormalization())(keys)
+        # keys = kl.LeakyReLU()(keys)
+        queries = kl.TimeDistributed(kl.Dense(key_size))(model_input)
+        queries = kl.TimeDistributed(kl.BatchNormalization())(queries)
+        # queries = kl.LeakyReLU()(queries)
+        output = kl.Attention(use_scale=True)([queries, keys])
+        outputs_multi.append(output)
+
+    outputs_add = []
+    for i in range(n_add):
+        # More layers can be added here.
+        keys = kl.TimeDistributed(kl.Dense(key_size))(model_input)
+        keys = kl.TimeDistributed(kl.BatchNormalization())(keys)
+        # keys = kl.LeakyReLU()(keys)
+        queries = kl.TimeDistributed(kl.Dense(key_size))(model_input)
+        queries = kl.TimeDistributed(kl.BatchNormalization())(queries)
+        # Multiply with -1 so that it is actually a subtractive attention.
+        # queries = kl.Lambda(lambda x: -x)(queries)
+        # queries = kl.LeakyReLU()(queries)
+        output = kl.AdditiveAttention(use_scale=True)([queries, keys])
+        outputs_add.append(output)
+
+    outputs = outputs_multi + outputs_add
+    if len(outputs) > 1:
+        output = kl.Concatenate()(outputs)
+    else:
+        output = outputs[0]
+
+    # Should I add one more dense layer here?
+    output = kl.TimeDistributed(kl.Dense(output_size))(output)
+    output = kl.TimeDistributed(kl.Dropout(dropout))(output)
+    output = kl.TimeDistributed(kl.BatchNormalization())(output)
+    output = kl.LeakyReLU()(output)
+
+    return Model(inputs=model_input, outputs=output, name='multi_head_attention_{}'.format(idx))
+
+
+def get_inter_attention_layer(input_number, head_units=256, hidden_units=1024,
+                              idx=0, dropout=0.2, key_size=128, n_multi_heads=2, n_add_heads=2):
+    model_input = kl.Input(shape=(input_number, head_units))
+
+    layer = get_multi_head_attention_model((input_number, head_units),
+                                           idx=idx,
+                                           key_size=key_size,
+                                           n_multi=n_multi_heads,
+                                           n_add=n_add_heads)(model_input)
+    layer = kl.Add()([layer, model_input])
+
+    # Two layers of dense connections running in parallel
+    layer_2 = kl.TimeDistributed(kl.Dense(hidden_units))(layer)
+    layer_2 = kl.TimeDistributed(kl.Dropout(dropout))(layer_2)
+    layer_2 = kl.TimeDistributed(kl.BatchNormalization())(layer_2)
+    layer_2 = kl.LeakyReLU()(layer_2)
+    layer_2 = kl.TimeDistributed(kl.Dense(head_units))(layer_2)
+    layer_2 = kl.TimeDistributed(kl.Dropout(dropout))(layer_2)
+    layer_2 = kl.TimeDistributed(kl.BatchNormalization())(layer_2)
+    layer_2 = kl.LeakyReLU()(layer_2)
+    layer = kl.Add()([layer, layer_2])
+
+    return Model(inputs=model_input, outputs=layer, name='inter_attention_{}'.format(idx))
+
+
+def line_net_model_3(line_num_attr, num_lines, img_shape):
+    # Inputs for geometric line information.
+    # img_inputs = kl.Input(shape=(num_lines, img_shape[0], img_shape[1], img_shape[2]), dtype='float32', name='images')
+    line_inputs = kl.Input(shape=(num_lines, line_num_attr), dtype='float32', name='lines')
+    label_input = kl.Input(shape=(num_lines,), dtype='int32', name='labels')
+    valid_input = kl.Input(shape=(num_lines,), dtype='bool', name='valid_input_mask')
+    bg_input = kl.Input(shape=(num_lines,), dtype='bool', name='background_mask')
+    fake_input = kl.Input(shape=(num_lines, 15), dtype='float32', name='fake')
+    unique_label_input = kl.Input(shape=(15,), dtype='int32', name='unique_labels')
+    cluster_count_input = kl.Input(shape=(1,), dtype='int32', name='cluster_count')
+
+    head_units = 256
+
+    # The embedding layer:
+    line_embeddings = kl.Masking(mask_value=0.0)(line_inputs)
+    line_embeddings = kl.TimeDistributed(kl.Dense(head_units))(line_embeddings)
+    line_embeddings = kl.Dropout(0.1)(line_embeddings)
+    line_embeddings = kl.TimeDistributed(kl.BatchNormalization())(line_embeddings)
+    line_embeddings = kl.LeakyReLU()(line_embeddings)
+
+    # Build 5 multi head attention layers. Hopefully this will work.
+    layer = get_inter_attention_layer(num_lines, idx=0)(line_embeddings)
+    layer = get_inter_attention_layer(num_lines, idx=1)(layer)
+    layer = get_inter_attention_layer(num_lines, idx=2)(layer)
+    layer = get_inter_attention_layer(num_lines, idx=3)(layer)
+    layer = get_inter_attention_layer(num_lines, idx=4)(layer)
+    layer = get_inter_attention_layer(num_lines, idx=5)(layer)
+
+    line_ins = kl.TimeDistributed(kl.Dense(15))(layer)
+    line_ins = kl.BatchNormalization()(line_ins)
+    debug_layer = line_ins
+    line_ins = kl.TimeDistributed(kl.Softmax(name='instance_distribution'))(line_ins)
+
+    loss, metrics = get_kl_losses_and_metrics(line_ins, label_input, valid_input, bg_input, num_lines)
+    iou = iou_metric(label_input, unique_label_input, cluster_count_input, bg_input, valid_input, 15)
+    opt = SGD(lr=0.0015, momentum=0.9)
+    line_model = Model(inputs=[line_inputs, label_input, valid_input, bg_input, fake_input,
+                               unique_label_input, cluster_count_input],
+                       outputs=line_ins,
+                       name='line_net_model')
+    line_model.compile(loss=loss,
+                       optimizer='adam',
+                       metrics=[iou] + metrics + debug_metrics(debug_layer),
+                       experimental_run_tf_function=False)
+    return line_model
+
+
 def get_fake_instancing(labels, valid_mask, bg_mask):
     valid_count = np.where(valid_mask == 1)[0].shape[0]
     unique_labels = np.unique(labels[np.where(np.logical_and(valid_mask, np.logical_not(bg_mask)))])
@@ -630,48 +780,6 @@ def get_fake_instancing(labels, valid_mask, bg_mask):
     kl_loss_np(out, labels, valid_mask, bg_mask)
 
     return np.expand_dims(out, axis=0)
-
-
-def data_generator(image_data_generator, max_line_count, line_num_attr, batch_size=1):
-    while True:
-        tic = time.perf_counter()
-
-        batch_geometries = []
-        batch_labels = []
-        batch_valid_mask = []
-        batch_bg_mask = []
-        batch_images = []
-        batch_k = []
-        batch_fake = []
-
-        for i in range(batch_size):
-            # image_data_generator.reset_pointer()
-            geometries, labels, valid_mask, bg_mask, images, k = image_data_generator.next_batch(max_line_count,
-                                                                                                 load_images=False)
-            batch_labels.append(labels.reshape((1, max_line_count)))
-            batch_geometries.append(geometries.reshape((1, max_line_count, line_num_attr)))
-            batch_valid_mask.append(valid_mask.reshape((1, max_line_count)))
-            batch_bg_mask.append(bg_mask.reshape((1, max_line_count)))
-            batch_images.append(np.expand_dims(images, axis=0))
-            batch_k.append(np.expand_dims(k, axis=0))
-            batch_fake.append(get_fake_instancing(labels, valid_mask, bg_mask))
-
-        geometries = np.concatenate(batch_geometries, axis=0)
-        labels = np.concatenate(batch_labels, axis=0)
-        valid_mask = np.concatenate(batch_valid_mask, axis=0)
-        bg_mask = np.concatenate(batch_bg_mask, axis=0)
-        images = np.concatenate(batch_images, axis=0)
-        batch_k = np.concatenate(batch_k, axis=0)
-        batch_fake = np.concatenate(batch_fake, axis=0)
-
-        # print("Data generation took {} seconds.".format(time.perf_counter() - tic))
-
-        yield {'lines': geometries,
-               'labels': labels,
-               'valid_input_mask': valid_mask,
-               'background_mask': bg_mask,
-               'images': images,
-               'fake': batch_fake}, batch_k
 
 
 def train():
@@ -690,14 +798,15 @@ def train():
 
     # Create line net Keras model.
     # line_model = line_net_model(line_num_attr, max_line_count, img_shape, margin)
-    line_model = line_net_model_2(line_num_attr, max_line_count, img_shape)
+    line_model = line_net_model_3(line_num_attr, max_line_count, img_shape)
     line_model.summary()
 
-    log_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/110520_2158"
-    line_model.load_weights("/home/felix/line_ws/src/line_tools/python/line_net/logs/110520_2158/weights.h5", by_name=True)
+    # log_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/120520_2010"
+    # line_model.load_weights("/home/felix/line_ws/src/line_tools/python/line_net/logs/130520_2315/weights.20.hdf5",
+    #                         by_name=True)
     train_set_mean = np.array([-0.00246431839, 0.0953982015,  3.15564408])
 
-    train_ = False
+    train_ = True
     if train_:
 
         train_data_generator = LineDataGenerator(train_files, bg_classes,
@@ -714,7 +823,7 @@ def train():
         val_generator = data_generator(val_data_generator, max_line_count, line_num_attr, batch_size)
 
         log_path = "./logs/{}".format(datetime.datetime.now().strftime("%d%m%y_%H%M"))
-        save_weights_callback = keras.callbacks.ModelCheckpoint(os.path.join(log_path, "weights.h5"))
+        save_weights_callback = keras.callbacks.ModelCheckpoint(os.path.join(log_path, "weights.{epoch:02d}.hdf5"))
         tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_path)
 
         line_model.fit_generator(generator=train_generator,
@@ -723,45 +832,10 @@ def train():
                                  workers=1,
                                  use_multiprocessing=False,
                                  epochs=num_epochs,
-                                 steps_per_epoch=np.floor(train_data_generator.frame_count / batch_size),
+                                 steps_per_epoch=np.floor((train_data_generator.frame_count - 3093) / batch_size),
                                  validation_data=val_generator,
-                                 validation_steps=np.floor(val_data_generator.frame_count / batch_size),
+                                 validation_steps=np.floor((val_data_generator.frame_count - 558) / batch_size),
                                  callbacks=[save_weights_callback, tensorboard_callback])
-
-    predictions = []
-    gts = []
-
-    test_data_generator = LineDataGenerator(test_files, bg_classes,
-                                            mean=train_set_mean, img_shape=img_shape, sort=True,
-                                            min_line_count=0, max_cluster_count=100000)
-    for i in range(test_data_generator.frame_count):
-        geometries, labels, valid_mask, bg_mask, images, k = \
-            test_data_generator.next_batch(max_line_count, load_images=False)
-
-        fake = np.zeros((1, max_line_count, 15))
-        labels = labels.reshape((1, max_line_count))
-        geometries = geometries.reshape((1, max_line_count, line_num_attr))
-        valid_mask = valid_mask.reshape((1, max_line_count))
-        bg_mask = bg_mask.reshape((1, max_line_count))
-        images = np.expand_dims(images, axis=0)
-
-        output = line_model.predict({'lines': geometries,
-                                     'labels': labels,
-                                     'valid_input_mask': valid_mask,
-                                     'background_mask': bg_mask,
-                                     'images': images,
-                                     'fake': fake})
-
-        predictions.append(output)
-        gts.append(labels)
-
-        print("Frame {}/{}".format(i, test_data_generator.frame_count))
-        # np.save("output/output_frame_{}".format(i), output)
-
-    results_path = os.path.join(log_path, "results")
-    os.mkdir(results_path)
-    np.save(os.path.join(results_path, "predictions_train"), np.array(predictions))
-    np.save(os.path.join(results_path, "ground_truths_train"), np.array(gts))
 
 
 if __name__ == '__main__':

@@ -8,7 +8,7 @@ from datagenerator_framewise import LineDataGenerator
 
 
 class LineRenderer:
-    def __init__(self, line_data_generator, results, margin, label_colors):
+    def __init__(self, line_data_generator, results, pred_labels, margin, label_colors):
         self.line_data_generator = line_data_generator
         self.results = results
         self.label_colors = label_colors
@@ -21,6 +21,7 @@ class LineRenderer:
         self.render_normals = False
         self.render_result_connections = False
         self.show_closest = False
+        self.pred_labels = pred_labels
 
         self.line_geometries, self.line_labels, self.valid_mask, self.bg_mask, images, k = \
             self.line_data_generator.next_batch(150, False)
@@ -107,6 +108,7 @@ class LineRenderer:
                             result_connections[i, j] = False
 
                 print_metrics(result_connections, self.line_labels, self.bg_mask, self.valid_mask)
+                print_iou(self.pred_labels[self.pointer, :], self.line_labels, self.bg_mask, self.valid_mask)
 
         if self.render_result_connections and self.render_gt_connections:
             # vis.add_geometry(render_compare(self.line_geometries, self.line_labels, self.bg_mask, result_connections))
@@ -320,11 +322,41 @@ def print_metrics(predictions, gt, bg, valid):
     gt_equals = np.logical_and(np.equal(v_gt, h_gt), loss_mask)
 
     true_p = np.sum(np.logical_and(predictions, gt_equals).astype(float))
+    false_p = np.sum(np.logical_and(predictions, np.logical_not(gt_equals))).astype(float)
+    false_n = np.sum(np.logical_and(np.logical_not(predictions), np.logical_not(gt_equals))).astype(float)
     gt_p = np.sum(gt_equals.astype(float))
     pred_p = np.sum(predictions.astype(float))
 
     print("tp_gt_p: {}".format(true_p / gt_p))
     print("tp_pd_p: {}".format(true_p / pred_p))
+
+
+def print_iou(pred_labels, gt, bg, valid):
+    mask = np.logical_and(np.logical_not(bg), valid)
+
+    labels = gt[mask]
+    unique_labels = np.unique(labels)
+    cluster_count = unique_labels.shape[0]
+    unique_labels = np.pad(unique_labels, (0, 15 - cluster_count), mode='constant', constant_values=0)
+    pred_labels = pred_labels[mask]
+
+    gt_labels = np.expand_dims(np.expand_dims(labels, axis=-1), axis=-1)
+    unique_gt_labels = np.expand_dims(np.expand_dims(unique_labels, axis=0), axis=-1)
+    pred_labels = np.expand_dims(np.expand_dims(pred_labels, axis=-1), axis=-1)
+    unique_pred_labels = np.expand_dims(np.expand_dims(np.arange(0, 15), axis=0), axis=0)
+
+    gt_matrix = np.equal(unique_gt_labels, gt_labels)
+    pred_matrix = np.equal(unique_pred_labels, pred_labels)
+
+    intersections = np.logical_and(gt_matrix, pred_matrix)
+    unions = np.logical_or(gt_matrix, pred_matrix)
+    intersections = np.sum(intersections, axis=0)
+    unions = np.sum(unions, axis=0)
+
+    ious = np.max(np.nan_to_num(intersections / unions), axis=1)
+    iou = np.sum(ious) / cluster_count
+
+    print("IoU: {}".format(iou))
 
 
 def load_lines(path):
@@ -338,7 +370,7 @@ def load_lines(path):
 
 if __name__ == '__main__':
     data_path = "/nvme/line_ws/test"
-    result_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/110520_2158/results"
+    result_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/120520_2010/results"
 
     data_generator = LineDataGenerator(data_path,
                                        [0, 1, 2, 20, 22],
@@ -354,5 +386,5 @@ if __name__ == '__main__':
     results = np.equal(h_pred, v_pred).astype(float)
     print(predictions[0, :])
 
-    renderer = LineRenderer(data_generator, results, 0.7, get_colors())
+    renderer = LineRenderer(data_generator, results, predictions, 0.7, get_colors())
     renderer.run()
