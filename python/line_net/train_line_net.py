@@ -19,9 +19,9 @@ def train():
 
     # The length of the geometry vector of a line.
     line_num_attr = 15
-    img_shape = (120, 180, 3)
+    img_shape = (60, 90, 3)
     max_line_count = 150
-    batch_size = 40
+    batch_size = 20
     num_epochs = 80
     bg_classes = [0, 1, 2, 20, 22]
 

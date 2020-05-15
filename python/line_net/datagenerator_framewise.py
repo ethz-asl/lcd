@@ -326,7 +326,7 @@ def get_fake_instancing(labels, valid_mask, bg_mask):
     return np.expand_dims(out, axis=0)
 
 
-def generate_data(image_data_generator, max_line_count, line_num_attr, batch_size=1):
+def generate_data(image_data_generator, max_line_count, line_num_attr, batch_size=1, load_images=True):
     batch_geometries = []
     batch_labels = []
     batch_valid_mask = []
@@ -340,7 +340,7 @@ def generate_data(image_data_generator, max_line_count, line_num_attr, batch_siz
     for i in range(batch_size):
         # image_data_generator.reset_pointer()
         geometries, labels, valid_mask, bg_mask, images, k = image_data_generator.next_batch(max_line_count,
-                                                                                             load_images=False)
+                                                                                             load_images=load_images)
         batch_labels.append(labels.reshape((1, max_line_count)))
         batch_geometries.append(geometries.reshape((1, max_line_count, line_num_attr)))
         batch_valid_mask.append(valid_mask.reshape((1, max_line_count)))
@@ -371,16 +371,25 @@ def generate_data(image_data_generator, max_line_count, line_num_attr, batch_siz
     batch_unique = np.concatenate(batch_unique, axis=0)
     batch_counts = np.concatenate(batch_counts, axis=0)
 
-    return {'lines': geometries,
-            'labels': labels,
-            'valid_input_mask': valid_mask,
-            'background_mask': bg_mask,
-            # 'images': images,
-            'unique_labels': batch_unique,
-            'cluster_count': batch_counts,
-            'fake': batch_fake}, batch_k
+    if not load_images:
+        return {'lines': geometries,
+                'labels': labels,
+                'valid_input_mask': valid_mask,
+                'background_mask': bg_mask,
+                'unique_labels': batch_unique,
+                'cluster_count': batch_counts,
+                'fake': batch_fake}, batch_k
+    else:
+        return {'lines': geometries,
+                'labels': labels,
+                'valid_input_mask': valid_mask,
+                'background_mask': bg_mask,
+                'images': images,
+                'unique_labels': batch_unique,
+                'cluster_count': batch_counts,
+                'fake': batch_fake}, batch_k
 
 
-def data_generator(image_data_generator, max_line_count, line_num_attr, batch_size=1):
+def data_generator(image_data_generator, max_line_count, line_num_attr, batch_size=1, load_images=True):
     while True:
-        yield generate_data(image_data_generator, max_line_count, line_num_attr, batch_size)
+        yield generate_data(image_data_generator, max_line_count, line_num_attr, batch_size, load_images)
