@@ -38,7 +38,7 @@ class Frame:
         images = []
 
         if load_images:
-            for i in range(len(indices)):
+            for i in indices:
                 img = cv2.imread(self.line_vci_paths[i], cv2.IMREAD_UNCHANGED)
                 if img is None:
                     print("WARNING: VIRTUAL CAMERA IMAGE NOT FOUND AT {}".format(self.line_vci_paths[i]))
@@ -48,7 +48,6 @@ class Frame:
                                                             interpolation=cv2.INTER_LINEAR), axis=0))
             images = np.concatenate(images, axis=0)
 
-        # print("Path: {}".format(self.line_vci_paths[0]))
         return count, self.line_geometries[indices, :], \
             self.line_labels[indices], self.line_class_ids[indices], images
 

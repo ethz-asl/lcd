@@ -201,7 +201,7 @@ def line_net_model_4(line_num_attr, num_lines, img_shape):
     hidden_units = head_units * 4
 
     # The virtual camera image feature cnn:
-    line_img_features = get_img_model(img_input_shape, 128)
+    line_img_features = get_img_model(img_input_shape, 128)(img_inputs)
 
     # The geometric embedding layer:
     line_embeddings = kl.Masking(mask_value=0.0)(line_inputs)

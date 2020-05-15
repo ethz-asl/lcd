@@ -10,6 +10,7 @@ np.random.seed(123)
 from datagenerator_framewise import LineDataGenerator
 from datagenerator_framewise import data_generator
 from model import line_net_model_3
+from model import line_net_model_4
 
 
 def train():
@@ -21,13 +22,13 @@ def train():
     line_num_attr = 15
     img_shape = (60, 90, 3)
     max_line_count = 150
-    batch_size = 20
+    batch_size = 2
     num_epochs = 80
     bg_classes = [0, 1, 2, 20, 22]
 
     # Create line net Keras model.
     # line_model = line_net_model(line_num_attr, max_line_count, img_shape, margin)
-    line_model = line_net_model_3(line_num_attr, max_line_count, img_shape)
+    line_model = line_net_model_4(line_num_attr, max_line_count, img_shape)
     line_model.summary()
 
     # log_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/120520_2010"
