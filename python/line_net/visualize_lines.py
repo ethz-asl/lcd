@@ -341,7 +341,10 @@ def print_iou(pred_labels, gt, bg, valid):
     labels = gt[mask]
     unique_labels = np.unique(labels)
     cluster_count = unique_labels.shape[0]
-    unique_labels = np.pad(unique_labels, (0, 15 - cluster_count), mode='constant', constant_values=0)
+    if cluster_count >= 15:
+        unique_labels = unique_labels[:15]
+    else:
+        unique_labels = np.pad(unique_labels, (0, 15 - cluster_count), mode='constant', constant_values=-1)
     pred_labels = pred_labels[mask]
 
     gt_labels = np.expand_dims(np.expand_dims(labels, axis=-1), axis=-1)
@@ -374,7 +377,7 @@ def load_lines(path):
 
 if __name__ == '__main__':
     data_path = "/nvme/line_ws/test"
-    result_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/130520_2315/results"
+    result_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/140520_1809/results"
 
     data_generator = LineDataGenerator(data_path,
                                        [0, 1, 2, 20, 22],

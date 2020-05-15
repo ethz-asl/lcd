@@ -56,7 +56,7 @@ class Frame:
 class LineDataGenerator:
     def __init__(self, files_dir, bg_classes,
                  shuffle=False, data_augmentation=False, mean=np.zeros((3,)), img_shape=(224, 224, 3),
-                 sort=False, min_line_count=15, max_cluster_count=15):
+                 sort=False, min_line_count=30, max_cluster_count=15):
         # Initialize parameters.
         self.shuffle = shuffle
         self.data_augmentation = data_augmentation
@@ -167,9 +167,9 @@ class LineDataGenerator:
         line_geometries = normalize(line_geometries, 2.0)
         line_geometries = add_length(line_geometries)
 
-        if self.data_augmentation:
+        if self.data_augmentation and np.random.binomial(1, 0.5):
             augment_flip(line_geometries)
-            augment_global(line_geometries, np.radians(20.), 0.5)
+            augment_global(line_geometries, np.radians(15.), 0.2)
 
         # Sort by x value of leftest point:
         if self.sort:
@@ -351,7 +351,7 @@ def generate_data(image_data_generator, max_line_count, line_num_attr, batch_siz
 
         unique_labels = np.unique(labels[np.logical_and(np.logical_not(bg_mask), valid_mask)])
         cluster_count = unique_labels.shape[0]
-        if cluster_count > 15:
+        if cluster_count >= 15:
             unique_labels = unique_labels[:15]
         else:
             unique_labels = np.pad(unique_labels, (0, 15 - cluster_count), mode='constant', constant_values=-1)

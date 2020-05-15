@@ -65,6 +65,7 @@ def get_inter_attention_layer(input_number, head_units=256, hidden_units=1024,
 
     layer = get_multi_head_attention_model((input_number, head_units),
                                            idx=idx,
+                                           dropout=dropout,
                                            key_size=key_size,
                                            n_multi=n_multi_heads,
                                            n_add=n_add_heads)(model_input)
@@ -95,7 +96,8 @@ def line_net_model_3(line_num_attr, num_lines, img_shape):
     unique_label_input = kl.Input(shape=(15,), dtype='int32', name='unique_labels')
     cluster_count_input = kl.Input(shape=(1,), dtype='int32', name='cluster_count')
 
-    head_units = 256
+    head_units = 384
+    hidden_units = head_units * 4
 
     # The embedding layer:
     line_embeddings = kl.Masking(mask_value=0.0)(line_inputs)
@@ -105,12 +107,12 @@ def line_net_model_3(line_num_attr, num_lines, img_shape):
     line_embeddings = kl.LeakyReLU()(line_embeddings)
 
     # Build 5 multi head attention layers. Hopefully this will work.
-    layer = get_inter_attention_layer(num_lines, idx=0)(line_embeddings)
-    layer = get_inter_attention_layer(num_lines, idx=1)(layer)
-    layer = get_inter_attention_layer(num_lines, idx=2)(layer)
-    layer = get_inter_attention_layer(num_lines, idx=3)(layer)
-    layer = get_inter_attention_layer(num_lines, idx=4)(layer)
-    layer = get_inter_attention_layer(num_lines, idx=5)(layer)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units, idx=0)(line_embeddings)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units, idx=1)(layer)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units, idx=2)(layer)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units, idx=3)(layer)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units, idx=4)(layer)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units, idx=5)(layer)
 
     line_ins = kl.TimeDistributed(kl.Dense(15))(layer)
     line_ins = kl.BatchNormalization()(line_ins)

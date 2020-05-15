@@ -17,7 +17,7 @@ def infer():
     max_line_count = 150
     bg_classes = [0, 1, 2, 20, 22]
 
-    log_dir = "/home/felix/line_ws/src/line_tools/python/line_net/logs/130520_2315"
+    log_dir = "/home/felix/line_ws/src/line_tools/python/line_net/logs/140520_1809"
     epoch = 47
 
     model = line_net_model_3(line_num_attr, max_line_count, img_shape)
