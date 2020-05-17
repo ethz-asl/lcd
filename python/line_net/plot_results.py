@@ -48,7 +48,7 @@ def get_colors():
 
 
 if __name__ == '__main__':
-    log_dir = "/home/felix/line_ws/src/line_tools/python/line_net/logs/110520_2158"
+    log_dir = "/home/felix/line_ws/src/line_tools/python/line_net/logs/130520_2315_attention_2"
     test_dir = "/nvme/line_ws/test"
     bg_classes = [0, 1, 2, 20, 22]
 
@@ -69,6 +69,8 @@ if __name__ == '__main__':
                                             sort=True,
                                             min_line_count=0,
                                             max_cluster_count=1000000)
+    for i in range(20):
+        geom, labels, valid, bg, img, k = test_data_generator.next_batch(150, load_images=False)
     geom, labels, valid, bg, img, k = test_data_generator.next_batch(150, load_images=False)
     unique_labels = np.unique(labels[np.where(np.logical_and(valid, np.logical_not(bg)))])
     print(unique_labels)
@@ -97,7 +99,7 @@ if __name__ == '__main__':
                 else:
                     color = colors[lbl_index, :]
 
-            plt.bar(range(15), predictions[0, line_index, :], color=color)
+            plt.bar(range(15), predictions[21, line_index, :], color=color)
 
     plt.show()
 

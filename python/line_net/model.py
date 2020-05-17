@@ -8,6 +8,7 @@ import tensorflow as tf
 
 from losses_and_metrics import get_kl_losses_and_metrics
 from losses_and_metrics import iou_metric
+from losses_and_metrics import bg_accuracy_metrics
 from losses_and_metrics import debug_metrics
 
 
@@ -15,48 +16,65 @@ def get_img_model(input_shape, output_dim, drop_out=0.3):
     input_imgs = kl.Input(input_shape)
 
     # First 7 layers of vgg16.
-    model = km.Sequential()
+    model = km.Sequential(name="vgg16_features")
     model.add(kl.TimeDistributed(
-        kl.Conv2D(input_shape=input_shape, filters=64, kernel_size=(3, 3), padding="same", activation="relu")
+        kl.Conv2D(input_shape=input_shape, filters=64, kernel_size=(3, 3), padding="valid", activation="relu"),
+        name="block1_conv1", trainable=False
     ))
-    model.add(kl.TimeDistributed(kl.BatchNormalization()))
+    # model.add(kl.TimeDistributed(kl.BatchNormalization()))
     model.add(kl.TimeDistributed(
-        kl.Conv2D(filters=64, kernel_size=(3, 3), padding="same", activation="relu")
+        kl.Conv2D(filters=64, kernel_size=(3, 3), padding="valid", activation="relu"),
+        name="block1_conv2", trainable=False
     ))
-    model.add(kl.TimeDistributed(kl.BatchNormalization()))
+    # model.add(kl.TimeDistributed(kl.BatchNormalization()))
     model.add(kl.TimeDistributed(kl.MaxPool2D(pool_size=(2, 2), strides=(2, 2))))
     model.add(kl.TimeDistributed(
-        kl.Conv2D(filters=128, kernel_size=(3, 3), padding="same", activation="relu")
+        kl.Conv2D(filters=128, kernel_size=(3, 3), padding="same", activation="relu"),
+        name="block2_conv1", trainable=False
     ))
-    model.add(kl.TimeDistributed(kl.BatchNormalization()))
+    # model.add(kl.TimeDistributed(kl.BatchNormalization()))
     model.add(kl.TimeDistributed(
-        kl.Conv2D(filters=128, kernel_size=(3, 3), padding="same", activation="relu")
+        kl.Conv2D(filters=128, kernel_size=(3, 3), padding="valid", activation="relu"),
+        name="block2_conv2", trainable=False
     ))
-    model.add(kl.TimeDistributed(kl.BatchNormalization()))
+    # model.add(kl.TimeDistributed(kl.BatchNormalization()))
     model.add(kl.TimeDistributed(kl.MaxPool2D(pool_size=(2, 2), strides=(2, 2))))
-    model.add(kl.TimeDistributed(kl.BatchNormalization()))
+    # model.add(kl.TimeDistributed(kl.BatchNormalization()))
     model.add(kl.TimeDistributed(
-        kl.Conv2D(filters=256, kernel_size=(3, 3), padding="same", activation="relu")
+        kl.Conv2D(filters=256, kernel_size=(3, 3), padding="valid", activation="relu"),
+        name="block3_conv1", trainable=False
     ))
-    model.add(kl.TimeDistributed(kl.BatchNormalization()))
+    # model.add(kl.TimeDistributed(kl.BatchNormalization()))
     model.add(kl.TimeDistributed(
-        kl.Conv2D(filters=256, kernel_size=(3, 3), padding="same", activation="relu")
+        kl.Conv2D(filters=256, kernel_size=(3, 3), padding="valid", activation="relu"),
+        name="block3_conv2", trainable=False
     ))
-    model.add(kl.TimeDistributed(kl.BatchNormalization()))
+    # model.add(kl.TimeDistributed(kl.BatchNormalization()))
     model.add(kl.TimeDistributed(
-        kl.Conv2D(filters=256, kernel_size=(3, 3), padding="same", activation="relu")
+        kl.Conv2D(filters=256, kernel_size=(3, 3), padding="valid", activation="relu"),
+        name="block3_conv3", trainable=False
     ))
-    model.add(kl.TimeDistributed(kl.BatchNormalization()))
+    model.add(kl.TimeDistributed(kl.MaxPool2D(pool_size=(4, 4), strides=(4, 4))))
+    model.add(kl.TimeDistributed(kl.Flatten()))
+    # model.add(kl.TimeDistributed(
+    #     kl.Conv2D(filters=512, kernel_size=(3, 3), padding="valid", activation="relu"),
+    #     name="block4_conv1", trainable=False
+    # ))
+    # The output here should be 8x16x256.
+    # We add another max pool so the output will be 2x2x256
+    # model.add(kl.TimeDistributed(kl.MaxPool2D(pool_size=(4, 8), strides=(4, 8))))
+    # model.add(kl.TimeDistributed(kl.Flatten()))
 
     cnn_output = model(input_imgs)
-    global_avg = kl.TimeDistributed(kl.GlobalAveragePooling2D())(cnn_output)
-    global_max = kl.TimeDistributed(kl.GlobalMaxPool2D())(cnn_output)
-    features = kl.Concatenate()([global_avg, global_max])
-    features = kl.TimeDistributed(kl.Dense(output_dim * 4))(features)
+    # global_avg = kl.TimeDistributed(kl.GlobalAveragePooling2D())(cnn_output)
+    # global_max = kl.TimeDistributed(kl.GlobalMaxPool2D())(cnn_output)
+    # features = kl.Concatenate()([global_avg, global_max])
+    # pooled = kl.TimeDistributed(kl.MaxPool2D())
+    features = kl.TimeDistributed(kl.Dense(output_dim * 8), name='img_dense1')(cnn_output)
     features = kl.TimeDistributed(kl.BatchNormalization())(features)
     features = kl.Activation('relu')(features)
     features = kl.TimeDistributed(kl.Dropout(drop_out))(features)
-    features = kl.TimeDistributed(kl.Dense(output_dim))(features)
+    features = kl.TimeDistributed(kl.Dense(output_dim), name='img_dense2')(features)
     features = kl.TimeDistributed(kl.BatchNormalization())(features)
     features = kl.Activation('relu')(features)
 
@@ -106,7 +124,6 @@ def get_multi_head_attention_model(input_shape, dropout=0.2, idx=0, key_size=128
     output = kl.TimeDistributed(kl.Dense(output_size))(output)
     output = kl.TimeDistributed(kl.Dropout(dropout))(output)
     output = kl.TimeDistributed(kl.BatchNormalization())(output)
-    output = kl.LeakyReLU()(output)
 
     return km.Model(inputs=model_input, outputs=output, name='multi_head_attention_{}'.format(idx))
 
@@ -122,6 +139,7 @@ def get_inter_attention_layer(input_number, head_units=256, hidden_units=1024,
                                            n_multi=n_multi_heads,
                                            n_add=n_add_heads)(model_input)
     layer = kl.Add()([layer, model_input])
+    layer = kl.LeakyReLU()(layer)
 
     # Two layers of dense connections running in parallel
     layer_2 = kl.TimeDistributed(kl.Dense(hidden_units))(layer)
@@ -131,8 +149,8 @@ def get_inter_attention_layer(input_number, head_units=256, hidden_units=1024,
     layer_2 = kl.TimeDistributed(kl.Dense(head_units))(layer_2)
     layer_2 = kl.TimeDistributed(kl.Dropout(dropout))(layer_2)
     layer_2 = kl.TimeDistributed(kl.BatchNormalization())(layer_2)
-    layer_2 = kl.LeakyReLU()(layer_2)
     layer = kl.Add()([layer, layer_2])
+    layer = kl.LeakyReLU()(layer)
 
     return km.Model(inputs=model_input, outputs=layer, name='inter_attention_{}'.format(idx))
 
@@ -185,6 +203,81 @@ def line_net_model_3(line_num_attr, num_lines, img_shape):
     return line_model
 
 
+def image_pretrain_model(line_num_attr, num_lines, img_shape):
+    # Inputs for geometric line information.
+    img_input_shape = (num_lines, img_shape[0], img_shape[1], img_shape[2])
+    img_inputs = kl.Input(shape=img_input_shape, dtype='float32', name='images')
+    line_inputs = kl.Input(shape=(num_lines, line_num_attr), dtype='float32', name='lines')
+    label_input = kl.Input(shape=(num_lines,), dtype='int32', name='labels')
+    valid_input = kl.Input(shape=(num_lines,), dtype='bool', name='valid_input_mask')
+    bg_input = kl.Input(shape=(num_lines,), dtype='bool', name='background_mask')
+    fake_input = kl.Input(shape=(num_lines, 15), dtype='float32', name='fake')
+    unique_label_input = kl.Input(shape=(15,), dtype='int32', name='unique_labels')
+    cluster_count_input = kl.Input(shape=(1,), dtype='int32', name='cluster_count')
+
+    head_units = 128
+    hidden_units = head_units * 4
+    key_size = 64
+    num_multi = 4
+    num_add = 0
+
+    # The virtual camera image feature cnn:
+    line_img_features = kl.Masking(mask_value=0.0)(img_inputs)
+    line_img_features = get_img_model(img_input_shape, head_units)(line_img_features)
+
+    line_embeddings = line_img_features
+
+    # Build 5 multi head attention layers. Hopefully this will work.
+    layer = get_inter_attention_layer(num_lines, head_units=head_units,
+                                      hidden_units=hidden_units, idx=0, key_size=key_size, n_multi_heads=num_multi,
+                                      n_add_heads=num_add)(line_embeddings)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units,
+                                      hidden_units=hidden_units, idx=1, key_size=key_size, n_multi_heads=num_multi,
+                                      n_add_heads=num_add)(layer)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units,
+                                      hidden_units=hidden_units, idx=2, key_size=key_size, n_multi_heads=num_multi,
+                                      n_add_heads=num_add)(layer)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units,
+                                      hidden_units=hidden_units, idx=3, key_size=key_size, n_multi_heads=num_multi,
+                                      n_add_heads=num_add)(layer)
+
+    line_ins = kl.TimeDistributed(kl.Dense(16))(layer)
+    line_ins = kl.BatchNormalization()(line_ins)
+    debug_layer = line_ins
+    line_ins = kl.TimeDistributed(kl.Softmax(name='instance_distribution'))(line_ins)
+    line_model = km.Model(inputs=[line_inputs, label_input, valid_input, bg_input, fake_input, img_inputs,
+                                  unique_label_input, cluster_count_input],
+                          outputs=line_ins,
+                          name='line_net_model')
+
+    # Set pretrained imagenet weights. This hack is necessary because vgg16 somehow does not work with the
+    # time distributed layer...
+    backbone = tf.keras.applications.vgg16.VGG16(include_top=False, weights='imagenet',
+                                                 input_shape=img_input_shape[1:])
+    line_model.get_layer("image_features").get_layer("vgg16_features").summary()
+    backbone.summary()
+
+    transfer_layers = ["block1_conv1", "block1_conv2", "block2_conv1", "block2_conv2", "block3_conv1",
+                       "block3_conv2", "block3_conv3"]
+
+    for layer_name in transfer_layers:
+        line_model.get_layer("image_features").get_layer("vgg16_features").get_layer(layer_name).set_weights(
+            backbone.get_layer(layer_name).get_weights())
+
+    loss, loss_metrics = get_kl_losses_and_metrics(line_ins, label_input, valid_input, bg_input, num_lines)
+    iou = iou_metric(label_input, unique_label_input, cluster_count_input, bg_input, valid_input, 15)
+    bg_acc = bg_accuracy_metrics(bg_input, valid_input)
+    metrics = loss_metrics + [iou] + bg_acc
+    opt = SGD(lr=0.0015, momentum=0.9)
+    opt = Adam(learning_rate=0.0002)
+    line_model.compile(loss=loss,
+                       optimizer=opt,
+                       metrics=metrics,
+                       experimental_run_tf_function=False)
+
+    return line_model, loss, opt, metrics
+
+
 def line_net_model_4(line_num_attr, num_lines, img_shape):
     # Inputs for geometric line information.
     img_input_shape = (num_lines, img_shape[0], img_shape[1], img_shape[2])
@@ -201,7 +294,10 @@ def line_net_model_4(line_num_attr, num_lines, img_shape):
     hidden_units = head_units * 4
 
     # The virtual camera image feature cnn:
-    line_img_features = get_img_model(img_input_shape, 128)(img_inputs)
+    backbone = tf.keras.applications.vgg16.VGG16(include_top=False, weights='imagenet',
+                                                 input_shape=img_input_shape[1:])
+    line_img_features = kl.Masking(mask_value=0.0)(img_inputs)
+    line_img_features = get_img_model(img_input_shape, 384)(line_img_features)
 
     # The geometric embedding layer:
     line_embeddings = kl.Masking(mask_value=0.0)(line_inputs)
@@ -210,7 +306,7 @@ def line_net_model_4(line_num_attr, num_lines, img_shape):
     line_embeddings = kl.TimeDistributed(kl.BatchNormalization())(line_embeddings)
     line_embeddings = kl.LeakyReLU()(line_embeddings)
 
-    line_embeddings = kl.Concatenate()([line_img_features, line_embeddings])
+    line_embeddings = line_img_features # kl.Concatenate()([line_img_features, line_embeddings])
 
     # Build 5 multi head attention layers. Hopefully this will work.
     layer = get_inter_attention_layer(num_lines, head_units=head_units,
@@ -242,4 +338,18 @@ def line_net_model_4(line_num_attr, num_lines, img_shape):
                        optimizer='adam',
                        metrics=[iou] + metrics + debug_metrics(debug_layer),
                        experimental_run_tf_function=False)
+
+    # Set pretrained imagenet weights. This hack is necessary because vgg16 somehow does not work with the
+    # time distributed layer...
+    line_model.get_layer("image_features").get_layer("vgg16_features").summary()
+    backbone.summary()
+
+    transfer_layers = ["block1_conv1", "block1_conv2", "block2_conv1", "block2_conv2", "block3_conv1",
+                       "block3_conv2", "block3_conv3"]
+
+    for layer_name in transfer_layers:
+        line_model.get_layer("image_features").get_layer("vgg16_features").get_layer(layer_name).set_weights(
+            backbone.get_layer(layer_name).get_weights()
+        )
+
     return line_model

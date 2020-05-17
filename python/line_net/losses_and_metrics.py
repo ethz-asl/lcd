@@ -27,7 +27,7 @@ def iou_metric(labels, unique_labels, cluster_counts, bg_mask, valid_mask, max_c
 
         gt_labels = tf.expand_dims(tf.expand_dims(labels, axis=-1), axis=-1)
         unique_gt_labels = tf.expand_dims(tf.expand_dims(unique_labels, axis=1), axis=-1)
-        pred_labels = tf.expand_dims(tf.expand_dims(tf.argmax(y_pred, axis=-1, output_type=tf.dtypes.int32),
+        pred_labels = tf.expand_dims(tf.expand_dims(tf.argmax(y_pred[:, :, 1:], axis=-1, output_type=tf.dtypes.int32),
                                                     axis=-1), axis=-1)
         unique_pred_labels = tf.expand_dims(tf.expand_dims(tf.expand_dims(tf.range(0, 15, dtype='int32'),
                                                                           axis=0), axis=0), axis=0)
@@ -49,7 +49,29 @@ def iou_metric(labels, unique_labels, cluster_counts, bg_mask, valid_mask, max_c
     return iou
 
 
-def get_kl_losses_and_metrics(instancing_tensor, labels_tensor, validity_mask, bg_mask, num_lines):
+def bg_accuracy_metrics(bg_mask, valid_mask, threshold=0.3):
+    num_valid_1d = tf.reduce_sum(tf.cast(valid_mask, dtype='float32'), axis=-1)
+
+    def bg_tp(y_true, y_pred):
+        bg_tensor = y_pred[:, :, 0]
+        bg_correct = tf.logical_and(valid_mask, tf.logical_and(bg_mask, tf.greater(bg_tensor, threshold)))
+        num_correct = tf.reduce_sum(tf.cast(bg_correct, dtype='float32'), axis=-1)
+        ratio_correct = tf.math.divide_no_nan(num_correct, num_valid_1d)
+
+        return tf.reduce_mean(ratio_correct)
+
+    def bg_fp(y_true, y_pred):
+        bg_tensor = y_pred[:, :, 0]
+        bg_fp = tf.logical_and(valid_mask, tf.logical_and(tf.logical_not(bg_mask), tf.greater(bg_tensor, threshold)))
+        num_fp = tf.reduce_sum(tf.cast(bg_fp, dtype='float32'), axis=-1)
+        ratio_fp = tf.math.divide_no_nan(num_fp, num_valid_1d)
+
+        return tf.reduce_mean(ratio_fp)
+
+    return [bg_tp, bg_fp]
+
+
+def get_kl_losses_and_metrics(instancing_tensor, labels_tensor, valid_mask, bg_mask, num_lines):
     h_labels = tf.expand_dims(labels_tensor, axis=-1)
     v_labels = tf.transpose(h_labels, perm=(0, 2, 1))
 
@@ -60,7 +82,7 @@ def get_kl_losses_and_metrics(instancing_tensor, labels_tensor, validity_mask, b
     v_bg = tf.transpose(h_bg, perm=(0, 2, 1))
     mask_not_bg = tf.logical_and(h_bg, v_bg)
 
-    h_val = tf.expand_dims(validity_mask, axis=-1)
+    h_val = tf.expand_dims(valid_mask, axis=-1)
     v_val = tf.transpose(h_val, perm=(0, 2, 1))
     mask_val = tf.logical_and(h_val, v_val)
     mask_val = tf.linalg.set_diag(mask_val, tf.zeros(tf.shape(mask_val)[0:-1], dtype='bool'))
@@ -68,10 +90,14 @@ def get_kl_losses_and_metrics(instancing_tensor, labels_tensor, validity_mask, b
     loss_mask = tf.logical_and(mask_val, mask_not_bg)
 
     num_valid = tf.reduce_sum(tf.cast(loss_mask, dtype='float32'), axis=(1, 2), keepdims=True)
+    num_valid_1d = tf.reduce_sum(tf.cast(valid_mask, dtype='float32'), axis=-1, keepdims=True)
 
-    def kl_cross_div_loss(y_true, y_pred):
-        extended_pred = tf.expand_dims(instancing_tensor, axis=2)
-        h_pred = extended_pred  # K.permute_dimensions(extended_pred, (0, 1, 2, 3))
+    cluster_tensor = instancing_tensor[:, :, 1:]
+    bg_tensor = instancing_tensor[:, :, 0]
+
+    def cluster_loss(y_true, y_pred):
+        extended_pred = tf.expand_dims(cluster_tensor, axis=2)
+        h_pred = extended_pred
         v_pred = tf.transpose(extended_pred, perm=(0, 2, 1, 3))
         d = h_pred * tf.math.log(tf.math.divide_no_nan(h_pred, v_pred + 1e-100) + 1e-100)
         d = tf.reduce_sum(d, axis=-1, keepdims=False)
@@ -79,7 +105,16 @@ def get_kl_losses_and_metrics(instancing_tensor, labels_tensor, validity_mask, b
         equal_loss = tf.where(tf.logical_and(mask_equal, loss_mask), d, 0.)
         not_equal_loss = tf.where(tf.logical_and(mask_not_equal, loss_mask),
                                   tf.maximum(0., 2.0 - d), 0.)
-        return tf.math.divide_no_nan((equal_loss + not_equal_loss), num_valid) * 150. * 150.
+        return tf.reduce_mean(tf.math.divide_no_nan((equal_loss + not_equal_loss), num_valid) * 150. * 150.)
+
+    def bg_loss(y_true, y_pred):
+        d = tf.where(bg_mask, -tf.math.log(bg_tensor), -tf.math.log(1. - bg_tensor))
+        d = tf.where(valid_mask, d, 0.)
+        d = tf.reduce_mean(d, axis=-1, keepdims=False)
+        return tf.reduce_mean(tf.math.divide_no_nan(d, num_valid_1d) * 150.)
+
+    def loss(y_true, y_pred):
+        return cluster_loss(y_true, y_pred) + bg_loss(y_true, y_pred)
 
     pred_labels = tf.argmax(instancing_tensor, axis=-1)
     h_pred_labels = tf.expand_dims(pred_labels, axis=-1)
@@ -118,4 +153,4 @@ def get_kl_losses_and_metrics(instancing_tensor, labels_tensor, validity_mask, b
     def tn_pd_n(y_true, y_pred):
         return tf.reduce_mean(tf.math.divide_no_nan(true_n, pred_n))
 
-    return kl_cross_div_loss, [tp_gt_p, tn_gt_n, tp_pd_p, tn_pd_n]
+    return loss, [cluster_loss, bg_loss]# [tp_gt_p, tn_gt_n, tp_pd_p, tn_pd_n]

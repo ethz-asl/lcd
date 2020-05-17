@@ -4,6 +4,8 @@ import cv2
 import os
 import sys
 
+from tensorflow.keras.applications.vgg16 import preprocess_input
+
 
 def load_frame(path):
     try:
@@ -38,14 +40,18 @@ class Frame:
         images = []
 
         if load_images:
+            # Do not forget to shuffle images according to indices.
             for i in indices:
                 img = cv2.imread(self.line_vci_paths[i], cv2.IMREAD_UNCHANGED)
                 if img is None:
                     print("WARNING: VIRTUAL CAMERA IMAGE NOT FOUND AT {}".format(self.line_vci_paths[i]))
                     images.append(np.expand_dims(np.zeros(img_shape), axis=0))
                 else:
-                    images.append(np.expand_dims(cv2.resize(img / 255. * 2. - 1., dsize=(img_shape[1], img_shape[0]),
-                                                            interpolation=cv2.INTER_LINEAR), axis=0))
+                    # mask = np.logical_and(np.logical_and(img[:, :, 0] == 0, img[:, :, 1] == 0), img[:, :, 2] == 0)
+                    img = preprocess_input(img)
+                    # img[mask] = 0.0
+                    img = cv2.resize(img, dsize=(img_shape[1], img_shape[0]), interpolation=cv2.INTER_LINEAR)
+                    images.append(np.expand_dims(img, axis=0))
             images = np.concatenate(images, axis=0)
 
         return count, self.line_geometries[indices, :], \
@@ -167,7 +173,7 @@ class LineDataGenerator:
         line_geometries = add_length(line_geometries)
 
         if self.data_augmentation and np.random.binomial(1, 0.5):
-            augment_flip(line_geometries)
+            augment_flip(line_geometries, line_images)
             augment_global(line_geometries, np.radians(15.), 0.2)
 
         # Sort by x value of leftest point:
@@ -193,7 +199,7 @@ class LineDataGenerator:
         out_bg[line_count:batch_size] = False
 
         if load_images:
-            # TODO: Sort images too.
+            # Images are sorted already.
             out_images = line_images
             if line_count < batch_size:
                 out_images = np.concatenate([out_images,
@@ -260,7 +266,7 @@ def augment_local(line_geometries, offset_deviation, length_deviation, ):
     print("To be implemented.")
 
 
-def augment_flip(line_geometries):
+def augment_flip(line_geometries, images):
     for i in range(line_geometries.shape[0]):
         if np.random.binomial(1, 0.5):
             buffer_start = np.copy(line_geometries[i, :3])
@@ -272,6 +278,8 @@ def augment_flip(line_geometries):
             buffer_open_start = np.copy(line_geometries[i, 12])
             line_geometries[i, 12] = line_geometries[i, 13]
             line_geometries[i, 13] = buffer_open_start
+
+            images[i, :, :, :] = np.flip(images[i, :, :, :], axis=2)
 
 
 def kl_loss_np(prediction, labels, val_mask, bg_mask):
