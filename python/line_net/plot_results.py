@@ -48,7 +48,7 @@ def get_colors():
 
 
 if __name__ == '__main__':
-    log_dir = "/home/felix/line_ws/src/line_tools/python/line_net/logs/130520_2315_attention_2"
+    log_dir = "/home/felix/line_ws/src/line_tools/python/line_net/logs/160520_2110"
     test_dir = "/nvme/line_ws/test"
     bg_classes = [0, 1, 2, 20, 22]
 
@@ -59,6 +59,8 @@ if __name__ == '__main__':
     gts = np.squeeze(gts)
     print(predictions.shape)
     print(gts.shape)
+
+    print(np.where(predictions == 0.0))
 
     pred_arg = np.argmax(predictions, axis=-1)
     gt_arg = np.argmax(gts, axis=-1)
@@ -99,7 +101,7 @@ if __name__ == '__main__':
                 else:
                     color = colors[lbl_index, :]
 
-            plt.bar(range(15), predictions[21, line_index, :], color=color)
+            plt.bar(range(16), predictions[21, line_index, :], color=color)
 
     plt.show()
 

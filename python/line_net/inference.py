@@ -5,7 +5,8 @@ from tensorflow.keras.models import load_model
 
 from datagenerator_framewise import LineDataGenerator
 from datagenerator_framewise import generate_data
-from model import line_net_model_3
+from model import image_pretrain_model
+from model import line_net_model_4
 
 
 def infer():
@@ -13,15 +14,33 @@ def infer():
 
     # The length of the geometry vector of a line.
     line_num_attr = 15
-    img_shape = (120, 180, 3)
+    img_shape = (64, 96, 3)
     max_line_count = 150
     bg_classes = [0, 1, 2, 20, 22]
 
-    log_dir = "/home/felix/line_ws/src/line_tools/python/line_net/logs/150520_0340"
-    epoch = 30
+    log_dir = "/home/felix/line_ws/src/line_tools/python/line_net/logs/180520_0018"
+    epoch = 1
 
-    model = line_net_model_3(line_num_attr, max_line_count, img_shape)
-    model.load_weights(os.path.join(log_dir, "weights.{}.hdf5".format(epoch)))
+    model, loss, opt, metrics = line_net_model_4(line_num_attr, max_line_count, img_shape)
+    model.get_layer("image_features").load_weights("/home/felix/line_ws/src/line_tools/python/line_net/weights/image_weights.hdf5")
+
+    # transfer_layers = ["block3_conv1", "block3_conv2", "block3_conv3"]
+    # for layer_name in transfer_layers:
+    #     model.get_layer("image_features").get_layer("vgg16_features").get_layer(layer_name).trainable = True
+    #     print("Unfreezing layer {}.".format(layer_name))
+    model.load_weights(os.path.join(log_dir, "weights.{}.hdf5".format(epoch)), by_name=True, skip_mismatch=False)
+
+    model.compile(loss=loss,
+                  optimizer=opt,
+                  metrics=metrics,
+                  experimental_run_tf_function=False)
+
+    model.summary()
+    # model.get_layer("image_features").trainable = False
+    # for layer in model.get_layer("image_features").layers:
+    #     layer.trainable = False
+    # model.get_layer("image_features").save_weights("image_weights.hdf5")
+    # model.get_layer("image_features").load_weights("image_weights.hdf5")
 
     predictions = []
     gts = []

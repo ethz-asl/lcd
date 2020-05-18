@@ -9,7 +9,6 @@ np.random.seed(123)
 
 from datagenerator_framewise import LineDataGenerator
 from datagenerator_framewise import data_generator
-from model import line_net_model_3
 from model import line_net_model_4
 from model import image_pretrain_model
 
@@ -23,7 +22,7 @@ class LayerUnfreezeCallback(tf_keras.callbacks.Callback):
         self.metrics = metrics
 
     def on_epoch_end(self, epoch, logs=None):
-        if epoch == 10:
+        if epoch == 15:
             transfer_layers = ["block3_conv1", "block3_conv2", "block3_conv3"]
             for layer_name in transfer_layers:
                 self.model.get_layer("image_features").get_layer("vgg16_features").get_layer(layer_name).trainable = \
@@ -35,7 +34,7 @@ class LayerUnfreezeCallback(tf_keras.callbacks.Callback):
                                metrics=self.metrics,
                                experimental_run_tf_function=False)
 
-        if epoch == 20:
+        if epoch == 30:
             transfer_layers = ["block2_conv1", "block2_conv2"]
             for layer_name in transfer_layers:
                 self.model.get_layer("image_features").get_layer("vgg16_features").get_layer(layer_name).trainable = \
@@ -47,17 +46,6 @@ class LayerUnfreezeCallback(tf_keras.callbacks.Callback):
                                metrics=self.metrics,
                                experimental_run_tf_function=False)
 
-        # if epoch == 15:
-        #     transfer_layers = ["block1_conv1", "block1_conv2"]
-        #     for layer_name in transfer_layers:
-        #         self.model.get_layer("image_features").get_layer("vgg16_features").get_layer(layer_name).trainable = \
-        #             True
-        #         print("Unfreezing layer {}.".format(layer_name))
-
-        #    self.model.compile(loss=self.loss,
-        #                        optimizer=self.opt,
-        #                        metrics=self.metrics,
-        #                        experimental_run_tf_function=False)
 
 def train():
     # Paths to line files.
@@ -71,13 +59,21 @@ def train():
     batch_size = 2
     num_epochs = 40
     bg_classes = [0, 1, 2, 20, 22]
-    load_past = True
-    past_epoch = 10
-    past_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/160520_2110"
+    load_past = False
+    past_epoch = 15
+    past_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/180520_0018"
+    image_weight_path = "/home/felix/line_ws/src/line_tools/python/line_net/weights/image_weights.hdf5"
+
+    pretrain_images = False
 
     # Create line net Keras model.
-    # line_model = line_net_model(line_num_attr, max_line_count, img_shape, margin)
-    line_model, loss, opt, metrics = image_pretrain_model(line_num_attr, max_line_count, img_shape)
+    if pretrain_images:
+        line_model, loss, opt, metrics = image_pretrain_model(line_num_attr, max_line_count, img_shape)
+    else:
+        line_model, loss, opt, metrics = line_net_model_4(line_num_attr, max_line_count, img_shape)
+        print("Nice")
+        line_model.get_layer("image_features").summary()
+        line_model.get_layer("image_features").load_weights(image_weight_path)
     line_model.summary()
 
     if load_past:
@@ -106,19 +102,25 @@ def train():
 
     save_weights_callback = tf_keras.callbacks.ModelCheckpoint(os.path.join(log_path, "weights.{epoch:02d}.hdf5"))
     tensorboard_callback = tf_keras.callbacks.TensorBoard(log_dir=log_path)
-    unfreeze_callback = LayerUnfreezeCallback(loss, opt, metrics)
+    callbacks = [save_weights_callback, tensorboard_callback]
+    if pretrain_images:
+        unfreeze_callback = LayerUnfreezeCallback(loss, opt, metrics)
+        callbacks += [unfreeze_callback]
 
+    initial_epoch = 0
+    if load_past:
+        initial_epoch = past_epoch
     line_model.fit_generator(generator=train_generator,
                              verbose=1,
                              max_queue_size=1,
                              workers=1,
                              use_multiprocessing=False,
-                             initial_epoch=past_epoch,
+                             initial_epoch=initial_epoch,
                              epochs=num_epochs,
                              steps_per_epoch=np.floor(train_frame_count / batch_size),
                              validation_data=val_generator,
                              validation_steps=np.floor(val_frame_count / batch_size),
-                             callbacks=[save_weights_callback, tensorboard_callback, unfreeze_callback])
+                             callbacks=callbacks)
 
 
 if __name__ == '__main__':

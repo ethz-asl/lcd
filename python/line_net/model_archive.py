@@ -435,3 +435,51 @@ def line_net_model_2(line_num_attr, num_lines, img_shape):
                        metrics=metrics + debug_metrics(debug_layer),
                        experimental_run_tf_function=False)
     return line_model
+
+
+def line_net_model_3(line_num_attr, num_lines, img_shape):
+    # Inputs for geometric line information.
+    # img_inputs = kl.Input(shape=(num_lines, img_shape[0], img_shape[1], img_shape[2]), dtype='float32', name='images')
+    line_inputs = kl.Input(shape=(num_lines, line_num_attr), dtype='float32', name='lines')
+    label_input = kl.Input(shape=(num_lines,), dtype='int32', name='labels')
+    valid_input = kl.Input(shape=(num_lines,), dtype='bool', name='valid_input_mask')
+    bg_input = kl.Input(shape=(num_lines,), dtype='bool', name='background_mask')
+    fake_input = kl.Input(shape=(num_lines, 15), dtype='float32', name='fake')
+    unique_label_input = kl.Input(shape=(15,), dtype='int32', name='unique_labels')
+    cluster_count_input = kl.Input(shape=(1,), dtype='int32', name='cluster_count')
+
+    head_units = 384
+    hidden_units = head_units * 4
+
+    # The embedding layer:
+    line_embeddings = kl.Masking(mask_value=0.0)(line_inputs)
+    line_embeddings = kl.TimeDistributed(kl.Dense(head_units))(line_embeddings)
+    line_embeddings = kl.Dropout(0.1)(line_embeddings)
+    line_embeddings = kl.TimeDistributed(kl.BatchNormalization())(line_embeddings)
+    line_embeddings = kl.LeakyReLU()(line_embeddings)
+
+    # Build 5 multi head attention layers. Hopefully this will work.
+    layer = get_inter_attention_layer(num_lines, head_units=head_units, idx=0)(line_embeddings)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units, idx=1)(layer)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units, idx=2)(layer)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units, idx=3)(layer)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units, idx=4)(layer)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units, idx=5)(layer)
+
+    line_ins = kl.TimeDistributed(kl.Dense(15))(layer)
+    line_ins = kl.BatchNormalization()(line_ins)
+    debug_layer = line_ins
+    line_ins = kl.TimeDistributed(kl.Softmax(name='instance_distribution'))(line_ins)
+
+    loss, metrics = get_kl_losses_and_metrics(line_ins, label_input, valid_input, bg_input, num_lines)
+    iou = iou_metric(label_input, unique_label_input, cluster_count_input, bg_input, valid_input, 15)
+    opt = SGD(lr=0.0015, momentum=0.9)
+    line_model = km.Model(inputs=[line_inputs, label_input, valid_input, bg_input, fake_input,
+                               unique_label_input, cluster_count_input],
+                          outputs=line_ins,
+                          name='line_net_model')
+    line_model.compile(loss=loss,
+                       optimizer='adam',
+                       metrics=[iou] + metrics + debug_metrics(debug_layer),
+                       experimental_run_tf_function=False)
+    return line_model
