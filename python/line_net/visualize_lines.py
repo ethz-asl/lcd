@@ -80,13 +80,14 @@ class LineRenderer:
         #     else:
         #         vis.add_geometry(render_normals(self.line_geometries))
 
-        if self.render_result_connections and self.render_gt_connections:
+        pred_labels = self.pred_labels[self.pointer, :]
+        pred_bg = np.where(pred_labels == 0, True, False)
+        if self.render_result_connections and self.render_gt_connections or self.render_result_connections:
             print("Rendering predictions.")
-            vis.add_geometry(render_lines(self.line_geometries,
-                                          np.argmax(self.results[self.pointer, :, :], axis=-1), self.label_colors))
+            vis.add_geometry(render_lines(self.line_geometries, pred_labels, pred_bg, self.label_colors))
         else:
             print("Rendering ground truth.")
-            vis.add_geometry(render_lines(self.line_geometries, self.line_labels, self.label_colors))
+            vis.add_geometry(render_lines(self.line_geometries, self.line_labels, self.bg_mask, self.label_colors))
 
         if self.results is not None:
             result = self.results[self.pointer, :, :]
@@ -106,10 +107,10 @@ class LineRenderer:
 
                 for i in range(150):
                     for j in range(150):
-                        if self.bg_mask[i] or self.bg_mask[j] or not self.valid_mask[i] or not self.valid_mask[j]:
+                        if pred_bg[i] or pred_bg[j] or not self.valid_mask[i] or not self.valid_mask[j]:
                             result_connections[i, j] = False
 
-                print_metrics(result_connections, self.line_labels, self.bg_mask, self.valid_mask)
+                # print_metrics(result_connections, self.line_labels, self.bg_mask, self.valid_mask)
                 print_iou(self.pred_labels[self.pointer, :], self.line_labels, self.bg_mask, self.valid_mask)
 
         if self.render_result_connections and self.render_gt_connections:
@@ -204,13 +205,18 @@ def get_colors():
     return colors
 
 
-def render_lines(lines, labels, label_colors):
+def render_lines(lines, labels, bg_mask, label_colors):
+    bg_color = np.array([1.0, 0.0, 0.0])
+
     points = np.vstack((lines[:, 0:3], lines[:, 3:6]))
     line_count = lines.shape[0]
     indices = np.hstack((np.arange(line_count).reshape(line_count, 1),
                          (np.arange(line_count) + line_count).reshape(line_count, 1)))
 
     colors = [label_colors[int(labels[i]), :].tolist() for i in range(line_count)]
+    for i in range(line_count):
+        if bg_mask[i]:
+            colors[i] = bg_color
     line_set = o3d.geometry.LineSet(
         points=o3d.utility.Vector3dVector(points.astype(float).tolist()),
         lines=o3d.utility.Vector2iVector(indices.astype(int).tolist()),
@@ -377,7 +383,7 @@ def load_lines(path):
 
 if __name__ == '__main__':
     data_path = "/nvme/line_ws/test"
-    result_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/180520_2229/results"
+    result_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/180520_2229/results_12"
 
     data_generator = LineDataGenerator(data_path,
                                        [0, 1, 2, 20, 22],
@@ -386,8 +392,9 @@ if __name__ == '__main__':
                                        max_cluster_count=1000000)
 
     predictions = np.load(os.path.join(result_path, "predictions_train.npy"))
+    print(predictions.shape)
     predictions = np.squeeze(predictions)
-    predictions = np.argmax(predictions, axis=-1)
+    predictions = np.argmax(predictions[:, :, 0:], axis=-1)
     h_pred = np.expand_dims(predictions, axis=-1)
     v_pred = np.transpose(h_pred, axes=(0, 2, 1))
     results = np.equal(h_pred, v_pred).astype(float)

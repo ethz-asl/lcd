@@ -100,7 +100,7 @@ def get_kl_losses_and_metrics(instancing_tensor, labels_tensor, valid_mask, bg_m
         extended_pred = tf.expand_dims(cluster_tensor, axis=2)
         h_pred = extended_pred
         v_pred = tf.transpose(extended_pred, perm=(0, 2, 1, 3))
-        d = h_pred * tf.math.log(tf.math.divide_no_nan(h_pred, v_pred + 1e-100) + 1e-100)
+        d = h_pred * tf.math.log(tf.math.divide_no_nan(h_pred, v_pred + 1e-10) + 1e-10)
         d = tf.reduce_sum(d, axis=-1, keepdims=False)
 
         equal_loss = tf.where(tf.logical_and(mask_equal, loss_mask), d, 0.)

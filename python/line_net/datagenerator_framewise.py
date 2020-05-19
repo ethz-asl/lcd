@@ -28,10 +28,11 @@ def load_frame(path):
 class Frame:
     def __init__(self, path):
         self.path = path
-        self.line_count, self.line_geometries, self.line_labels, self.line_class_ids, self.line_vci_paths = \
-            load_frame(path)
 
     def get_batch(self, batch_size, img_shape, shuffle, load_images):
+        self.line_count, self.line_geometries, self.line_labels, self.line_class_ids, self.line_vci_paths = \
+            load_frame(self.path)
+
         count = min(batch_size, self.line_count)
         indices = np.arange(count)
         if shuffle:

@@ -60,7 +60,7 @@ class InferenceCallback(tf_keras.callbacks.Callback):
         self.line_num_attr = line_num_attr
 
     def on_epoch_end(self, epoch, logs=None):
-        infer_on_test_set(self.model, self.test_dir, self.log_dir, epoch, self.bg_classes, self.img_shape,
+        infer_on_test_set(self.model, self.test_dir, self.log_dir, epoch + 1, self.bg_classes, self.img_shape,
                           self.max_line_count, self.line_num_attr)
 
 
@@ -88,11 +88,11 @@ def train():
     line_num_attr = 15
     img_shape = (64, 96, 3)
     max_line_count = 150
-    batch_size = 2
+    batch_size = 4
     num_epochs = 40
     bg_classes = [0, 1, 2, 20, 22]
     load_past = True
-    past_epoch = 6
+    past_epoch = 9
     past_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/180520_2229"
     image_weight_path = "/home/felix/line_ws/src/line_tools/python/line_net/weights/image_weights.hdf5"
 

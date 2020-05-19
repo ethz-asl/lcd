@@ -306,7 +306,7 @@ def line_net_model_4(line_num_attr, num_lines, img_shape):
     metrics = loss_metrics + [iou] + bg_acc
 
     opt = SGD(lr=0.0015, momentum=0.9)
-    opt = Adam(learning_rate=0.0001)
+    opt = Adam(learning_rate=0.00005)
     line_model.compile(loss=loss,
                        optimizer=opt,
                        metrics=metrics,
