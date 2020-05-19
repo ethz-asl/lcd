@@ -106,20 +106,16 @@ def get_kl_losses_and_metrics(instancing_tensor, labels_tensor, valid_mask, bg_m
         equal_loss = tf.where(tf.logical_and(mask_equal, loss_mask), d, 0.)
         not_equal_loss = tf.where(tf.logical_and(mask_not_equal, loss_mask),
                                   tf.maximum(0., 2.0 - d), 0.)
-        output = tf.math.divide_no_nan((equal_loss + not_equal_loss), num_valid_1d) * 150.
+        output = equal_loss + not_equal_loss
         output = tf.reduce_mean(output, axis=-1)
-        print("Cluster")
-        print(output.shape)
+        output = tf.math.divide_no_nan(output, num_valid_1d) * 150.
         return output
 
     def bg_loss(y_true, y_pred):
         bg_tensor = y_pred[:, :, 0]
         d = tf.where(bg_mask, -tf.math.log(bg_tensor), -tf.math.log(1. - bg_tensor))
         d = tf.where(valid_mask, d, 0.)
-        # d = tf.reduce_mean(d, axis=-1, keepdims=False)
         # output = tf.math.divide_no_nan(d, num_valid_1d) * 150.
-        print("Bg")
-        print(d.shape)
         return d
 
     def loss(y_true, y_pred):
