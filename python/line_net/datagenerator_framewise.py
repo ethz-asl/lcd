@@ -25,6 +25,57 @@ def load_frame(path):
     return line_count, line_geometries, line_labels, line_class_ids, line_vci_paths
 
 
+def fuse_frames(lines_1, lines_2):
+    for i in range(lines_2.shape[0]):
+        ...
+
+def fuse_lines(line_1, line_2):
+    max_angle = 0.05
+    max_dis = 0.025
+
+    start_1 = line_1[:3]
+    end_1 = line_1[3:6]
+    dir_1 = end_1 - start_1
+    l_1 = np.linalg.norm(dir_1)
+    dir_1_n = dir_1 / l_1
+
+    start_2 = line_2[:3]
+    end_2 = line_2[3:6]
+    dir_2 = end_2 - start_2
+    dir_2_n = dir_2 / np.linalg.norm(dir_2)
+
+    # Check if the angle of the line is not above a certain threshold.
+    angle = np.abs(np.dot(dir_1_n, dir_2_n))
+    if angle > np.cos(max_angle):
+        # Check if the orthogonal distance between the lines are lower than a certain threshold.
+        dis_3 = np.linalg.norm(np.cross(dir_1, start_2 - start_1))
+        dis_4 = np.linalg.norm(np.cross(dir_1, end_2 - start_1))
+
+        if dis_3 < max_dis and dis_4 < max_dis:
+            # Check if the lines overlap.
+            x_3 = np.dot(dir_1, start_2 - start_1)
+            x_4 = np.dot(dir_1, end_2 - start_1)
+            if min(x_3, x_4) < 0 < max(x_3, x_4) or 0 < min(x_3, x_4) < l_1:
+                # We have an overlapping line!
+                out_lines = np.zeros((15,))
+                new_start_p = start_1
+                new_start_open = line_1[-2]
+                new_end_p = end_1
+                new_end_open = line_1[-1]
+                if x_3 < x_4:
+                    if x_3 < 0:
+                        new_start_p = start_2
+                    elif x_4 > l_1:
+                        new_end_p = end_2
+                elif x_4 < x_3:
+                    if x_4 < 0:
+                        new_start_p = end_2
+                    elif x_3 > l_1:
+                        new_end_p = start_2
+
+
+
+
 class Frame:
     def __init__(self, path):
         self.path = path

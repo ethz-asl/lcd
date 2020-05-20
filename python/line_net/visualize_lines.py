@@ -383,7 +383,7 @@ def load_lines(path):
 
 if __name__ == '__main__':
     data_path = "/nvme/line_ws/test"
-    result_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/180520_2229/results_12"
+    result_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/180520_2229/results_25"
 
     data_generator = LineDataGenerator(data_path,
                                        [0, 1, 2, 20, 22],
