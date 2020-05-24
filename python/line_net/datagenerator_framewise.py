@@ -3,35 +3,192 @@ import pandas as pd
 import cv2
 import os
 import sys
+import time
+from numba import jit, njit
+from collections import Counter
 
 from tensorflow.keras.applications.vgg16 import preprocess_input
+from tensorflow.keras.utils import Sequence
 
 
 def load_frame(path):
-    try:
-        data_lines = pd.read_csv(path, sep=" ", header=None)
-        line_vci_paths = data_lines.values[:, 0]
-        line_geometries = data_lines.values[:, 1:15].astype(float)
-        line_labels = data_lines.values[:, 15]
-        line_class_ids = data_lines.values[:, 17]
-        line_count = line_geometries.shape[0]
-    except pd.errors.EmptyDataError:
-        line_geometries = 0
-        line_labels = 0
-        line_class_ids = 0
-        line_count = 0
-        line_vci_paths = 0
+    data_lines = pd.read_csv(path, sep=" ", header=None)
+    line_vci_paths = data_lines.values[:, 0]
+    line_geometries = data_lines.values[:, 1:15].astype(float)
+    line_labels = data_lines.values[:, 15]
+    line_class_ids = data_lines.values[:, 17]
+    line_count = line_geometries.shape[0]
 
-    return line_count, line_geometries, line_labels, line_class_ids, line_vci_paths
+    cam_origin = data_lines.values[0, 19:22].astype(float)
+    cam_rotation = data_lines.values[0, 22:26].astype(float)
+    transform = get_world_transform(cam_origin, cam_rotation)
+
+    return line_count, line_geometries, line_labels, line_class_ids, line_vci_paths, transform
 
 
-def fuse_frames(lines_1, lines_2):
+def get_world_transform(cam_origin, cam_rotation):
+    x = cam_origin[0]
+    y = cam_origin[1]
+    z = cam_origin[2]
+    e0 = cam_rotation[3]
+    e1 = cam_rotation[0]
+    e2 = cam_rotation[1]
+    e3 = cam_rotation[2]
+    T = np.array([[e0 ** 2 + e1 ** 2 - e2 ** 2 - e3 ** 2, 2 * e1 * e2 - 2 * e0 * e3, 2 * e0 * e2 + 2 * e1 * e3, x],
+                  [2 * e0 * e3 + 2 * e1 * e2, e0 ** 2 - e1 ** 2 + e2 ** 2 - e3 ** 2, 2 * e2 * e3 - 2 * e0 * e1, y],
+                  [2 * e1 * e3 - 2 * e0 * e2, 2 * e0 * e1 + 2 * e2 * e3, e0 ** 2 - e1 ** 2 - e2 ** 2 + e3 ** 2, z],
+                  [0, 0, 0, 1]])
+    return T
+
+
+def transform_lines(lines, transform):
+    lines[:, :3] = transform.dot(np.vstack([lines[:, :3].T, np.ones((1, lines.shape[0]))]))[:3, :].T
+    lines[:, 3:6] = transform.dot(np.vstack([lines[:, 3:6].T, np.ones((1, lines.shape[0]))]))[:3, :].T
+    lines[:, 6:9] = transform[:3, :3].dot(lines[:, 6:9].T).T
+    lines[:, 9:12] = transform[:3, :3].dot(lines[:, 9:12].T).T
+
+    return lines
+
+
+def fuse_frames(geom_1, labels_1, class_1, vcis_1, geom_2, labels_2, class_2, vcis_2):
+    groups = group_lines(geom_1, geom_2)
+
+    out_geometries = []
+    out_labels = []
+    out_classes = []
+    out_vcis = []
+
+    for group in groups:
+        geometries = [geom_1[i, :] for i in group[0]] + [geom_2[j, :] for j in group[1]]
+        labels = [labels_1[i] for i in group[0]] + [labels_2[j] for j in group[1]]
+        classes = [class_1[i] for i in group[0]] + [class_2[j] for j in group[1]]
+        vcis = [vcis_1[i] for i in group[0]] + [vcis_2[j] for j in group[1]]
+
+        # Fuse lines by geometry
+        fused_line = fuse_line_group(geometries)
+
+        fused_label = Counter(labels).most_common(1)[0][0]
+        fused_class = Counter(classes).most_common(1)[0][0]
+
+        resolutions = np.array([vci.shape[0] for vci in vcis])
+        fused_vci = vcis[int(np.argmax(resolutions))]
+
+        out_geometries.append(fused_line)
+        out_labels.append(fused_label)
+        out_classes.append(fused_class)
+        out_vcis.append(fused_vci)
+
+    return out_geometries, out_labels, out_classes, out_vcis
+
+
+def group_lines(lines_1, lines_2):
+    groups = [[{j}, set()] for j in range(lines_1.shape[0])] + \
+        [[set(), {i}] for i in range(lines_2.shape[0])]
+
     for i in range(lines_2.shape[0]):
-        ...
+        line = lines_2[i, :]
+        for j in range(lines_1.shape[0]):
+            if lines_coincide(lines_1[j, :], line):
+                grouped = []
+                for k, pair in enumerate(groups):
+                    if i in pair[1] or j in pair[0]:
+                        grouped.append(k)
 
+                new_group = [{j}, {i}]
+                for g in grouped:
+                    new_group[0] = new_group[0] | groups[g][0]
+                    new_group[1] = new_group[1] | groups[g][1]
+
+                for g in sorted(grouped, reverse=True):
+                    del(groups[g])
+                groups.append(new_group)
+
+    return groups
+
+
+@njit
+def lines_coincide(line_1, line_2):
+    # tic = time.perf_counter()
+    max_angle = 0.15
+    max_dis = 0.015
+
+    start_1 = line_1[0:3]
+    end_1 = line_1[3:6]
+    dir_1 = end_1 - start_1
+    l_1 = np.linalg.norm(dir_1)
+    dir_1_n = dir_1 / l_1
+
+    start_2 = line_2[0:3]
+    end_2 = line_2[3:6]
+    dir_2 = end_2 - start_2
+    l_2 = np.linalg.norm(dir_2)
+    dir_2_n = dir_2 / l_2
+
+    # Check if the angle of the line is not above a certain threshold.
+    angle = np.abs(np.dot(dir_1_n, dir_2_n))
+
+    # print("Calculating took {} seconds.".format(time.perf_counter() - tic))
+    if angle > np.cos(max_angle):
+        # Check if the orthogonal distance between the lines are lower than a certain threshold.
+        dis_3 = np.linalg.norm(np.cross(dir_1_n, start_2 - start_1))
+        dis_4 = np.linalg.norm(np.cross(dir_1_n, end_2 - start_1))
+
+        if dis_3 < max_dis or dis_4 < max_dis:
+            # Check if the lines overlap.
+            x_3 = np.dot(dir_1_n, start_2 - start_1)
+            x_4 = np.dot(dir_1_n, end_2 - start_1)
+            if min(x_3, x_4) < 0. < max(x_3, x_4) or 0. < min(x_3, x_4) < l_1:
+                return True
+
+    return False
+
+
+def fuse_line_group(lines):
+    start_1 = lines[0][:3]
+    end_1 = lines[0][3:6]
+    l_1 = np.linalg.norm(end_1 - start_1)
+    dir_1 = (end_1 - start_1) / l_1
+    start_1_open = lines[0][12]
+    end_1_open = lines[0][13]
+
+    x = [0., l_1]
+    points = [start_1, end_1]
+    opens = [start_1_open, end_1_open]
+
+    for line in lines[1:]:
+        x.append(dir_1.dot(line[:3] - start_1))
+        points.append(line[:3])
+        opens.append(line[12])
+        x.append(dir_1.dot(line[3:6] - start_1))
+        points.append(line[3:6])
+        opens.append(line[13])
+
+    start_idx = int(np.argmin(x))
+    end_idx = int(np.argmax(x))
+    new_start = points[start_idx]
+    new_end = points[end_idx]
+    new_start_open = opens[start_idx]
+    new_end_open = opens[end_idx]
+
+    new_normal_1 = lines[0][6:9]
+    new_normal_2 = lines[0][9:12]
+    # Find a line that has two normals, and use those.
+    for line in lines:
+        n_1 = line[6:9]
+        n_2 = line[9:12]
+        if not (n_1 == 0.).all() and not (n_2 == 0.).all():
+            new_normal_1 = n_1
+            new_normal_2 = n_2
+            break
+
+    return np.hstack([new_start, new_end, new_normal_1, new_normal_2, new_start_open, new_end_open])
+
+
+# Not used.
 def fuse_lines(line_1, line_2):
     max_angle = 0.05
     max_dis = 0.025
+    max_normal_angle = 0.1
 
     start_1 = line_1[:3]
     end_1 = line_1[3:6]
@@ -42,7 +199,8 @@ def fuse_lines(line_1, line_2):
     start_2 = line_2[:3]
     end_2 = line_2[3:6]
     dir_2 = end_2 - start_2
-    dir_2_n = dir_2 / np.linalg.norm(dir_2)
+    l_2 = np.linalg.norm(dir_2)
+    dir_2_n = dir_2 / l_2
 
     # Check if the angle of the line is not above a certain threshold.
     angle = np.abs(np.dot(dir_1_n, dir_2_n))
@@ -57,7 +215,6 @@ def fuse_lines(line_1, line_2):
             x_4 = np.dot(dir_1, end_2 - start_1)
             if min(x_3, x_4) < 0 < max(x_3, x_4) or 0 < min(x_3, x_4) < l_1:
                 # We have an overlapping line!
-                out_lines = np.zeros((15,))
                 new_start_p = start_1
                 new_start_open = line_1[-2]
                 new_end_p = end_1
@@ -73,7 +230,199 @@ def fuse_lines(line_1, line_2):
                     elif x_3 > l_1:
                         new_end_p = start_2
 
+                # Find common normals.
+                normal_1_1 = line_1[6:9]
+                normal_1_2 = line_1[9:12]
+                normal_2_1 = line_2[6:9]
+                normal_2_2 = line_2[9:12]
+                angle_1_1 = normal_1_1.dot(normal_2_1)
+                angle_1_2 = normal_1_1.dot(normal_2_2)
+                angle_2_1 = normal_1_2.dot(normal_2_1)
+                angle_2_2 = normal_1_2.dot(normal_2_2)
 
+                if angle_1_1 > angle_2_1 > np.cos(max_normal_angle):
+                    # Merge 1 and 1, 2 and 2
+                    new_normal_1 = fuse_normals(normal_1_1, normal_2_1, l_1, l_2, angle_1_1, max_normal_angle)
+                    new_normal_2 = fuse_normals(normal_1_2, normal_2_2, l_1, l_2, angle_2_2, max_normal_angle)
+                elif angle_2_1 > angle_1_1 > np.cos(max_normal_angle):
+                    # Merge 2 and 1, 1 and 2
+                    new_normal_1 = fuse_normals(normal_1_2, normal_2_1, l_1, l_2, angle_2_1, max_normal_angle)
+                    new_normal_2 = fuse_normals(normal_1_1, normal_2_2, l_1, l_2, angle_1_2, max_normal_angle)
+                elif angle_1_2 > angle_2_2 > np.cos(max_normal_angle):
+                    # Merge 1 and 2, 2 and 1
+                    new_normal_1 = fuse_normals(normal_1_1, normal_2_2, l_1, l_2, angle_1_2, max_normal_angle)
+                    new_normal_2 = fuse_normals(normal_1_2, normal_2_1, l_1, l_2, angle_2_1, max_normal_angle)
+                elif angle_2_2 > angle_1_2 > np.cos(max_normal_angle):
+                    # Merge 2 and 2, 1 and 1
+                    new_normal_1 = fuse_normals(normal_1_2, normal_2_2, l_1, l_2, angle_2_2, max_normal_angle)
+                    new_normal_2 = fuse_normals(normal_1_1, normal_2_1, l_1, l_2, angle_1_1, max_normal_angle)
+                else:
+                    if l_1 > l_2:
+                        new_normal_1 = normal_1_1
+                        new_normal_2 = normal_1_2
+                    else:
+                        new_normal_1 = normal_2_1
+                        new_normal_2 = normal_2_2
+
+                # Return the fused line.
+                return np.hstack([new_start_p, new_end_p, new_normal_1, new_normal_2, new_start_open, new_end_open])
+
+    # If the lines do not match, return None.
+    return None
+
+
+def fuse_normals(normal_1, normal_2, length_1, length_2, angle_1_2, max_angle):
+    # If one normal does not exist, return the other one.
+    if (normal_1 == 0.).all():
+        return normal_2
+    if (normal_2 == 0.).all():
+        return normal_1
+
+    if angle_1_2 > np.cos(max_angle):
+        # Return the interpolated normal.
+        normal = normal_1 + normal_2
+        return normal / np.linalg.norm(normal)
+    else:
+        # Return the normal of the longest line.
+        if length_1 > length_2:
+            return normal_1
+        else:
+            return normal_2
+
+
+def load_image(path, img_shape):
+    img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+    if img is None:
+        print("WARNING: VIRTUAL CAMERA IMAGE NOT FOUND AT {}".format(path))
+        return np.zeros(img_shape)
+    else:
+        img = preprocess_input(img)
+        img = cv2.resize(img, dsize=(img_shape[1], img_shape[0]), interpolation=cv2.INTER_LINEAR)
+        return img
+
+
+class Scene:
+    def __init__(self, path, bg_classes, min_line_count):
+        self.scene_path = path
+        self.frame_paths = [os.path.join(path, name) for name in os.listdir(path)
+                            if os.path.isfile(os.path.join(path, name))]
+        self.frame_count = len(self.frame_paths)
+        self.frames = [Frame(path) for path in self.frame_paths]
+        self.bg_classes = bg_classes
+        self.min_line_count = min_line_count
+        self.valid_frames = []
+        self.get_frames_info()
+
+    def get_frames_info(self):
+        line_counts = np.zeros((20,), dtype=int)
+        cluster_counts = np.zeros((20,), dtype=int)
+        scene_labels = np.zeros((0,), dtype=int)
+        scene_classes = np.zeros((0,), dtype=int)
+
+        print("=============================================")
+
+        for i, frame in enumerate(self.frame_paths):
+            frame_idx = int(frame.split('_')[-1])
+            count, geometries, labels, classes, vci_paths, transform = load_frame(frame)
+            line_counts[frame_idx] = count
+            clusters = Counter(labels[get_bg_mask(classes, self.bg_classes)]).most_common()
+            cluster_counts[frame_idx] = len(clusters)
+            scene_labels = np.hstack((scene_labels, labels))
+            scene_classes = np.hstack((scene_classes, classes))
+            print("Frame line count: {}".format(line_counts[frame_idx]))
+            print("Frame cluster count: {}".format(cluster_counts[frame_idx]))
+            cluster_line_counts = [cluster[1] for cluster in clusters]
+            print("Without clutter: {}".format(np.sum(np.where(np.array(cluster_line_counts) > 1, 1, 0))))
+            print(cluster_line_counts)
+
+            if count > self.min_line_count:
+                self.valid_frames.append(i)
+
+        scene_clusters = Counter(scene_labels[get_bg_mask(scene_classes, self.bg_classes)]).most_common()
+        scene_cluster_count = len(scene_clusters)
+
+        print("Scene: {}".format(self.scene_path))
+        print("Scene cluster count: {}".format(scene_cluster_count))
+        print("Scene line count: {}".format(np.sum(line_counts)))
+        print([cluster[1] for cluster in scene_clusters])
+
+    def get_batch(self, batch_size, max_clusters, img_shape, shuffle, fuse):
+        frames = self.frame_paths[:5]
+        tot_count, lines, labels, classes, vci_paths, t_1 = load_frame(frames[0])
+        vcis = [load_image(path, img_shape) for path in vci_paths]
+
+        if fuse:
+            tic = time.perf_counter()
+            for frame in frames[1:]:
+                count_2, lines_2, labels_2, classes_2, vci_paths_2, t_2 = load_frame(frame)
+                vcis_2 = [load_image(path, img_shape) for path in vci_paths_2]
+                lines_2 = transform_lines(lines_2, np.linalg.inv(t_1).dot(t_2))
+                lines, labels, classes, vcis = fuse_frames(np.array(lines), np.array(labels), np.array(classes), vcis,
+                                                           lines_2, labels_2, classes_2, vcis_2)
+                tot_count += count_2
+                vcis = vcis + vcis_2
+            count = len(lines)
+            print("Lines before fusing: {}".format(tot_count))
+            print("Lines after fusing: {}".format(count))
+            print("Fused {} lines.".format(tot_count - count))
+            print("Fusion took {} seconds.".format(time.perf_counter() - tic))
+
+            labels = np.stack(labels)
+            lines = np.vstack(lines)
+            classes = np.stack(classes)
+
+            # Delete lines of small clusters so that the number of clusters is below maximum.
+            cluster_line_counts = Counter(np.array(labels)[get_bg_mask(classes, self.bg_classes)]).most_common()
+            for pair in cluster_line_counts[max_clusters:]:
+                delete_idx = np.where(labels == pair[0])
+                labels = np.delete(labels, delete_idx)
+                lines = np.delete(lines, delete_idx, axis=0)
+                classes = np.delete(classes, delete_idx)
+                for i in np.sort(delete_idx[0])[::-1]:
+                    del(vcis[i])
+
+            print("Clutter lines deleted: {}".format(count - labels.shape[0]))
+            count = labels.shape[0]
+
+            indices = np.arange(count)
+            if shuffle:
+                np.random.shuffle(indices)
+            indices = indices[:batch_size]
+
+            return count, lines[indices, :], labels[indices], \
+                classes[indices], \
+                np.concatenate([np.expand_dims(img, axis=0) for img in np.array(vcis)[indices]], axis=0)
+        else:
+            for frame in frames[1:]:
+                count_2, lines_2, labels_2, classes_2, vci_paths_2, t_2 = load_frame(frame)
+                vcis_2 = [load_image(path, img_shape) for path in vci_paths_2]
+                lines_2 = transform_lines(lines_2, np.linalg.inv(t_1).dot(t_2))
+                lines, labels, classes, vcis = fuse_frames(np.array(lines), np.array(labels), np.array(classes), vcis,
+                                                           lines_2, labels_2, classes_2, vcis_2)
+                tot_count += count_2
+                lines = np.vstack([lines, lines_2])
+                labels = np.hstack([labels, labels_2])
+                classes = np.hstack([classes, classes_2])
+                vcis = vcis + vcis_2
+
+            # Delete lines of small clusters so that the number of clusters is below maximum.
+            cluster_line_counts = Counter(np.array(labels)[get_bg_mask(classes, self.bg_classes)]).most_common()
+            for pair in cluster_line_counts[max_clusters:]:
+                delete_idx = np.where(labels == pair[0])
+                labels = np.delete(labels, delete_idx)
+                lines = np.delete(lines, delete_idx, axis=0)
+                classes = np.delete(classes, delete_idx)
+                for i in np.sort(delete_idx[0])[::-1]:
+                    del(vcis[i])
+
+            print("Clutter lines deleted: {}".format(tot_count - labels.shape[0]))
+            count = lines.shape[0]
+            return count, lines[:batch_size, :], labels[:batch_size], classes[:batch_size], \
+                np.concatenate([np.expand_dims(img, axis=0) for img in vcis[:batch_size]], axis=0)
+
+
+def get_bg_mask(classes, bg_classes):
+    return np.where(np.isin(classes, bg_classes, invert=True))
 
 
 class Frame:
@@ -110,6 +459,29 @@ class Frame:
             self.line_labels[indices], self.line_class_ids[indices], images
 
 
+class LineDataSequence(Sequence):
+    def __init__(self, files_dir, bg_classes, shuffle=False, fuse=False, data_augmentation=False, mean=np.zeros((3,)),
+                 img_shape=(64, 96, 3), min_line_count=30, max_cluster_count=15):
+        self.files_dir = files_dir
+        self.bg_classes = bg_classes
+        self.shuffle = shuffle
+        self.fuse = fuse
+        self.data_augmentation = data_augmentation
+        self.mean = mean
+        self.img_shape = img_shape
+        self.min_line_count = min_line_count
+        self.max_cluster_count = max_cluster_count
+
+    def on_epoch_end(self):
+        ...
+
+    def __getitem__(self, item):
+        ...
+
+    def __len__(self):
+        ...
+
+
 class LineDataGenerator:
     def __init__(self, files_dir, bg_classes,
                  shuffle=False, data_augmentation=False, mean=np.zeros((3,)), img_shape=(224, 224, 3),
@@ -122,7 +494,6 @@ class LineDataGenerator:
         self.frame_count = 0
         self.frames = []
         self.frame_indices = []
-        self.load_frames(files_dir)
         self.mean = mean
         self.img_shape = img_shape
         self.sort = sort
@@ -133,6 +504,7 @@ class LineDataGenerator:
         self.skipped_frames = 0
         self.min_line_count = min_line_count
         self.max_cluster_count = max_cluster_count
+        self.load_scenes(files_dir)
 
         if self.shuffle:
             self.shuffle_data()
@@ -146,6 +518,18 @@ class LineDataGenerator:
         self.frame_count = len(frame_paths)
         self.frames = [Frame(path) for path in frame_paths]
         self.frame_indices = np.arange(self.frame_count)
+
+    def load_scenes(self, files_dir):
+        tic = time.perf_counter()
+        scene_paths = [os.path.join(files_dir, name) for name in os.listdir(files_dir)
+                       if os.path.isdir(os.path.join(files_dir, name))]
+        if not self.shuffle:
+            scene_paths.sort()
+
+        self.frame_count = len(scene_paths)
+        self.frames = [Scene(path, self.bg_classes, self.min_line_count) for path in scene_paths]
+        self.frame_indices = np.arange(self.frame_count)
+        print("Initialization took {} seconds.".format(time.perf_counter() - tic))
 
     def get_mean(self):
         mean = np.zeros((3,))
@@ -194,6 +578,7 @@ class LineDataGenerator:
 
         line_count, line_geometries, line_labels, line_class_ids, line_images = \
             self.frames[self.frame_indices[self.pointer]].get_batch(batch_size,
+                                                                    self.max_cluster_count,
                                                                     self.img_shape,
                                                                     self.shuffle,
                                                                     load_images)

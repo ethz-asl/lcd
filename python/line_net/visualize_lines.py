@@ -22,9 +22,11 @@ class LineRenderer:
         self.render_result_connections = False
         self.show_closest = False
         self.pred_labels = pred_labels
+        self.batch_size = 300
+        self.fuse = False
 
         self.line_geometries, self.line_labels, self.valid_mask, self.bg_mask, images, k = \
-            self.line_data_generator.next_batch(150, False)
+            self.line_data_generator.next_batch(self.batch_size, False)
 
     def run(self):
         vis = o3d.visualization.VisualizerWithKeyCallback()
@@ -40,8 +42,10 @@ class LineRenderer:
         vis.register_key_callback(ord("E"), self.get_toggle_show_connections_callback())
         vis.register_key_callback(ord("Q"), self.get_toggle_show_results_callback())
         vis.register_key_callback(ord("C"), self.get_toggle_show_closest_callback())
-        vis.register_key_callback(ord("M"), self.get_increase_margin_callback())
-        vis.register_key_callback(ord("N"), self.get_decrease_margin_callback())
+        # vis.register_key_callback(ord("M"), self.get_increase_margin_callback())
+        # vis.register_key_callback(ord("N"), self.get_decrease_margin_callback())
+        vis.register_key_callback(ord("F"), self.get_fuse_callback(True))
+        vis.register_key_callback(ord("D"), self.get_fuse_callback(False))
 
         print("Press space to switch label index.")
         print("Press 'A' to toggle between show all and show instance.")
@@ -49,8 +53,10 @@ class LineRenderer:
         print("Press 'E' to show ground truth connections.")
         print("Press 'Q' to show predicted connections.")
         print("Press 'C' to toggle between show closest and show margin.")
-        print("Press 'M' to increase margin.")
-        print("Press 'N' to decrease margin.")
+        # print("Press 'M' to increase margin.")
+        # print("Press 'N' to decrease margin.")
+        print("Press 'F' to fuse.")
+        print("Press 'D' to unfuse.")
 
         self.update_render(vis)
 
@@ -61,25 +67,6 @@ class LineRenderer:
         view = vis.get_view_control().convert_to_pinhole_camera_parameters()
         vis.clear_geometries()
 
-        # indices = np.where(self.line_labels == self.indices[self.pointer])
-
-        # if self.render_single_cluster:
-        #     vis.add_geometry(render_lines(
-        #         self.line_geometries[indices, :][0],
-        #         self.line_labels[indices],
-        #         self.label_colors)
-        #     )
-        # else:
-        #     vis.add_geometry(render_lines(self.line_geometries, self.line_labels, self.label_colors))
-
-        # if self.render_normals:
-        #     if self.render_single_cluster:
-        #         vis.add_geometry(render_normals(
-        #             self.line_geometries[indices, :][0])
-        #         )
-        #     else:
-        #         vis.add_geometry(render_normals(self.line_geometries))
-
         pred_labels = self.pred_labels[self.pointer, :]
         pred_bg = np.where(pred_labels == 0, True, False)
         if self.render_result_connections and self.render_gt_connections or self.render_result_connections:
@@ -89,29 +76,30 @@ class LineRenderer:
             print("Rendering ground truth.")
             vis.add_geometry(render_lines(self.line_geometries, self.line_labels, self.bg_mask, self.label_colors))
 
-        if self.results is not None:
-            result = self.results[self.pointer, :, :]
-            # result = self.results[0, :, :]
+        if self.render_result_connections:
+            if self.results is not None:
+                result = self.results[self.pointer, :, :]
+                # result = self.results[0, :, :]
 
-            if self.show_closest:
-                max_results = np.zeros_like(result, dtype=bool)
-                max_result_sort = np.argsort(result, axis=-1)[:, -1:]
-                for i in range(result.shape[0]):
-                    max_results[i, max_result_sort[i, :]] = True
-                max_results[:, np.logical_not(self.valid_mask)] = False
-                max_results[np.logical_not(self.valid_mask)] = False
-                # max_results[np.where(result < self.margin)] = False
-                result_connections = max_results
-            else:
-                result_connections = np.where(result > self.margin, True, False)
+                if self.show_closest:
+                    max_results = np.zeros_like(result, dtype=bool)
+                    max_result_sort = np.argsort(result, axis=-1)[:, -1:]
+                    for i in range(result.shape[0]):
+                        max_results[i, max_result_sort[i, :]] = True
+                    max_results[:, np.logical_not(self.valid_mask)] = False
+                    max_results[np.logical_not(self.valid_mask)] = False
+                    # max_results[np.where(result < self.margin)] = False
+                    result_connections = max_results
+                else:
+                    result_connections = np.where(result > self.margin, True, False)
 
-                for i in range(150):
-                    for j in range(150):
-                        if pred_bg[i] or pred_bg[j] or not self.valid_mask[i] or not self.valid_mask[j]:
-                            result_connections[i, j] = False
+                    for i in range(self.batch_size):
+                        for j in range(self.batch_size):
+                            if pred_bg[i] or pred_bg[j] or not self.valid_mask[i] or not self.valid_mask[j]:
+                                result_connections[i, j] = False
 
-                # print_metrics(result_connections, self.line_labels, self.bg_mask, self.valid_mask)
-                print_iou(self.pred_labels[self.pointer, :], self.line_labels, self.bg_mask, self.valid_mask)
+                    # print_metrics(result_connections, self.line_labels, self.bg_mask, self.valid_mask)
+                    print_iou(self.pred_labels[self.pointer, :], self.line_labels, self.bg_mask, self.valid_mask)
 
         if self.render_result_connections and self.render_gt_connections:
             # vis.add_geometry(render_compare(self.line_geometries, self.line_labels, self.bg_mask, result_connections))
@@ -178,13 +166,19 @@ class LineRenderer:
 
         return toggle_show_closest
 
+    def get_fuse_callback(self, do_fuse):
+        def fuse(vis):
+            self.line_data_generator.set_pointer((self.line_data_generator.pointer - 1) %
+                                                 self.line_data_generator.frame_count)
+            self.line_geometries, self.line_labels, self.valid_mask, self.bg_mask, images, k = \
+                self.line_data_generator.next_batch(self.batch_size, load_images=do_fuse)
+            self.update_render(vis)
+        return fuse
+
     def get_switch_index_callback(self):
         def switch_index(vis):
-            # if not self.render_single_cluster:
-            #     self.render_single_cluster = True
-            # else:
             self.line_geometries, self.line_labels, self.valid_mask, self.bg_mask, images, k = \
-                self.line_data_generator.next_batch(150, load_images=False)
+                self.line_data_generator.next_batch(self.batch_size, load_images=False)
             self.pointer = (self.pointer + 1) % self.index_size
 
             print("Now showing index {} ({}/{})".format(self.indices[self.pointer], self.pointer + 1, self.index_size))
@@ -383,15 +377,16 @@ def load_lines(path):
 
 if __name__ == '__main__':
     data_path = "/nvme/line_ws/test"
-    result_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/180520_2229/results_25"
+    result_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/180520_2229/results_25_all_frames_300_lines"
 
     data_generator = LineDataGenerator(data_path,
                                        [0, 1, 2, 20, 22],
                                        sort=True,
+                                       shuffle=False,
                                        min_line_count=0,
-                                       max_cluster_count=1000000)
+                                       max_cluster_count=300)
 
-    predictions = np.load(os.path.join(result_path, "predictions_train.npy"))
+    predictions = np.load(os.path.join(result_path, "predictions.npy"))
     print(predictions.shape)
     predictions = np.squeeze(predictions)
     predictions = np.argmax(predictions[:, :, 0:], axis=-1)

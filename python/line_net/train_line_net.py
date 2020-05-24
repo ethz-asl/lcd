@@ -3,6 +3,7 @@ import datetime
 import os
 
 import tensorflow.keras as tf_keras
+import tensorflow as tf
 
 import numpy as np
 np.random.seed(123)
@@ -79,6 +80,9 @@ class SaveCallback(tf_keras.callbacks.Callback):
 
 
 def train():
+    physical_devices = tf.config.list_physical_devices('GPU')
+    tf.config.experimental.set_memory_growth(physical_devices[0], True)
+
     # Paths to line files.
     train_files = "/nvme/line_ws/train"
     val_files = "/nvme/line_ws/val"
@@ -91,7 +95,7 @@ def train():
     batch_size = 4
     num_epochs = 40
     bg_classes = [0, 1, 2, 20, 22]
-    load_past = True
+    load_past = False
     past_epoch = 9
     past_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/180520_2229"
     image_weight_path = "/home/felix/line_ws/src/line_tools/python/line_net/weights/image_weights.hdf5"

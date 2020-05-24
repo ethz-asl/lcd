@@ -87,10 +87,6 @@ def write_frame(line_count, data_lines, path_to_vcis, frame_id, path_write):
 
         line_dict.update({
             "image_path": path_to_vci,
-            # "start_point": line_start_point_world,
-            # "end_point": line_end_point_world,
-            # "normal_1": normal_1_world,
-            # "normal_2": normal_2_world,
             'frame_id': frame_id,
         })
 

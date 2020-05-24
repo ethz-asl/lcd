@@ -45,6 +45,8 @@ def read_line_detection_line(line):
 #    16: type
 #    17: class
 #    18: frame id
+# 19-21: camera origin
+# 22-24: camera rotation
 def write_line_split_line(write_file, line_dict):
     write_file.write(
         line_dict['image_path'] + ' ' +
@@ -65,7 +67,15 @@ def write_line_split_line(write_file, line_dict):
         str(line_dict['label']) + ' ' +
         str(line_dict['type']) + ' ' +
         str(line_dict['class']) + ' ' +
-        str(line_dict['frame_id']) + '\n'
+        str(line_dict['frame_id']) + ' ' +
+        str(line_dict['camera_origin'][0]) + ' ' +
+        str(line_dict['camera_origin'][1]) + ' ' +
+        str(line_dict['camera_origin'][2]) + ' ' +
+        str(line_dict['camera_rotation'][0]) + ' ' +
+        str(line_dict['camera_rotation'][1]) + ' ' +
+        str(line_dict['camera_rotation'][2]) + ' ' +
+        str(line_dict['camera_rotation'][3]) + ' ' +
+        '\n'
     )
 
 

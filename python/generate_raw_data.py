@@ -70,8 +70,12 @@ if __name__ == '__main__':
                 output_path=vci_path,
             )
 
-        train_path = os.path.join(train_path_master, scene_id + "_frame_{}")
-        if remake_vcis or not os.path.exists(train_path.format(19)):
+        scene_out_path = os.path.join(train_path_master, scene_id)
+        if not os.path.exists(scene_out_path):
+            os.mkdir(scene_out_path)
+
+            train_path = os.path.join(scene_out_path, scene_id + "_frame_{}")
+            # if remake_vcis or not os.path.exists(train_path.format(19)):
             split_dataset_framewise.split_scene(line_path, vci_path, train_path)
 
 
