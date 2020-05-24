@@ -229,7 +229,7 @@ def image_pretrain_model(line_num_attr, num_lines, img_shape):
     return line_model, loss, opt, metrics
 
 
-def line_net_model_4(line_num_attr, num_lines, img_shape):
+def line_net_model_4(line_num_attr, num_lines, max_clusters, img_shape):
     # Inputs for geometric line information.
     img_input_shape = (num_lines, img_shape[0], img_shape[1], img_shape[2])
     img_inputs = kl.Input(shape=img_input_shape, dtype='float32', name='images')
@@ -237,8 +237,8 @@ def line_net_model_4(line_num_attr, num_lines, img_shape):
     label_input = kl.Input(shape=(num_lines,), dtype='int32', name='labels')
     valid_input = kl.Input(shape=(num_lines,), dtype='bool', name='valid_input_mask')
     bg_input = kl.Input(shape=(num_lines,), dtype='bool', name='background_mask')
-    fake_input = kl.Input(shape=(num_lines, 15), dtype='float32', name='fake')
-    unique_label_input = kl.Input(shape=(15,), dtype='int32', name='unique_labels')
+    # fake_input = kl.Input(shape=(num_lines, 15), dtype='float32', name='fake')
+    unique_label_input = kl.Input(shape=(max_clusters,), dtype='int32', name='unique_labels')
     cluster_count_input = kl.Input(shape=(1,), dtype='int32', name='cluster_count')
 
     img_feature_size = 128
@@ -256,9 +256,9 @@ def line_net_model_4(line_num_attr, num_lines, img_shape):
     line_embeddings = kl.Masking(mask_value=0.0)(line_inputs)
     line_embeddings = kl.TimeDistributed(kl.Dense(geometric_size, kernel_constraint=kc.max_norm(3)),
                                          name='geometric_features')(line_embeddings)
-    line_embeddings = kl.Dropout(0.2)(line_embeddings)
+    line_embeddings = kl.TimeDistributed(kl.Dropout(0.2))(line_embeddings)
     line_embeddings = kl.TimeDistributed(kl.BatchNormalization())(line_embeddings)
-    line_embeddings = kl.Activation('relu')(line_embeddings)
+    line_embeddings = kl.LeakyReLU()(line_embeddings)
 
     # The virtual camera image feature cnn:
     line_img_features = kl.Masking(mask_value=0.0)(img_inputs)
@@ -283,30 +283,28 @@ def line_net_model_4(line_num_attr, num_lines, img_shape):
     layer = get_inter_attention_layer(num_lines, head_units=head_units, dropout=dropout, key_size=key_size,
                                       hidden_units=hidden_units, idx=4, n_multi_heads=num_multis,
                                       n_add_heads=num_adds)(layer)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units, dropout=dropout, key_size=key_size,
+                                      hidden_units=hidden_units, idx=5, n_multi_heads=num_multis,
+                                      n_add_heads=num_adds)(layer)
 
-    line_ins = kl.TimeDistributed(kl.Dense(16), name='instancing_layer')(layer)
-    line_ins, num_valid = MaskLayer()(line_ins)
-    print("masked")
+    line_ins = kl.TimeDistributed(kl.Dense(max_clusters + 1), name='instancing_layer')(layer)
     line_ins = kl.TimeDistributed(kl.BatchNormalization())(line_ins)
     # debug_layer = line_ins
     line_ins = kl.TimeDistributed(kl.Softmax(name='instance_distribution'))(line_ins)
 
-    line_model = km.Model(inputs=[line_inputs, label_input, valid_input, bg_input, fake_input, img_inputs,
+    line_model = km.Model(inputs=[line_inputs, label_input, valid_input, bg_input, img_inputs,
                                   unique_label_input, cluster_count_input],
                           outputs=line_ins,
                           name='line_net_model')
 
     loss, loss_metrics = get_kl_losses_and_metrics(line_ins, label_input, valid_input, bg_input, num_lines)
-    iou = iou_metric(label_input, unique_label_input, cluster_count_input, bg_input, valid_input, 15)
+    iou = iou_metric(label_input, unique_label_input, cluster_count_input, bg_input, valid_input, max_clusters)
     bg_acc = bg_accuracy_metrics(bg_input, valid_input)
-
-    def mask_test(y_true, y_pred):
-        return num_valid
 
     metrics = loss_metrics + [iou] + bg_acc
 
-    opt = SGD(lr=0.0015, momentum=0.9)
-    opt = Adam(learning_rate=0.00005)
+    # opt = SGD(lr=0.0015, momentum=0.9)
+    opt = Adam(learning_rate=0.0005)
     line_model.compile(loss=loss,
                        optimizer=opt,
                        metrics=metrics,

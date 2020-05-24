@@ -108,7 +108,7 @@ def get_kl_losses_and_metrics(instancing_tensor, labels_tensor, valid_mask, bg_m
                                   tf.maximum(0., 2.0 - d), 0.)
         output = equal_loss + not_equal_loss
         output = tf.reduce_mean(output, axis=-1)
-        output = tf.math.divide_no_nan(output, num_valid_1d) * 150.
+        output = tf.math.divide_no_nan(output, num_valid_1d) * num_lines
         return output
 
     def bg_loss(y_true, y_pred):

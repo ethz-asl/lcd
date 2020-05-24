@@ -4,7 +4,7 @@ import numpy as np
 from tensorflow.keras.models import load_model
 import tensorflow as tf
 
-from datagenerator_framewise import LineDataGenerator
+from datagenerator_framewise import LineDataSequence
 from datagenerator_framewise import generate_data
 from model import image_pretrain_model
 from model import line_net_model_4
@@ -19,7 +19,7 @@ def infer():
     # The length of the geometry vector of a line.
     line_num_attr = 15
     img_shape = (64, 96, 3)
-    max_line_count = 500
+    max_line_count = 300
     bg_classes = [0, 1, 2, 20, 22]
 
     log_dir = "/home/felix/line_ws/src/line_tools/python/line_net/logs/180520_2229"
@@ -45,19 +45,26 @@ def infer():
     infer_on_test_set(model, test_files, log_dir, epoch, bg_classes, img_shape, max_line_count, line_num_attr)
 
 
-def infer_on_test_set(model, test_path, log_dir, epoch, bg_classes, img_shape, max_line_count, line_num_attr):
+def infer_on_test_set(model, test_path, log_dir, epoch, bg_classes, img_shape, max_line_count, max_clusters):
     predictions = []
     labels = []
     geometries = []
     bgs = []
     valids = []
 
-    train_set_mean = np.array([0.0, 0.0,  3.15564408])
-    test_data_generator = LineDataGenerator(test_path, bg_classes,
-                                            mean=train_set_mean, img_shape=img_shape, sort=True,
-                                            min_line_count=0, max_cluster_count=1000000)
+    # train_set_mean = np.array([0.0, 0.0,  3.15564408])
+    test_data_generator = LineDataSequence(test_path,
+                                           1,
+                                           bg_classes,
+                                           shuffle=False,
+                                           fuse=True,
+                                           img_shape=img_shape,
+                                           min_line_count=0,
+                                           max_line_count=max_line_count,
+                                           data_augmentation=False,
+                                           max_cluster_count=max_clusters)
     for i in range(test_data_generator.frame_count):
-        data, gt = generate_data(test_data_generator, max_line_count, line_num_attr, 1)
+        data, gt = test_data_generator.__getitem__(i)
 
         output = model.predict(data)
 
@@ -67,7 +74,7 @@ def infer_on_test_set(model, test_path, log_dir, epoch, bg_classes, img_shape, m
         bgs.append(data['background_mask'])
         valids.append(data['valid_input_mask'])
 
-        print("Frame {}/{}".format(i, test_data_generator.frame_count))
+        # print("Frame {}/{}".format(i, test_data_generator.frame_count))
         # np.save("output/output_frame_{}".format(i), output)
 
     results_path = os.path.join(log_dir, "results_{:02d}".format(epoch))

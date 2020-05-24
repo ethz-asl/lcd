@@ -4,7 +4,7 @@ import pandas as pd
 import os
 import sys
 
-from datagenerator_framewise import LineDataGenerator
+from datagenerator_framewise import LineDataSequence
 
 
 class LineRenderer:
@@ -23,10 +23,15 @@ class LineRenderer:
         self.show_closest = False
         self.pred_labels = pred_labels
         self.batch_size = 300
-        self.fuse = False
+        self.fuse = True
+        self.get_data()
 
-        self.line_geometries, self.line_labels, self.valid_mask, self.bg_mask, images, k = \
-            self.line_data_generator.next_batch(self.batch_size, False)
+    def get_data(self):
+        data = self.line_data_generator.__getitem__(self.pointer)
+        self.line_geometries = data[0]['lines'][0, :, :]
+        self.line_labels = data[0]['labels'][0, :]
+        self.valid_mask = data[0]['valid_input_mask'][0, :]
+        self.bg_mask = data[0]['background_mask'][0, :]
 
     def run(self):
         vis = o3d.visualization.VisualizerWithKeyCallback()
@@ -168,18 +173,15 @@ class LineRenderer:
 
     def get_fuse_callback(self, do_fuse):
         def fuse(vis):
-            self.line_data_generator.set_pointer((self.line_data_generator.pointer - 1) %
-                                                 self.line_data_generator.frame_count)
-            self.line_geometries, self.line_labels, self.valid_mask, self.bg_mask, images, k = \
-                self.line_data_generator.next_batch(self.batch_size, load_images=do_fuse)
+            self.line_data_generator.fuse = not self.line_data_generator.fuse
+            self.get_data()
             self.update_render(vis)
         return fuse
 
     def get_switch_index_callback(self):
         def switch_index(vis):
-            self.line_geometries, self.line_labels, self.valid_mask, self.bg_mask, images, k = \
-                self.line_data_generator.next_batch(self.batch_size, load_images=False)
             self.pointer = (self.pointer + 1) % self.index_size
+            self.get_data()
 
             print("Now showing index {} ({}/{})".format(self.indices[self.pointer], self.pointer + 1, self.index_size))
             self.update_render(vis)
@@ -377,14 +379,17 @@ def load_lines(path):
 
 if __name__ == '__main__':
     data_path = "/nvme/line_ws/test"
-    result_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/180520_2229/results_25_all_frames_300_lines"
+    result_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/180520_2229/results_25_new"
 
-    data_generator = LineDataGenerator(data_path,
-                                       [0, 1, 2, 20, 22],
-                                       sort=True,
-                                       shuffle=False,
-                                       min_line_count=0,
-                                       max_cluster_count=300)
+    data_generator = LineDataSequence(data_path,
+                                      1,
+                                      [0, 1, 2, 20, 22],
+                                      shuffle=False,
+                                      fuse=True,
+                                      min_line_count=0,
+                                      max_line_count=300,
+                                      data_augmentation=True,
+                                      max_cluster_count=15)
 
     predictions = np.load(os.path.join(result_path, "predictions.npy"))
     print(predictions.shape)
