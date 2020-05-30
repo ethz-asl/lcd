@@ -116,7 +116,7 @@ def mean_shift_split(data_lines, label_index):
     max_label = max(label_indices)
     if max_label == 65535:
         label_indices.sort()
-        max_label = label_indices[-2]
+        max_label = label_indices[-2] + 1
     changes = []
 
     for label in label_indices:
@@ -158,7 +158,7 @@ def mean_shift_split(data_lines, label_index):
                 mean_shift_iter = mean_shift_iter + 1
 
             # If first iteration, no changes to labels.
-            # After that, change label to the biggest available
+            # After that, change label to the biggest available (one more than the maximum label)
             if iteration > 0:
                 changes.append([lines[in_radius, -2:], max_label])
                 print("Added one instance split at instance {}.".format(int(max_label)))
