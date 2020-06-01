@@ -8,6 +8,9 @@ import tensorflow as tf
 import numpy as np
 np.random.seed(123)
 
+import model
+import datagenerator_framewise
+
 from datagenerator_framewise import LineDataSequence
 from datagenerator_framewise import data_generator
 from model import line_net_model_4
@@ -91,6 +94,69 @@ class SaveCallback(tf_keras.callbacks.Callback):
         self.model.get_layer("image_features").trainable = False
 
 
+def train_cluster():
+    physical_devices = tf.config.list_physical_devices('GPU')
+    tf.config.experimental.set_memory_growth(physical_devices[0], True)
+
+    # Paths to line files.
+    train_files = "/nvme/line_ws/train"
+    val_files = "/nvme/line_ws/val"
+    test_files = "/nvme/line_ws/test"
+
+    line_num_attr = 15
+    img_shape = (64, 96, 3)
+    max_line_count = 50
+    batch_size = 10
+    num_epochs = 40
+    max_clusters = 15
+    bg_classes = [0, 1, 2, 20, 22]
+    valid_classes = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 25, 30]
+    num_classes = 1 + len(valid_classes)
+    image_weight_path = "/home/felix/line_ws/src/line_tools/python/line_net/weights/image_weights.hdf5"
+
+    cluster_model = model.cluster_model(line_num_attr, max_line_count, num_classes, img_shape)
+    cluster_model.get_layer("image_features").load_weights(image_weight_path)
+    cluster_model.summary()
+
+    train_data_generator = datagenerator_framewise.ClusterDataSequence(train_files,
+                                                                       batch_size,
+                                                                       bg_classes,
+                                                                       valid_classes,
+                                                                       shuffle=True,
+                                                                       data_augmentation=True,
+                                                                       img_shape=img_shape,
+                                                                       min_line_count=5,
+                                                                       max_line_count=50)
+
+    val_data_generator = datagenerator_framewise.ClusterDataSequence(val_files,
+                                                                     batch_size,
+                                                                     bg_classes,
+                                                                     valid_classes,
+                                                                     shuffle=False,
+                                                                     data_augmentation=False,
+                                                                     img_shape=img_shape,
+                                                                     min_line_count=5,
+                                                                     max_line_count=50)
+
+    log_path = "./logs/description_{}".format(datetime.datetime.now().strftime("%d%m%y_%H%M"))
+    tensorboard_callback = tf_keras.callbacks.TensorBoard(log_dir=log_path)
+    save_callback = SaveCallback(os.path.join(log_path, "weights_only.{:02d}.hdf5"))
+
+    callbacks = [tensorboard_callback, save_callback]
+
+    cluster_model.fit(x=train_data_generator,
+                      verbose=1,
+                      max_queue_size=16,
+                      workers=1,
+                      epochs=num_epochs,
+                      # steps_per_epoch=10,
+                      # validation_steps=10,
+                      # initial_epoch=0,
+                      use_multiprocessing=False,
+                      validation_data=val_data_generator,
+                      callbacks=callbacks)
+
+
 def train():
     physical_devices = tf.config.list_physical_devices('GPU')
     tf.config.experimental.set_memory_growth(physical_devices[0], True)
@@ -103,15 +169,15 @@ def train():
     # The length of the geometry vector of a line.
     line_num_attr = 15
     img_shape = (64, 96, 3)
-    max_line_count = 400
-    batch_size = 1
+    max_line_count = 150
+    batch_size = 3
     num_epochs = 40
     # Do not forget to delete pickle files when this config is changed.
-    max_clusters = 20
+    max_clusters = 15
     bg_classes = [0, 1, 2, 20, 22]
     load_past = False
-    past_epoch = 9
-    past_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/180520_2229"
+    past_epoch = 3
+    past_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/240520_2350"
     image_weight_path = "/home/felix/line_ws/src/line_tools/python/line_net/weights/image_weights.hdf5"
 
     pretrain_images = False
@@ -135,7 +201,7 @@ def train():
             layer.trainable = True
         line_model.get_layer("image_features").trainable = False
     else:
-        log_path = "./logs/{}".format(datetime.datetime.now().strftime("%d%m%y_%H%M"))
+        log_path = "./logs/cluster_{}".format(datetime.datetime.now().strftime("%d%m%y_%H%M"))
 
     # train_set_mean = np.array([-0.00246431839, 0.0953982015,  3.15564408])
 
@@ -143,7 +209,7 @@ def train():
                                             batch_size,
                                             bg_classes,
                                             shuffle=True,
-                                            fuse=True,
+                                            fuse=False,
                                             img_shape=img_shape,
                                             min_line_count=30,
                                             max_line_count=max_line_count,
@@ -155,7 +221,7 @@ def train():
     val_data_generator = LineDataSequence(val_files,
                                           batch_size,
                                           bg_classes,
-                                          fuse=True,
+                                          fuse=False,
                                           img_shape=img_shape,
                                           min_line_count=30,
                                           max_line_count=max_line_count,
@@ -165,7 +231,7 @@ def train():
     tensorboard_callback = tf_keras.callbacks.TensorBoard(log_dir=log_path)
     save_callback = SaveCallback(os.path.join(log_path, "weights_only.{:02d}.hdf5"))
     inference_callback = InferenceCallback(test_files, log_path, bg_classes, img_shape, max_line_count, max_clusters)
-    learning_rate_callback = LearningRateCallback({5: 0.00025, 10: 0.0001, 15: 0.00005})
+    learning_rate_callback = LearningRateCallback({10: 0.00005, 15: 0.000025, 20: 0.000005})
     callbacks = [save_weights_callback, tensorboard_callback, save_callback, inference_callback, learning_rate_callback]
     if pretrain_images:
         unfreeze_callback = LayerUnfreezeCallback(loss, opt, metrics)
@@ -177,7 +243,7 @@ def train():
     line_model.fit(x=train_data_generator,
                    verbose=1,
                    max_queue_size=16,
-                   workers=4,
+                   workers=2,
                    epochs=num_epochs,
                    # steps_per_epoch=10,
                    # validation_steps=10,
@@ -189,6 +255,8 @@ def train():
 
 if __name__ == '__main__':
     train()
+    # train_cluster()
+
 
 
 

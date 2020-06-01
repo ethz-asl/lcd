@@ -541,6 +541,8 @@ def get_virtual_camera_images_interiornet(scene_path, scene_type, trajectory, li
 
 
 def get_process_line_func(output_path, data_lines, frame_id, real_camera, pcl):
+    # This function exists to make thread pool execution easier.
+
     inpainting = True
     show_line = False
     # Distance between virtual camera origin and center of the line.

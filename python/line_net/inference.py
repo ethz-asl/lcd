@@ -57,7 +57,7 @@ def infer_on_test_set(model, test_path, log_dir, epoch, bg_classes, img_shape, m
                                            1,
                                            bg_classes,
                                            shuffle=False,
-                                           fuse=True,
+                                           fuse=False,
                                            img_shape=img_shape,
                                            min_line_count=0,
                                            max_line_count=max_line_count,

@@ -42,7 +42,8 @@ def iou_metric(labels, unique_labels, cluster_counts, bg_mask, valid_mask, max_c
         unions = tf.reduce_sum(unions, axis=1)
 
         iou_out = tf.reduce_max(tf.math.divide_no_nan(intersections, unions), axis=-1)
-        iou_out = tf.reduce_sum(iou_out, axis=-1, keepdims=True) / tf.cast(cluster_counts, dtype='float32')
+        iou_out = tf.math.divide_no_nan(tf.reduce_sum(iou_out, axis=-1, keepdims=True),
+                                        tf.cast(cluster_counts, dtype='float32'))
 
         return tf.reduce_mean(iou_out)
 
@@ -68,7 +69,15 @@ def bg_accuracy_metrics(bg_mask, valid_mask, threshold=0.3):
 
         return tf.reduce_mean(ratio_fp)
 
-    return [bg_tp, bg_fp]
+    def bg_acc(y_true, y_pred):
+        pred_bg = tf.argmax(y_pred, axis=-1)
+        pred_bg = tf.equal(pred_bg, 0)
+        corrects = tf.logical_and(valid_mask, tf.equal(pred_bg, bg_mask))
+        num_corrects = tf.reduce_sum(tf.cast(corrects, dtype='float32'), axis=-1)
+
+        return tf.reduce_mean(num_corrects)
+
+    return [bg_acc]
 
 
 def get_kl_losses_and_metrics(instancing_tensor, labels_tensor, valid_mask, bg_mask, num_lines):

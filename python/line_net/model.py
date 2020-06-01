@@ -87,7 +87,7 @@ def get_img_model(input_shape, output_dim, dropout=0.3, trainable=True):
 
 
 def get_multi_head_attention_model(input_shape, dropout=0.2, idx=0, key_size=128, n_multi=2, n_add=2):
-    assert n_multi + n_add > 0
+    assert n_multi + n_add >= 0
 
     output_size = input_shape[1]
 
@@ -96,9 +96,9 @@ def get_multi_head_attention_model(input_shape, dropout=0.2, idx=0, key_size=128
     outputs_multi = []
     for i in range(n_multi):
         # More layers can be added here.
-        keys = kl.TimeDistributed(kl.Dense(key_size, kernel_constraint=kc.max_norm(3)))(model_input)
+        keys = kl.TimeDistributed(kl.Dense(key_size))(model_input)
         keys = kl.TimeDistributed(kl.BatchNormalization())(keys)
-        queries = kl.TimeDistributed(kl.Dense(key_size, kernel_constraint=kc.max_norm(3)))(model_input)
+        queries = kl.TimeDistributed(kl.Dense(key_size))(model_input)
         queries = kl.TimeDistributed(kl.BatchNormalization())(queries)
         output = kl.Attention(use_scale=True)([queries, keys])
         outputs_multi.append(output)
@@ -106,9 +106,9 @@ def get_multi_head_attention_model(input_shape, dropout=0.2, idx=0, key_size=128
     outputs_add = []
     for i in range(n_add):
         # More layers can be added here.
-        keys = kl.TimeDistributed(kl.Dense(key_size, kernel_constraint=kc.max_norm(3)))(model_input)
+        keys = kl.TimeDistributed(kl.Dense(key_size))(model_input)
         keys = kl.TimeDistributed(kl.BatchNormalization())(keys)
-        queries = kl.TimeDistributed(kl.Dense(key_size, kernel_constraint=kc.max_norm(3)))(model_input)
+        queries = kl.TimeDistributed(kl.Dense(key_size))(model_input)
         queries = kl.TimeDistributed(kl.BatchNormalization())(queries)
         output = kl.AdditiveAttention(use_scale=True)([queries, keys])
         outputs_add.append(output)
@@ -120,7 +120,7 @@ def get_multi_head_attention_model(input_shape, dropout=0.2, idx=0, key_size=128
         output = outputs[0]
 
     # Should I add one more dense layer here?
-    output = kl.TimeDistributed(kl.Dense(output_size, kernel_constraint=kc.max_norm(3)))(output)
+    output = kl.TimeDistributed(kl.Dense(output_size))(output)
     output = kl.TimeDistributed(kl.Dropout(dropout))(output)
     output = kl.TimeDistributed(kl.BatchNormalization())(output)
 
@@ -131,27 +131,84 @@ def get_inter_attention_layer(input_number, head_units=256, hidden_units=1024,
                               idx=0, dropout=0.2, key_size=128, n_multi_heads=2, n_add_heads=2):
     model_input = kl.Input(shape=(input_number, head_units))
 
-    layer = get_multi_head_attention_model((input_number, head_units),
-                                           idx=idx,
-                                           dropout=dropout,
-                                           key_size=key_size,
-                                           n_multi=n_multi_heads,
-                                           n_add=n_add_heads)(model_input)
-    layer = kl.Add()([layer, model_input])
+    if n_multi_heads + n_add_heads > 0:
+        layer = get_multi_head_attention_model((input_number, head_units),
+                                               idx=idx,
+                                               dropout=dropout,
+                                               key_size=key_size,
+                                               n_multi=n_multi_heads,
+                                               n_add=n_add_heads)(model_input)
+        layer = kl.Add()([layer, model_input])
+    else:
+        layer = model_input
     layer = kl.LeakyReLU()(layer)
 
     # Two layers of dense connections running in parallel
-    layer_2 = kl.TimeDistributed(kl.Dense(hidden_units, kernel_constraint=kc.max_norm(3)))(layer)
+    layer_2 = kl.TimeDistributed(kl.Dense(hidden_units))(layer)
     layer_2 = kl.TimeDistributed(kl.Dropout(dropout))(layer_2)
     layer_2 = kl.TimeDistributed(kl.BatchNormalization())(layer_2)
     layer_2 = kl.LeakyReLU()(layer_2)
-    layer_2 = kl.TimeDistributed(kl.Dense(head_units, kernel_constraint=kc.max_norm(3)))(layer_2)
+    layer_2 = kl.TimeDistributed(kl.Dense(head_units))(layer_2)
     layer_2 = kl.TimeDistributed(kl.Dropout(dropout))(layer_2)
     layer_2 = kl.TimeDistributed(kl.BatchNormalization())(layer_2)
     layer = kl.Add()([layer, layer_2])
     layer = kl.LeakyReLU()(layer)
 
     return km.Model(inputs=model_input, outputs=layer, name='inter_attention_{}'.format(idx))
+
+
+def get_global_attention_layer(input_number, head_units=256, hidden_units=1025, dropout=0.2, key_size=128,
+                               n_multi_heads=2, n_add_heads=2):
+    assert n_multi_heads + n_add_heads >= 0
+
+    output_size = head_units
+
+    model_input = kl.Input(shape=(input_number, head_units))
+    one_input = kl.Input(shape=(1, 1))
+
+    outputs_multi = []
+    for i in range(n_multi_heads):
+        # More layers can be added here.
+        keys = kl.TimeDistributed(kl.Dense(key_size))(model_input)
+        keys = kl.TimeDistributed(kl.BatchNormalization())(keys)
+        queries = kl.TimeDistributed(kl.Dense(key_size))(one_input)
+        queries = kl.TimeDistributed(kl.BatchNormalization())(queries)
+        output = kl.Attention(use_scale=True)([queries, keys])
+        outputs_multi.append(output)
+
+    outputs_add = []
+    for i in range(n_add_heads):
+        # More layers can be added here.
+        keys = kl.TimeDistributed(kl.Dense(key_size))(model_input)
+        keys = kl.TimeDistributed(kl.BatchNormalization())(keys)
+        queries = kl.TimeDistributed(kl.Dense(key_size))(one_input)
+        queries = kl.TimeDistributed(kl.BatchNormalization())(queries)
+        output = kl.AdditiveAttention(use_scale=True)([queries, keys])
+        outputs_add.append(output)
+
+    outputs = outputs_multi + outputs_add
+    if len(outputs) > 1:
+        output = kl.Concatenate()(outputs)
+    else:
+        output = outputs[0]
+
+    output = kl.Flatten()(output)
+    output = kl.Dense(output_size)(output)
+    output = kl.Dropout(dropout)(output)
+    output = kl.BatchNormalization()(output)
+
+    # Add a residual fully connected layer at the end.
+    output_2 = kl.Dense(hidden_units)(output)
+    output_2 = kl.BatchNormalization()(output_2)
+    output_2 = kl.LeakyReLU()(output_2)
+    output_2 = kl.Dense(output_size)(output_2)
+    output_2 = kl.BatchNormalization()(output_2)
+
+    output = kl.Add()([output, output_2])
+    output = kl.LeakyReLU()(output)
+
+    model = km.Model(inputs=[model_input, one_input], outputs=output, name='global_attention')
+    return model
 
 
 def image_pretrain_model(line_num_attr, num_lines, img_shape):
@@ -250,13 +307,107 @@ def line_net_model_4(line_num_attr, num_lines, max_clusters, img_shape):
     num_adds = 2
     key_size = 128
 
-    dropout = 0.2
+    dropout = 0.0
+
+    # , kernel_constraint=kc.max_norm(3)
+
+    # The geometric embedding layer:
+    line_embeddings = kl.Masking(mask_value=0.0)(line_inputs)
+    line_embeddings = kl.TimeDistributed(kl.Dense(geometric_size),
+                                         name='geometric_features')(line_embeddings)
+    line_embeddings = kl.TimeDistributed(kl.Dropout(dropout))(line_embeddings)
+    line_embeddings = kl.TimeDistributed(kl.BatchNormalization())(line_embeddings)
+    line_embeddings = kl.LeakyReLU()(line_embeddings)
+
+    # The virtual camera image feature cnn:
+    line_img_features = kl.Masking(mask_value=0.0)(img_inputs)
+    line_img_features = get_img_model(img_input_shape, img_feature_size, dropout=0.,
+                                      trainable=False)(line_img_features)
+
+    line_embeddings = kl.Concatenate()([line_img_features, line_embeddings])
+
+    # Build 5 multi head attention layers. Hopefully this will work.
+    # layer = get_inter_attention_layer(num_lines, head_units=head_units, dropout=dropout, key_size=key_size,
+    #                                   hidden_units=hidden_units, idx=0, n_multi_heads=num_multis,
+    #                                   n_add_heads=num_adds)(line_embeddings)
+    # layer = get_inter_attention_layer(num_lines, head_units=head_units, dropout=dropout, key_size=key_size,
+    #                                   hidden_units=hidden_units, idx=1, n_multi_heads=num_multis,
+    #                                   n_add_heads=num_adds)(layer)
+    # layer = get_inter_attention_layer(num_lines, head_units=head_units, dropout=dropout, key_size=key_size,
+    #                                   hidden_units=hidden_units, idx=2, n_multi_heads=num_multis,
+    #                                   n_add_heads=num_adds)(layer)
+    # layer = get_inter_attention_layer(num_lines, head_units=head_units, dropout=dropout, key_size=key_size,
+    #                                   hidden_units=hidden_units, idx=3, n_multi_heads=num_multis,
+    #                                   n_add_heads=num_adds)(layer)
+    # layer = get_inter_attention_layer(num_lines, head_units=head_units, dropout=dropout, key_size=key_size,
+    #                                   hidden_units=hidden_units, idx=4, n_multi_heads=num_multis,
+    #                                   n_add_heads=num_adds)(layer)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units, dropout=dropout, key_size=32,
+                                      hidden_units=hidden_units, idx=0, n_multi_heads=8,
+                                      n_add_heads=8)(line_embeddings)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units, dropout=dropout, key_size=64,
+                                      hidden_units=hidden_units, idx=1, n_multi_heads=4,
+                                      n_add_heads=4)(layer)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units, dropout=dropout, key_size=128,
+                                      hidden_units=hidden_units, idx=2, n_multi_heads=2,
+                                      n_add_heads=2)(layer)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units, dropout=dropout, key_size=256,
+                                      hidden_units=hidden_units, idx=3, n_multi_heads=1,
+                                      n_add_heads=1)(layer)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units, dropout=dropout, key_size=512,
+                                      hidden_units=hidden_units, idx=4, n_multi_heads=1,
+                                      n_add_heads=0)(layer)
+
+    line_ins = kl.TimeDistributed(kl.Dense(max_clusters + 1), name='instancing_layer')(layer)
+    line_ins = kl.TimeDistributed(kl.BatchNormalization())(line_ins)
+    # debug_layer = line_ins
+    line_ins = kl.TimeDistributed(kl.Softmax(name='instance_distribution'))(line_ins)
+
+    line_model = km.Model(inputs=[line_inputs, label_input, valid_input, bg_input, img_inputs,
+                                  unique_label_input, cluster_count_input],
+                          outputs=line_ins,
+                          name='line_net_model')
+
+    loss, loss_metrics = get_kl_losses_and_metrics(line_ins, label_input, valid_input, bg_input, num_lines)
+    iou = iou_metric(label_input, unique_label_input, cluster_count_input, bg_input, valid_input, max_clusters)
+    bg_acc = bg_accuracy_metrics(bg_input, valid_input)
+
+    metrics = loss_metrics + [iou] + bg_acc
+
+    # opt = SGD(lr=0.0015, momentum=0.9)
+    opt = Adam(learning_rate=0.00005)
+    line_model.compile(loss=loss,
+                       optimizer=opt,
+                       metrics=metrics,
+                       experimental_run_tf_function=False)
+
+    return line_model, loss, opt, metrics
+
+
+def cluster_model(line_num_attr, num_lines, num_classes, img_shape):
+    # Inputs for geometric line information.
+    img_input_shape = (num_lines, img_shape[0], img_shape[1], img_shape[2])
+    img_inputs = kl.Input(shape=img_input_shape, dtype='float32', name='images')
+    line_inputs = kl.Input(shape=(num_lines, line_num_attr), dtype='float32', name='lines')
+    valid_input = kl.Input(shape=(num_lines,), dtype='bool', name='valid_input_mask')
+    one_input = kl.Input(shape=(1, 1), dtype='float32', name='ones')
+
+    img_feature_size = 128
+    geometric_size = 384
+    head_units = 512
+    hidden_units = head_units * 4
+
+    num_multis = 4
+    num_adds = 4
+    key_size = 64
+
+    dropout = 0.0
 
     # The geometric embedding layer:
     line_embeddings = kl.Masking(mask_value=0.0)(line_inputs)
     line_embeddings = kl.TimeDistributed(kl.Dense(geometric_size, kernel_constraint=kc.max_norm(3)),
                                          name='geometric_features')(line_embeddings)
-    line_embeddings = kl.TimeDistributed(kl.Dropout(0.2))(line_embeddings)
+    line_embeddings = kl.TimeDistributed(kl.Dropout(dropout))(line_embeddings)
     line_embeddings = kl.TimeDistributed(kl.BatchNormalization())(line_embeddings)
     line_embeddings = kl.LeakyReLU()(line_embeddings)
 
@@ -283,31 +434,22 @@ def line_net_model_4(line_num_attr, num_lines, max_clusters, img_shape):
     layer = get_inter_attention_layer(num_lines, head_units=head_units, dropout=dropout, key_size=key_size,
                                       hidden_units=hidden_units, idx=4, n_multi_heads=num_multis,
                                       n_add_heads=num_adds)(layer)
-    layer = get_inter_attention_layer(num_lines, head_units=head_units, dropout=dropout, key_size=key_size,
-                                      hidden_units=hidden_units, idx=5, n_multi_heads=num_multis,
-                                      n_add_heads=num_adds)(layer)
+    output = get_global_attention_layer(num_lines, head_units=head_units, dropout=dropout, key_size=key_size,
+                                        hidden_units=hidden_units, n_multi_heads=num_multis,
+                                        n_add_heads=num_adds)([layer, one_input])
+    output = kl.Dense(num_classes)(output)
+    output = kl.BatchNormalization()(output)
+    output = kl.Softmax(name='class_logits')(output)
 
-    line_ins = kl.TimeDistributed(kl.Dense(max_clusters + 1), name='instancing_layer')(layer)
-    line_ins = kl.TimeDistributed(kl.BatchNormalization())(line_ins)
-    # debug_layer = line_ins
-    line_ins = kl.TimeDistributed(kl.Softmax(name='instance_distribution'))(line_ins)
+    model = km.Model(inputs=[line_inputs, valid_input, img_inputs, one_input],
+                     outputs=output,
+                     name='cluster_model')
 
-    line_model = km.Model(inputs=[line_inputs, label_input, valid_input, bg_input, img_inputs,
-                                  unique_label_input, cluster_count_input],
-                          outputs=line_ins,
-                          name='line_net_model')
-
-    loss, loss_metrics = get_kl_losses_and_metrics(line_ins, label_input, valid_input, bg_input, num_lines)
-    iou = iou_metric(label_input, unique_label_input, cluster_count_input, bg_input, valid_input, max_clusters)
-    bg_acc = bg_accuracy_metrics(bg_input, valid_input)
-
-    metrics = loss_metrics + [iou] + bg_acc
-
-    # opt = SGD(lr=0.0015, momentum=0.9)
-    opt = Adam(learning_rate=0.0005)
-    line_model.compile(loss=loss,
+    opt = Adam(learning_rate=0.0001)
+    model.compile(loss='categorical_crossentropy',
                        optimizer=opt,
-                       metrics=metrics,
+                       metrics=['categorical_accuracy'],
                        experimental_run_tf_function=False)
 
-    return line_model, loss, opt, metrics
+    return model
+

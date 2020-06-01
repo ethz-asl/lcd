@@ -8,7 +8,7 @@ from datagenerator_framewise import LineDataSequence
 
 
 class LineRenderer:
-    def __init__(self, line_data_generator, results, pred_labels, margin, label_colors):
+    def __init__(self, line_data_generator, results, pred_labels, margin, label_colors, max_line_count):
         self.line_data_generator = line_data_generator
         self.results = results
         self.label_colors = label_colors
@@ -22,7 +22,7 @@ class LineRenderer:
         self.render_result_connections = False
         self.show_closest = False
         self.pred_labels = pred_labels
-        self.batch_size = 300
+        self.batch_size = max_line_count
         self.fuse = True
         self.get_data()
 
@@ -379,17 +379,7 @@ def load_lines(path):
 
 if __name__ == '__main__':
     data_path = "/nvme/line_ws/test"
-    result_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/180520_2229/results_25_new"
-
-    data_generator = LineDataSequence(data_path,
-                                      1,
-                                      [0, 1, 2, 20, 22],
-                                      shuffle=False,
-                                      fuse=True,
-                                      min_line_count=0,
-                                      max_line_count=300,
-                                      data_augmentation=True,
-                                      max_cluster_count=15)
+    result_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_310520_1250/results_13"
 
     predictions = np.load(os.path.join(result_path, "predictions.npy"))
     print(predictions.shape)
@@ -400,5 +390,17 @@ if __name__ == '__main__':
     results = np.equal(h_pred, v_pred).astype(float)
     print(predictions[0, :])
 
-    renderer = LineRenderer(data_generator, results, predictions, 0.7, get_colors())
+    max_line_count = predictions.shape[-1]
+
+    data_generator = LineDataSequence(data_path,
+                                      1,
+                                      [0, 1, 2, 20, 22],
+                                      shuffle=False,
+                                      fuse=False,
+                                      min_line_count=0,
+                                      max_line_count=max_line_count,
+                                      data_augmentation=False,
+                                      max_cluster_count=15)
+
+    renderer = LineRenderer(data_generator, results, predictions, 0.7, get_colors(), max_line_count)
     renderer.run()
