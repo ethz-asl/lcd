@@ -168,3 +168,29 @@ def get_kl_losses_and_metrics(instancing_tensor, labels_tensor, valid_mask, bg_m
         return tf.reduce_mean(tf.math.divide_no_nan(true_n, pred_n))
 
     return loss, [cluster_loss, bg_loss]# [tp_gt_p, tn_gt_n, tp_pd_p, tn_pd_n]
+
+
+def triplet_metrics(embedding_a, embedding_p, embedding_n, margin=0.2):
+    d_a_p = tf.norm(embedding_p - embedding_a, axis=-1)
+    d_a_n = tf.norm(embedding_n - embedding_a, axis=-1)
+    term = d_a_p - d_a_n + margin
+
+    def hard_triplets(y_true, y_pred):
+        return tf.cast(tf.logical_and(tf.greater(term, 0.), tf.greater(d_a_p, d_a_n)), dtype='float32')
+
+    def semi_hard_triplets(y_true, y_pred):
+        return tf.cast(tf.logical_and(tf.greater(term, 0.), tf.greater(d_a_n, d_a_p)), dtype='float32')
+
+    def easy_triplets(y_true, y_pred):
+        return tf.cast(tf.greater(0., term), dtype='float32')
+
+    return [hard_triplets, semi_hard_triplets, easy_triplets]
+
+
+def triplet_loss(embedding_a, embedding_p, embedding_n, margin=0.2):
+    def loss(y_true, y_pred):
+        out = tf.maximum(tf.norm(embedding_p - embedding_a, axis=-1) -
+                         tf.norm(embedding_n - embedding_a, axis=-1) + margin, 0.)
+        return out
+
+    return loss

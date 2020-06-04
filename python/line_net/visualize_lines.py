@@ -32,6 +32,7 @@ class LineRenderer:
         self.line_labels = data[0]['labels'][0, :]
         self.valid_mask = data[0]['valid_input_mask'][0, :]
         self.bg_mask = data[0]['background_mask'][0, :]
+        print("Number of lines in scene: {}".format(np.sum(self.valid_mask)))
 
     def run(self):
         vis = o3d.visualization.VisualizerWithKeyCallback()
@@ -104,7 +105,7 @@ class LineRenderer:
                                 result_connections[i, j] = False
 
                     # print_metrics(result_connections, self.line_labels, self.bg_mask, self.valid_mask)
-                    print_iou(self.pred_labels[self.pointer, :], self.line_labels, self.bg_mask, self.valid_mask)
+                    print_iou(self.pred_labels[self.pointer, :], pred_bg, self.line_labels, self.bg_mask, self.valid_mask)
 
         if self.render_result_connections and self.render_gt_connections:
             # vis.add_geometry(render_compare(self.line_geometries, self.line_labels, self.bg_mask, result_connections))
@@ -337,7 +338,7 @@ def print_metrics(predictions, gt, bg, valid):
     print("tp_pd_p: {}".format(true_p / pred_p))
 
 
-def print_iou(pred_labels, gt, bg, valid):
+def print_iou(pred_labels, pred_bg, gt, bg, valid):
     mask = np.logical_and(np.logical_not(bg), valid)
 
     labels = gt[mask]
@@ -366,6 +367,7 @@ def print_iou(pred_labels, gt, bg, valid):
     iou = np.sum(ious) / cluster_count
 
     print("IoU: {}".format(iou))
+    print("Background accuracy: {}".format(np.sum(np.logical_and(valid, np.equal(pred_bg, bg))) / np.sum(valid)))
 
 
 def load_lines(path):
@@ -378,17 +380,18 @@ def load_lines(path):
 
 
 if __name__ == '__main__':
+    # data_path = "/nvme/line_ws/test"
     data_path = "/nvme/line_ws/test"
-    result_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_310520_1250/results_13"
+    result_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_310520_1250/results_16_no_vis"
 
     predictions = np.load(os.path.join(result_path, "predictions.npy"))
-    print(predictions.shape)
+    # print(predictions.shape)
     predictions = np.squeeze(predictions)
     predictions = np.argmax(predictions[:, :, 0:], axis=-1)
     h_pred = np.expand_dims(predictions, axis=-1)
     v_pred = np.transpose(h_pred, axes=(0, 2, 1))
     results = np.equal(h_pred, v_pred).astype(float)
-    print(predictions[0, :])
+    # print(predictions[0, :])
 
     max_line_count = predictions.shape[-1]
 

@@ -423,7 +423,8 @@ def parse_frames(scene_path, scene_type, traj):
 
 
 # InteriorNet
-def get_virtual_camera_images_interiornet(scene_path, scene_type, trajectory, light_type, linesfiles_path, output_path):
+def get_virtual_camera_images_interiornet(scene_path, scene_type, trajectory, light_type, linesfiles_path, output_path,
+                                          moving_window_length=1):
     inpainting = True
     show_line = False
 
@@ -488,13 +489,12 @@ def get_virtual_camera_images_interiornet(scene_path, scene_type, trajectory, li
             rgb_image=rgb_image, depth_image=depth_image, visualize_cloud=False)
 
         # Sliding window:
-        sliding_window_length = 1
-        if sliding_window_length > 1:
+        if moving_window_length > 1:
             # Add this point cloud (transformed to world frame) to the sliding window.
             pcl_world = np.vstack((cloud_utils.pcl_transform(
                 pcl_new, cam_to_world_t), pcl_world))
-            if np.shape(pcl_world)[0] > (np.shape(pcl_new)[0] * sliding_window_length):
-                pcl_world = pcl_world[:np.shape(pcl_new)[0]*sliding_window_length, :]
+            if np.shape(pcl_world)[0] > (np.shape(pcl_new)[0] * moving_window_length):
+                pcl_world = pcl_world[:np.shape(pcl_new)[0] * moving_window_length, :]
 
             # Transform world point cloud back to camera frame.
             # And use this denser point cloud for virtual camera images.
@@ -552,7 +552,7 @@ def get_process_line_func(output_path, data_lines, frame_id, real_camera, pcl):
     min_pixel_per_meter = 50.
     # Min x resolution of the virtual camera image.
     min_image_width = 40
-    max_image_width = 200
+    max_image_width = 120
 
     def process_line(i):
         T, _ = virtual_camera_utils.virtual_camera_pose_from_file_line(
