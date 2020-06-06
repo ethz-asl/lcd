@@ -12,7 +12,6 @@ import model
 import datagenerator_framewise
 
 from datagenerator_framewise import LineDataSequence
-from datagenerator_framewise import data_generator
 from model import line_net_model_4
 from model import image_pretrain_model
 from inference import infer_on_test_set
@@ -88,15 +87,7 @@ class SaveCallback(tf_keras.callbacks.Callback):
         self.cluster = cluster
 
     def on_epoch_end(self, epoch, logs=None):
-        for layer in self.model.layers:
-            layer.trainable = False
-        self.model.save_weights(self.path.format(epoch + 1))
-        for layer in self.model.layers:
-            layer.trainable = True
-        if self.cluster:
-            self.model.get_layer("cluster_embedding_model").get_layer("image_features").trainable = False
-        else:
-            self.model.get_layer("image_features").trainable = False
+        model.save_line_net_model(self.model, self.path.format(epoch + 1))
 
 
 def train_cluster():
@@ -123,9 +114,9 @@ def train_cluster():
     num_classes = 1 + len(valid_classes)
     image_weight_path = "/home/felix/line_ws/src/line_tools/python/line_net/weights/image_weights.hdf5"
 
-    load_past = False
-    past_epoch = 19
-    log_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/description_040620_0024"
+    load_past = True
+    past_epoch = 12
+    log_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/description_040620_1846"
 
     if not load_past:
         cluster_model = model.cluster_triplet_loss_model(line_num_attr, max_line_count, embedding_dim,
@@ -136,6 +127,7 @@ def train_cluster():
         cluster_model = model.load_cluster_triplet_model(load_path, line_num_attr, max_line_count, embedding_dim,
                                                          img_shape, margin)
     cluster_model.summary()
+    # cluster_model.optimizer.learning_rate = 0.000025
 
     train_data_generator = datagenerator_framewise.ClusterDataSequence(train_files,
                                                                        batch_size,
@@ -192,16 +184,16 @@ def train():
     # The length of the geometry vector of a line.
     line_num_attr = 15
     img_shape = (64, 96, 3)
-    max_line_count = 150
-    batch_size = 1
+    max_line_count = 160
+    batch_size = 2
     num_epochs = 40
     # Do not forget to delete pickle files when this config is changed.
     max_clusters = 15
     # TODO: Check if 0 is background or naw.
     bg_classes = [0, 1, 2, 20, 22]
-    load_past = True
-    past_epoch = 15
-    past_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_310520_1250"
+    load_past = False
+    past_epoch = 1
+    past_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_060620_1704"
     image_weight_path = "/home/felix/line_ws/src/line_tools/python/line_net/weights/image_weights.hdf5"
 
     pretrain_images = False
@@ -255,7 +247,7 @@ def train():
     tensorboard_callback = tf_keras.callbacks.TensorBoard(log_dir=log_path, write_graph=False, write_images=True)
     save_callback = SaveCallback(os.path.join(log_path, "weights_only.{:02d}.hdf5"))
     inference_callback = InferenceCallback(test_files, log_path, bg_classes, img_shape, max_line_count, max_clusters)
-    learning_rate_callback = LearningRateCallback({5: 0.00005, 10: 0.000025, 20: 0.000005})
+    learning_rate_callback = LearningRateCallback({10: 0.000025, 15: 0.00001, 20: 0.000005})
     callbacks = [save_weights_callback, tensorboard_callback, save_callback, inference_callback, learning_rate_callback]
     if pretrain_images:
         unfreeze_callback = LayerUnfreezeCallback(loss, opt, metrics)
@@ -267,10 +259,10 @@ def train():
     line_model.fit(x=train_data_generator,
                    verbose=1,
                    max_queue_size=16,
-                   workers=2,
+                   workers=4,
                    epochs=num_epochs,
-                   steps_per_epoch=10,
-                   validation_steps=10,
+                   # steps_per_epoch=10,
+                   # validation_steps=10,
                    initial_epoch=initial_epoch,
                    use_multiprocessing=True,
                    validation_data=val_data_generator,
@@ -278,8 +270,8 @@ def train():
 
 
 if __name__ == '__main__':
-    # train()
-    train_cluster()
+    train()
+    # train_cluster()
 
 
 

@@ -13,11 +13,11 @@ import split_dataset_framewise
 
 def generate_hd7():
     path_to_data = "/nvme/datasets/interiornet/*"
-    line_path_master = "/nvme/line_ws/line_files_random"
-    vci_path_master = "/nvme/line_ws/virtual_camera_images_random"
-    train_path_master = "/nvme/line_ws/all_data_random"
+    line_path_master = "/nvme/line_ws/line_files"
+    vci_path_master = "/nvme/line_ws/virtual_camera_images"
+    train_path_master = "/nvme/line_ws/all_data"
 
-    light_type = 'random'
+    light_type = 'original'
 
     rospy.init_node('interiornet_node', anonymous=True)
 

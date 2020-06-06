@@ -5,7 +5,6 @@ from tensorflow.keras.models import load_model
 import tensorflow as tf
 
 from datagenerator_framewise import LineDataSequence
-from datagenerator_framewise import generate_data
 from model import image_pretrain_model
 from model import line_net_model_4
 

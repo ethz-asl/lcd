@@ -27,9 +27,10 @@ def iou_metric(labels, unique_labels, cluster_counts, bg_mask, valid_mask, max_c
 
         gt_labels = tf.expand_dims(tf.expand_dims(labels, axis=-1), axis=-1)
         unique_gt_labels = tf.expand_dims(tf.expand_dims(unique_labels, axis=1), axis=-1)
-        pred_labels = tf.expand_dims(tf.expand_dims(tf.argmax(y_pred[:, :, 1:], axis=-1, output_type=tf.dtypes.int32),
+        pred_labels = tf.expand_dims(tf.expand_dims(tf.argmax(y_pred[:, :, :], axis=-1, output_type=tf.dtypes.int32),
                                                     axis=-1), axis=-1)
-        unique_pred_labels = tf.expand_dims(tf.expand_dims(tf.expand_dims(tf.range(0, 15, dtype='int32'),
+        # Available instances are 1 to 16, 0 is background.
+        unique_pred_labels = tf.expand_dims(tf.expand_dims(tf.expand_dims(tf.range(1, max_clusters + 1, dtype='int32'),
                                                                           axis=0), axis=0), axis=0)
 
         gt_matrix = tf.equal(gt_labels, unique_gt_labels)

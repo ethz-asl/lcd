@@ -338,13 +338,6 @@ class Scene:
         self.get_frames_info()
 
     def get_frames_info(self):
-        # max_frame_count = 20
-
-        # line_counts = np.zeros((max_frame_count,), dtype=int)
-        # cluster_counts = np.zeros((max_frame_count,), dtype=int)
-        # scene_labels = np.zeros((0,), dtype=int)
-        # scene_classes = np.zeros((0,), dtype=int)
-
         cluster_labels = []
         cluster_classes = []
         clusters = []
@@ -352,11 +345,7 @@ class Scene:
         for i, frame in enumerate(self.frame_paths):
             frame_idx = int(frame.split('_')[-1])
             count, geometries, labels, classes, vci_paths, transform = load_frame(frame)
-            # line_counts[frame_idx] = count
             frame_clusters = Counter(labels[get_bg_mask(classes, self.bg_classes)]).most_common()
-            # cluster_counts[frame_idx] = len(frame_clusters)
-            # scene_labels = np.hstack((scene_labels, labels))
-            # scene_classes = np.hstack((scene_classes, classes))
 
             if count > self.min_line_count and len(frame_clusters) > 0:
                 self.valid_frames.append(i)
@@ -373,7 +362,7 @@ class Scene:
                     elif cluster_class not in self.valid_classes:
                         continue
 
-                    new_cluster = Cluster(i, cluster_lines)
+                    new_cluster = Cluster(frame_idx, cluster_lines)
                     if cluster_label in cluster_labels:
                         clusters[cluster_labels.index(cluster_label)].append(new_cluster)
                     else:
@@ -381,16 +370,9 @@ class Scene:
                         cluster_classes.append(cluster_class)
                         clusters.append([new_cluster])
 
-        # scene_clusters = Counter(scene_labels[get_bg_mask(scene_classes, self.bg_classes)]).most_common()
-        # scene_cluster_count = len(scene_clusters)
         self.clusters = clusters
         self.cluster_labels = cluster_labels
         self.cluster_classes = cluster_classes
-
-        # print("Scene: {}".format(self.scene_path))
-        # print("Scene cluster count: {}".format(scene_cluster_count))
-        # print("Scene line count: {}".format(np.sum(line_counts)))
-        # print([cluster[1] for cluster in scene_clusters])
 
     def get_cluster(self, cluster_id, line_count, shuffle, blacklisted=-1, center=True, forced_choice=None):
         if forced_choice is None:
@@ -401,9 +383,6 @@ class Scene:
                 cluster_choice = blacklisted + 1
         else:
             cluster_choice = forced_choice
-
-        # print(cluster_choice)
-        # TODO: Check this shit!
 
         cluster = self.clusters[cluster_id][cluster_choice]
         cluster_label = self.cluster_labels[cluster_id]
@@ -439,11 +418,11 @@ class Scene:
 
         return min(line_count, len(indices)), lines, cluster_label, cluster_class, images, cluster_choice
 
-    def get_lines(self, frame_id, fusion_frames, line_count, shuffle):
+    def get_frame(self, frame_id, fusion_frames, line_count, shuffle):
         tot_count, lines, labels, classes, vci_paths, t_1 = load_frame(self.frame_paths[frame_id])
         vcis = [load_image(path, self.img_shape) for path in vci_paths]
 
-        tic = time.perf_counter()
+        # tic = time.perf_counter()
         for fuse_frame_id in fusion_frames:
             count_2, lines_2, labels_2, classes_2, vci_paths_2, t_2 = load_frame(self.frame_paths[fuse_frame_id])
             vcis_2 = [load_image(path, self.img_shape) for path in vci_paths_2]
@@ -510,9 +489,7 @@ class Frame:
                     print("WARNING: VIRTUAL CAMERA IMAGE NOT FOUND AT {}".format(self.line_vci_paths[i]))
                     images.append(np.expand_dims(np.zeros(img_shape), axis=0))
                 else:
-                    # mask = np.logical_and(np.logical_and(img[:, :, 0] == 0, img[:, :, 1] == 0), img[:, :, 2] == 0)
                     img = preprocess_input(img)
-                    # img[mask] = 0.0
                     img = cv2.resize(img, dsize=(img_shape[1], img_shape[0]), interpolation=cv2.INTER_LINEAR)
                     images.append(np.expand_dims(img, axis=0))
             images = np.concatenate(images, axis=0)
@@ -553,7 +530,7 @@ def create_training_plan(scenes):
 class LineDataSequence(Sequence):
     def __init__(self, files_dir, batch_size, bg_classes, shuffle=False, fuse=False, data_augmentation=False,
                  mean=np.array([0., 0., 3.]), img_shape=(64, 96, 3), min_line_count=30, max_line_count=300,
-                 max_cluster_count=30, load_images=True):
+                 max_cluster_count=30, load_images=True, training_mode=True):
         self.files_dir = files_dir
         self.bg_classes = bg_classes
         self.shuffle = shuffle
@@ -566,11 +543,15 @@ class LineDataSequence(Sequence):
         self.max_line_count = max_line_count
         self.max_cluster_count = max_cluster_count
         self.batch_size = batch_size
-        self.scenes = load_scenes(files_dir, bg_classes, min_line_count, max_line_count, max_cluster_count, img_shape,
-                                  [])
+        if training_mode:
+            max_scene_cluster_count = max_cluster_count
+        else:
+            max_scene_cluster_count = 10000
+        self.scenes = load_scenes(files_dir, bg_classes, min_line_count, max_line_count, max_scene_cluster_count,
+                                  img_shape, [])
         self.training_plan = create_training_plan(self.scenes)
         self.frame_count = len(self.training_plan)
-        self.frame_indices = np.arange(self.frame_count)
+        self.frame_indices = np.arange(self.frame_count, dtype=int)
         self.shuffle_indices()
 
     def on_epoch_end(self):
@@ -581,7 +562,8 @@ class LineDataSequence(Sequence):
             np.random.shuffle(self.frame_indices)
 
     def __getitem__(self, idx):
-        training_plan = self.training_plan[idx * self.batch_size:(idx + 1) * self.batch_size]
+        training_plan = [self.training_plan[i] for i in
+                         self.frame_indices[idx * self.batch_size:(idx + 1) * self.batch_size]]
 
         batch_geometries = []
         batch_labels = []
@@ -591,27 +573,26 @@ class LineDataSequence(Sequence):
         batch_unique = []
         batch_counts = []
 
+        if not self.shuffle:
+            rand_state = np.random.get_state()
+            np.random.seed(idx)
+
         for element in training_plan:
             if self.fuse:
-                if not self.shuffle:
-                    rand_state = np.random.get_state()
-                    np.random.seed(element[0] * 20 + element[1])
                 num_fuses = np.random.randint(4)
                 other_frames = np.arange(self.scenes[element[0]].frame_count)
                 other_frames = np.delete(other_frames, element[1])
                 other_frames = np.random.choice(other_frames, num_fuses, False)
-                if not self.shuffle:
-                    np.random.set_state(rand_state)
             else:
                 other_frames = []
 
             line_count, line_geometries, line_labels, line_class_ids, line_images = \
-                self.scenes[element[0]].get_lines(element[1], other_frames, self.max_line_count, self.shuffle)
+                self.scenes[element[0]].get_frame(element[1], other_frames, self.max_line_count, self.shuffle)
 
             line_geometries = subtract_mean(line_geometries, self.mean)
 
             if self.data_augmentation and np.random.binomial(1, 0.5):
-                augment_flip(line_geometries, line_images)
+                # augment_flip(line_geometries, line_images)
                 augment_global(line_geometries, np.radians(15.), 0.3)
 
             line_geometries = normalize(line_geometries, 2.0)
@@ -669,6 +650,9 @@ class LineDataSequence(Sequence):
         unique = np.concatenate(batch_unique, axis=0)
         counts = np.concatenate(batch_counts, axis=0)
 
+        if not self.shuffle:
+            np.random.set_state(rand_state)
+
         return {'lines': geometries,
                 'labels': labels,
                 'valid_input_mask': valid_mask,
@@ -700,6 +684,8 @@ def create_training_plan_clusters(scenes, min_num_clusters=2):
                 floor_ids[i] = curr_id
                 curr_id += 1
 
+            # The white list is the the list of scenes that are not the scene the current cluster is in,
+            # to prevent trying to distinct between instances that are the same.
             white_list = []
             for j, other_scene in enumerate(scenes):
                 other_floor_name = other_scene.name.split('_')[0]
@@ -742,7 +728,7 @@ class ClusterDataSequence(Sequence):
             min_num_clusters = 1
         self.training_plan, self.floor_ids = create_training_plan_clusters(self.scenes, min_num_clusters)
         self.cluster_count = len(self.training_plan)
-        self.cluster_indices = np.arange(self.cluster_count)
+        self.cluster_indices = np.arange(self.cluster_count, dtype=int)
         self.shuffle_indices()
 
     def on_epoch_end(self):
@@ -754,7 +740,7 @@ class ClusterDataSequence(Sequence):
 
     def process_cluster(self, line_count, cluster_lines, cluster_label, cluster_class, cluster_images):
         if self.data_augmentation and np.random.binomial(1, 0.5):
-            augment_flip(cluster_lines, cluster_images)
+            # augment_flip(cluster_lines, cluster_images)
             augment_global(cluster_lines, np.radians(15.), 0.0)
 
         line_geometries = normalize(cluster_lines, 2.0)
@@ -789,7 +775,8 @@ class ClusterDataSequence(Sequence):
                np.expand_dims(out_images, axis=0)
 
     def __getitem__(self, idx):
-        training_plan = self.training_plan[idx * self.batch_size:(idx + 1) * self.batch_size]
+        training_plan = [self.training_plan[i] for i in
+                         self.cluster_indices[idx * self.batch_size:(idx + 1) * self.batch_size]]
 
         batch_geometries_a = []
         batch_valid_mask_a = []
@@ -825,7 +812,15 @@ class ClusterDataSequence(Sequence):
 
             other_scene_id = np.random.choice(white_list)
             other_scene = self.scenes[other_scene_id]
-            other_cluster_id = np.random.choice(np.arange(len(other_scene.cluster_labels)))
+            # With probability 0.5, try to choose a cluster with the same class.
+            if np.random.binomial(1, 0.5):
+                same_classes_clusters = np.where(np.array(other_scene.cluster_classes) == cluster_class)[0]
+                if len(same_classes_clusters) > 0:
+                    other_cluster_id = np.random.choice(same_classes_clusters)
+                else:
+                    other_cluster_id = np.random.choice(np.arange(len(other_scene.cluster_labels)))
+            else:
+                other_cluster_id = np.random.choice(np.arange(len(other_scene.cluster_labels)))
             line_count_n, lines_n, label_n, class_n, images_n, id_n = \
                 other_scene.get_cluster(other_cluster_id, self.max_line_count, True,
                                         center=True)
@@ -871,176 +866,6 @@ class ClusterDataSequence(Sequence):
 
     def __len__(self):
         return int(np.ceil(self.cluster_count / self.batch_size))
-
-
-class LineDataGenerator:
-    def __init__(self, files_dir, bg_classes,
-                 shuffle=False, data_augmentation=False, mean=np.zeros((3,)), img_shape=(224, 224, 3),
-                 sort=False, min_line_count=30, max_cluster_count=15):
-        # Initialize parameters.
-        self.shuffle = shuffle
-        self.data_augmentation = data_augmentation
-        self.pointer = 0
-        self.bg_classes = bg_classes
-        self.frame_count = 0
-        self.frames = []
-        self.frame_indices = []
-        self.mean = mean
-        self.img_shape = img_shape
-        self.sort = sort
-        self.cluster_counts = []
-        self.line_counts = []
-        self.cluster_count_file = "cluster_counts"
-        self.line_count_file = "line_counts"
-        self.skipped_frames = 0
-        self.min_line_count = min_line_count
-        self.max_cluster_count = max_cluster_count
-        self.load_scenes(files_dir)
-
-        if self.shuffle:
-            self.shuffle_data()
-
-    def load_frames(self, files_dir):
-        frame_paths = [os.path.join(files_dir, name) for name in os.listdir(files_dir)
-                       if os.path.isfile(os.path.join(files_dir, name))]
-        if not self.shuffle:
-            frame_paths.sort()
-
-        self.frame_count = len(frame_paths)
-        self.frames = [Frame(path) for path in frame_paths]
-        self.frame_indices = np.arange(self.frame_count)
-
-    def load_scenes(self, files_dir):
-        tic = time.perf_counter()
-        scene_paths = [os.path.join(files_dir, name) for name in os.listdir(files_dir)
-                       if os.path.isdir(os.path.join(files_dir, name))]
-        if not self.shuffle:
-            scene_paths.sort()
-
-        self.frame_count = len(scene_paths)
-        self.frames = [Scene(path, self.bg_classes, self.min_line_count, self.max_cluster_count, self.img_shape)
-                       for path in scene_paths]
-        self.frame_indices = np.arange(self.frame_count)
-        print("Initialization took {} seconds.".format(time.perf_counter() - tic))
-
-    def get_mean(self):
-        mean = np.zeros((3,))
-        count = 0
-        for frame in self.frames:
-            count = count + frame.line_count
-            for i in range(frame.line_count):
-                mean = mean + frame.line_geometries[i, :3] / 2.
-                mean = mean + frame.line_geometries[i, 3:6] / 2.
-
-        return mean / count
-
-    def set_mean(self, mean):
-        self.mean = mean
-
-    def shuffle_data(self):
-        """ Randomly shuffles the data stored.
-        """
-        np.random.shuffle(self.frame_indices)
-
-    def reset_pointer(self):
-        """ Resets internal pointer to point to the beginning of the stored
-            data.
-        """
-        self.pointer = 0
-
-        if self.shuffle:
-            self.shuffle_data()
-
-        print("Dataset completed. Number of skipped frames: {}".format(self.skipped_frames))
-        self.skipped_frames = 0
-        np.save(self.cluster_count_file, np.array(self.cluster_counts))
-        np.save(self.line_count_file, np.array(self.line_counts))
-
-    def set_pointer(self, index):
-        """ Sets the internal pointer to point to the given index.
-
-        Args:
-            index (int): Index to which the internal pointer should point.
-        """
-        self.pointer = index
-
-    def next_batch(self, batch_size, load_images):
-        if self.pointer == self.frame_count:
-            self.reset_pointer()
-
-        line_count, line_geometries, line_labels, line_class_ids, line_images = \
-            self.frames[self.frame_indices[self.pointer]].get_batch(batch_size,
-                                                                    self.max_cluster_count,
-                                                                    self.img_shape,
-                                                                    self.shuffle,
-                                                                    load_images)
-        self.pointer = self.pointer + 1
-
-        cluster_count = len(np.unique(line_labels[np.isin(line_class_ids, self.bg_classes, invert=True)]))
-
-        # Write line counts and cluster counts for histogram:
-        self.cluster_counts.append(cluster_count)
-        self.line_counts.append(line_count)
-
-        if line_count < self.min_line_count:
-            # print("Skipping frame because it does not have enough lines")
-            self.skipped_frames += 1
-            return self.next_batch(batch_size, load_images)
-
-        if cluster_count == 0 or cluster_count > self.max_cluster_count:
-            # print("Skipping frame because it has 0 or too many instances.")
-            self.skipped_frames += 1
-            return self.next_batch(batch_size, load_images)
-
-        out_k = np.zeros((31,))
-        out_k[min(30, cluster_count)] = 1.
-
-        # Subtract mean of start and end points.
-        # Intuitively, the mean lies some where straight forward, i.e. [0., 0., 3.].
-        line_geometries = subtract_mean(line_geometries, self.mean)
-        line_geometries = normalize(line_geometries, 2.0)
-        line_geometries = add_length(line_geometries)
-
-        if self.data_augmentation and np.random.binomial(1, 0.5):
-            augment_flip(line_geometries, line_images)
-            augment_global(line_geometries, np.radians(15.), 0.2)
-
-        # Sort by x value of leftest point:
-        if self.sort:
-            sorted_ids = np.argsort(np.min(line_geometries[:, [0, 3]], axis=1))
-            line_geometries = line_geometries[sorted_ids, :]
-            line_labels = line_labels[sorted_ids]
-            line_class_ids = line_class_ids[sorted_ids]
-            if load_images:
-                line_images = line_images[sorted_ids, :, :, :]
-
-        valid_mask = np.zeros((batch_size,), dtype=bool)
-        out_geometries = np.zeros((batch_size, line_geometries.shape[1]))
-        out_labels = np.zeros((batch_size,), dtype=int)
-        out_classes = np.zeros((batch_size,), dtype=int)
-        out_bg = np.zeros((batch_size,), dtype=bool)
-
-        valid_mask[:line_count] = True
-        out_geometries[:line_count, :] = line_geometries
-        out_labels[:line_count] = line_labels
-        out_classes[:line_count] = line_class_ids
-        out_bg[np.isin(out_classes, self.bg_classes)] = True
-        out_bg[line_count:batch_size] = False
-
-        if load_images:
-            # Images are sorted already.
-            out_images = line_images
-            if line_count < batch_size:
-                out_images = np.concatenate([out_images,
-                                             np.zeros((batch_size - line_count,
-                                                       self.img_shape[0],
-                                                       self.img_shape[1],
-                                                       self.img_shape[2]))],
-                                            axis=0)
-        else:
-            out_images = np.zeros((batch_size, self.img_shape[0], self.img_shape[1], self.img_shape[2]))
-
-        return out_geometries, out_labels, valid_mask, out_bg, out_images, out_k
 
 
 def add_length(line_geometries):
@@ -1110,124 +935,3 @@ def augment_flip(line_geometries, images):
 
             images[i, :, :, :] = np.flip(images[i, :, :, :], axis=2)
 
-
-def kl_loss_np(prediction, labels, val_mask, bg_mask):
-    h_labels = np.expand_dims(labels, axis=-1)
-    v_labels = np.transpose(h_labels, axes=(1, 0))
-
-    mask_equal = np.equal(h_labels, v_labels)
-    mask_not_equal = np.logical_not(mask_equal)
-    # mask_equal = np.expand_dims(mask_equal, axis=-1).astype(float)
-    # mask_not_equal = np.expand_dims(mask_not_equal, axis=-1).astype(float)
-    mask_equal = mask_equal.astype(float)
-    mask_not_equal = mask_not_equal.astype(float)
-
-    h_bg = np.expand_dims(np.logical_not(bg_mask), axis=-1).astype(float)
-    v_bg = np.transpose(h_bg, axes=(1, 0))
-    mask_not_bg_unexpanded = h_bg * v_bg
-    # mask_not_bg = np.expand_dims(h_bg * v_bg, -1)
-    mask_not_bg = mask_not_bg_unexpanded
-
-    h_val = np.expand_dims(val_mask, axis=-1).astype(float)
-    v_val = np.transpose(h_val, axes=(1, 0))
-    mask_val = h_val * v_val
-    mask_val_unexpanded = np.copy(mask_val)
-    np.fill_diagonal(mask_val_unexpanded, 0.)
-    # mask_val = np.expand_dims(mask_val_unexpanded, axis=-1)
-    mask_val = mask_val_unexpanded
-
-    h_pred = np.expand_dims(prediction, axis=0)
-    v_pred = np.transpose(h_pred, axes=(1, 0, 2))
-
-    d = h_pred * np.log(np.nan_to_num(h_pred / v_pred) + 0.000001)
-    d = np.sum(d, axis=-1, keepdims=False)
-
-    equal_loss_layer = mask_equal * d
-    not_equal_loss_layer = mask_not_equal * np.maximum(0., 2.0 - d)
-    # print(np.max(loss_layer * mask_val * mask_not_bg))
-    # print("Compare:")
-    # print(np.sum(not_equal_loss_layer * mask_val * mask_not_bg) + np.sum(equal_loss_layer * mask_val * mask_not_bg))
-
-
-def get_fake_instancing(labels, valid_mask, bg_mask):
-    valid_count = np.where(valid_mask == 1)[0].shape[0]
-    unique_labels = np.unique(labels[np.where(np.logical_and(valid_mask, np.logical_not(bg_mask)))])
-    out = np.zeros((150, 15), dtype=float)
-
-    for i, label in enumerate(unique_labels):
-        out[np.where(labels == label), i] = 1.
-
-    kl_loss_np(out, labels, valid_mask, bg_mask)
-
-    return np.expand_dims(out, axis=0)
-
-
-# Deprecated
-def generate_data(image_data_generator, max_line_count, line_num_attr, batch_size=1, load_images=True):
-    batch_geometries = []
-    batch_labels = []
-    batch_valid_mask = []
-    batch_bg_mask = []
-    batch_images = []
-    batch_k = []
-    batch_fake = []
-    batch_unique = []
-    batch_counts = []
-
-    for i in range(batch_size):
-        # image_data_generator.reset_pointer()
-        geometries, labels, valid_mask, bg_mask, images, k = image_data_generator.next_batch(max_line_count,
-                                                                                             load_images=load_images)
-        batch_labels.append(labels.reshape((1, max_line_count)))
-        batch_geometries.append(geometries.reshape((1, max_line_count, line_num_attr)))
-        batch_valid_mask.append(valid_mask.reshape((1, max_line_count)))
-        batch_bg_mask.append(bg_mask.reshape((1, max_line_count)))
-        batch_images.append(np.expand_dims(images, axis=0))
-        batch_k.append(np.expand_dims(k, axis=0))
-        batch_fake.append(np.zeros((1, max_line_count, 15)))
-
-        unique_labels = np.unique(labels[np.logical_and(np.logical_not(bg_mask), valid_mask)])
-        cluster_count = unique_labels.shape[0]
-        if cluster_count >= 15:
-            unique_labels = unique_labels[:15]
-        else:
-            unique_labels = np.pad(unique_labels, (0, 15 - cluster_count), mode='constant', constant_values=-1)
-        unique_labels = np.expand_dims(unique_labels, axis=0)
-        cluster_count = np.expand_dims(cluster_count, axis=0)
-        batch_unique.append(unique_labels)
-        batch_counts.append(cluster_count)
-
-    geometries = np.concatenate(batch_geometries, axis=0)
-    labels = np.concatenate(batch_labels, axis=0)
-    valid_mask = np.concatenate(batch_valid_mask, axis=0)
-    bg_mask = np.concatenate(batch_bg_mask, axis=0)
-    images = np.concatenate(batch_images, axis=0)
-    batch_k = np.concatenate(batch_k, axis=0)
-    batch_fake = np.concatenate(batch_fake, axis=0)
-
-    batch_unique = np.concatenate(batch_unique, axis=0)
-    batch_counts = np.concatenate(batch_counts, axis=0)
-
-    if not load_images:
-        return {'lines': geometries,
-                'labels': labels,
-                'valid_input_mask': valid_mask,
-                'background_mask': bg_mask,
-                'unique_labels': batch_unique,
-                'cluster_count': batch_counts,
-                'fake': batch_fake}, batch_k
-    else:
-        return {'lines': geometries,
-                'labels': labels,
-                'valid_input_mask': valid_mask,
-                'background_mask': bg_mask,
-                'images': images,
-                'unique_labels': batch_unique,
-                'cluster_count': batch_counts,
-                'fake': batch_fake}, batch_k
-
-
-# Deprecated
-def data_generator(image_data_generator, max_line_count, line_num_attr, batch_size=1, load_images=True):
-    while True:
-        yield generate_data(image_data_generator, max_line_count, line_num_attr, batch_size, load_images)

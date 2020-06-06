@@ -382,7 +382,7 @@ def load_lines(path):
 if __name__ == '__main__':
     # data_path = "/nvme/line_ws/test"
     data_path = "/nvme/line_ws/test"
-    result_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_310520_1250/results_16_no_vis"
+    result_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_060620_0111/results_10"
 
     predictions = np.load(os.path.join(result_path, "predictions.npy"))
     # print(predictions.shape)
