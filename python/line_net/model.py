@@ -240,11 +240,6 @@ def get_global_attention_layer(input_number, one_input_count=1, idx=0,
 
 def get_non_linearity():
     return kl.LeakyReLU()
-    # return kl.Lambda(lambda x: tf.math.l2_normalize(x, axis=-1))
-
-
-def get_hidden_non_linearity():
-    ...
 
 
 def image_pretrain_model(line_num_attr, num_lines, img_shape):

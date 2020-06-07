@@ -2,14 +2,109 @@ import numpy as np
 import sklearn.neighbors as sn
 import sklearn.cluster as sc
 import datagenerator_framewise
+import visualize_lines
 import model
 import pickle
 import os
 import cv2
+import matplotlib.pyplot as plt
 
 import tensorflow as tf
 
 from collections import Counter
+
+
+COLORS = (visualize_lines.get_colors() * 255).astype(int)
+INTERIORNET_PATH = "/nvme/datasets/interiornet"
+
+
+class QueryFloor:
+    def __init__(self, scenes):
+        self.scenes = scenes
+
+
+class QueryScene:
+    def __init__(self, frames):
+        self.frames = frames
+
+
+class QueryFrame:
+    def __init__(self, geometry, labels, path, clusters):
+        self.geometry = geometry
+        self.labels = labels
+        self.path = path
+        self.clusters = clusters
+
+    def draw_frame(self, cluster_id=None):
+        scene_name = self.path.split('/')[-2]
+        frame_id = self.path.split('_')[-1]
+        path = os.path.join(INTERIORNET_PATH, scene_name, 'cam0/data', frame_id + '.png')
+        # print("Loading image from path " + path)
+
+        image = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+
+        for i, cluster in enumerate(self.clusters):
+            if cluster_id is not None and i != cluster_id:
+                continue
+            color = (int(COLORS[self.labels[i], 0]),
+                     int(COLORS[self.labels[i], 1]),
+                     int(COLORS[self.labels[i], 2]), 255)
+            image = draw_cluster(image, cluster.geometry, color)
+
+        return image
+
+
+class QueryCluster:
+    def __init__(self, geometry, embedding):
+        self.geometry = geometry
+        self.embedding = embedding
+
+
+def unnormalize(line_geometries):
+    mean = np.array([0., 0., 3.])
+    line_geometries[:, :6] = line_geometries[:, :6] * 2.
+    line_geometries[:, :3] = line_geometries[:, :3] + mean
+    line_geometries[:, 3:6] = line_geometries[:, 3:6] + mean
+
+    return line_geometries
+
+
+def camera_intrinsic_transform(fx=600,
+                               fy=600,
+                               pixel_width=640,
+                               pixel_height=480):
+    """ Gets camera intrinsics matrix for InteriorNet dataset.
+    """
+    camera_intrinsics = np.zeros((4, 4))
+    camera_intrinsics[2, 2] = 1.
+    camera_intrinsics[0, 0] = fx
+    camera_intrinsics[0, 2] = pixel_width / 2.0
+    camera_intrinsics[1, 1] = fy
+    camera_intrinsics[1, 2] = pixel_height / 2.0
+    camera_intrinsics[3, 3] = 1.
+
+    return camera_intrinsics
+
+
+def draw_cluster(image, line_geometries, color):
+    t_cam = camera_intrinsic_transform()
+    start_points = line_geometries[:, :3]
+    start_points = np.vstack([start_points.T, np.ones((start_points.shape[0],))])
+    start_points = t_cam.dot(start_points).T
+    start_points = np.rint(start_points / np.expand_dims(start_points[:, 2], -1)).astype(int)[:, :2]
+    end_points = line_geometries[:, 3:6]
+    end_points = np.vstack([end_points.T, np.ones((end_points.shape[0],))])
+    end_points = t_cam.dot(end_points).T
+    end_points = np.rint(end_points / np.expand_dims(end_points[:, 2], -1)).astype(int)[:, :2]
+
+    out_image = image
+    for i in range(start_points.shape[0]):
+        out_image = cv2.line(out_image,
+                             (start_points[i, 0], start_points[i, 1]),
+                             (end_points[i, 0], end_points[i, 1]),
+                             color, 3)
+
+    return out_image
 
 
 def get_floor_ids(scenes):
@@ -29,39 +124,58 @@ def get_floor_ids(scenes):
     return floor_ids
 
 
-def get_sift_embeddings(interiornet_path, map_data, num_scenes=None):
+def get_sift_vocabulary(interiornet_path, map_data, vocabulary_dim=768, num_scenes=None):
     scene_paths = [os.path.join(interiornet_path, scene.name) for scene in map_data.scenes]
     floor_ids = map_data.floor_ids
 
     sift = cv2.xfeatures2d.SIFT_create()
 
-    all_embeddings = []
+    if not os.path.isfile("sift_vocabulary"):
+        all_embeddings = []
 
-    for i, scene_path in enumerate(scene_paths):
-        if num_scenes is not None and i > num_scenes:
-            print("Stopping with {} frames.".format(num_scenes))
-            break
+        random_scene_paths = scene_paths.copy()
+        np.random.shuffle(random_scene_paths)
+        for i, scene_path in enumerate(random_scene_paths):
+            if num_scenes is not None and i > num_scenes:
+                print("Stopping with {} frames.".format(num_scenes))
+                break
 
-        print("Processing scene {}.".format(i))
-        frame_dir = os.path.join(scene_path, "cam0/data")
-        frame_paths = [os.path.join(frame_dir, name) for name in os.listdir(frame_dir)
-                       if os.path.isfile(os.path.join(frame_dir, name))]
+            print("Processing scene {}.".format(i))
+            frame_dir = os.path.join(scene_path, "cam0/data")
+            frame_paths = [os.path.join(frame_dir, name) for name in os.listdir(frame_dir)
+                           if os.path.isfile(os.path.join(frame_dir, name))]
 
-        for j, frame_path in enumerate(frame_paths):
-            frame_im = cv2.imread(frame_path, cv2.IMREAD_GRAYSCALE)
-            keypoints, descriptors = sift.detectAndCompute(frame_im, None)
+            for j, frame_path in enumerate(frame_paths):
+                frame_im = cv2.imread(frame_path, cv2.IMREAD_GRAYSCALE)
+                keypoints, descriptors = sift.detectAndCompute(frame_im, None)
 
-            if descriptors is not None:
-                all_embeddings.append(descriptors)
-            else:
-                print("Empty frame at " + frame_path)
+                if descriptors is not None:
+                    all_embeddings.append(descriptors)
+                else:
+                    print("Empty frame at " + frame_path)
 
-    print("Starting k means clustering.")
-    all_embeddings = np.vstack(all_embeddings)
-    print("")
-    kmeans = sc.KMeans(n_clusters=256)
-    kmeans.fit(all_embeddings)
-    print("Finshed clustering")
+        print("Starting k means clustering.")
+        all_embeddings = np.vstack(all_embeddings)
+        print("Start clustering.")
+        kmeans = sc.MiniBatchKMeans(n_clusters=vocabulary_dim)
+        kmeans.fit(all_embeddings)
+        print("Finshed clustering")
+        with open("sift_vocabulary", 'wb') as f:
+            pickle.dump(kmeans, f)
+        print("Saved clustering file sift_vocabulary")
+    else:
+        print("Loading sift vocabulary.")
+        with open("sift_vocabulary", 'rb') as f:
+            kmeans = pickle.load(f)
+
+    return kmeans
+
+
+def get_sift_embeddings(interiornet_path, map_data, num_scenes=None):
+    scene_paths = [os.path.join(interiornet_path, scene.name) for scene in map_data.scenes]
+    floor_ids = map_data.floor_ids
+
+    sift = cv2.xfeatures2d.SIFT_create()
 
     query_frame_embeddings = []
     query_scene_ids = []
@@ -85,10 +199,11 @@ def get_sift_embeddings(interiornet_path, map_data, num_scenes=None):
             frame_im = cv2.imread(frame_path, cv2.IMREAD_GRAYSCALE)
             keypoints, descriptors = sift.detectAndCompute(frame_im, None)
 
-            indices = kmeans.predict(descriptors)
-            print(indices)
-            exit()
             if descriptors is not None:
+                indices = kmeans.predict(descriptors)
+                embedding = np.histogram(indices, np.arange(vocabulary_dim))[0].astype(float)
+                descriptors = np.expand_dims(embedding, 0)
+
                 if j in query_frames:
                     query_frame_embeddings.append(descriptors)
                     query_scene_ids.append(floor_id)
@@ -101,7 +216,7 @@ def get_sift_embeddings(interiornet_path, map_data, num_scenes=None):
     map_embeddings = np.vstack(map_embeddings)
     map_scene_ids = np.array(map_scene_ids)
 
-    return query_frame_embeddings, query_scene_ids, map_embeddings, map_scene_ids
+    return query_frame_embeddings, query_scene_ids, None, map_embeddings, map_scene_ids, None
 
 
 def query_on_sift_frames(query_frame_embeddings, query_scene_ids, map_embeddings, map_scene_ids, k=1):
@@ -252,22 +367,72 @@ def query_on_frames(query_frame_embeddings, query_scene_ids, query_scene_names,
     print("Average number of clusters per frame: {}".format(total_cluster_count / total_frame_num))
 
 
-def get_full_embeddings(cluster_model, descriptor_model, frame_data, min_cluster_line_count=4,
-                        max_cluster_line_count=50, query_frames=[0, 1]):
+def query_on_floors(query_floors, k=10):
+    num_floors = 100
+
+    embeddings = []
+    data = []
+
+    for floor in query_floors[:num_floors]:
+        for scene in floor.scenes:
+            for frame in scene.frames:
+                for cluster in frame.clusters:
+                    embeddings.append(cluster.embedding)
+                    data.append((floor, scene, frame, cluster))
+
+    embeddings = np.vstack(embeddings)
+    # Generating map tree.
+    print("Generating map tree.")
+    map_tree = sn.KDTree(embeddings, leaf_size=10)
+
+    matched_num = 0
+    tot_num_clusters = 0
+    for floor in query_floors[:num_floors]:
+        for scene in floor.scenes:
+            for frame in scene.frames:
+                for i, cluster in enumerate(frame.clusters):
+                    dist, nearest = map_tree.query(cluster.embedding.reshape(-1, 1).T, k=k+1)
+                    # Warning, the nearest one is of course the very same cluster.
+                    nearest_data = [data[nearest[0][j]] for j in range(1, k+1)]
+                    matched = False
+                    cluster_matches = []
+                    for data_point in nearest_data:
+                        if data_point[0] is floor:
+                            matched = True
+                        cluster_matches.append(query_floors.index(data_point[0]))
+                    # if nearest_data[0] is floor:
+                    if matched:
+                        # print("Match.")
+                        matched_num += 1
+                    else:
+                        ...
+                        # print("Mismatch.")
+                    tot_num_clusters += 1
+                    # image_1 = frame.draw_frame(i)
+                    # image_2 = nearest_data[2].draw_frame(nearest_data[2].clusters.index(nearest_data[3]))
+                    # plt.imshow(np.concatenate([image_1, image_2], axis=1))
+                    # plt.show()
+
+    print("Correctly matched clusters: {}".format(matched_num))
+    print("Total number of clusters: {}".format(tot_num_clusters))
+    print("Ratio of correctly matched clusters: {}".format(matched_num / tot_num_clusters))
+
+
+def get_full_embeddings(cluster_model, descriptor_model, frame_data,
+                        min_cluster_line_count=4,
+                        max_cluster_line_count=50):
     scenes = frame_data.scenes
     floor_ids = get_floor_ids(scenes)
     training_plan = frame_data.training_plan
-    query_frame_embeddings = []
-    query_scene_ids = []
-    query_scene_names = []
-    map_embeddings = []
-    map_scene_ids = []
-    map_scene_names = []
+
+    query_floors = [QueryFloor([]) for i in range(np.unique(floor_ids).shape[0])]
+    query_scenes = [QueryScene([]) for i in range(len(scenes))]
 
     for idx, element in enumerate(training_plan):
         scene_id = element[0]
         floor_id = floor_ids[scene_id]
         frame_id = element[1]
+        frame_path = scenes[scene_id].frame_paths[frame_id]
 
         data, _ = frame_data.__getitem__(idx)
         frame_geometries = data['lines']
@@ -277,22 +442,28 @@ def get_full_embeddings(cluster_model, descriptor_model, frame_data, min_cluster
         cluster_output = cluster_model.predict_on_batch(data)
         cluster_output = cluster_output[0, valid_mask[0, :], :]
         cluster_output = np.argmax(cluster_output, axis=-1)
+
+        query_frame = QueryFrame(frame_geometries[0, valid_mask[0, :], :], cluster_output, frame_path, [])
+
         unique_output = np.unique(cluster_output)
-        unique_output = unique_output[np.where(unique_output != 0)]
+        # unique_output = unique_output[np.where(unique_output != 0)]
         cluster_embeddings = []
         for label_idx in unique_output:
-            assert(label_idx != 0)
+            # assert(label_idx != 0)
             line_indices = np.where(cluster_output == label_idx)[0][:max_cluster_line_count]
             cluster_line_count = len(line_indices)
             # Min cluster line count is 4.
-            if cluster_line_count >= 4:
+            if cluster_line_count >= min_cluster_line_count:
+                cluster_lines = frame_geometries[0, line_indices[:cluster_line_count], :]
+                cluster_lines_render = unnormalize(cluster_lines.copy())
+                cluster_lines = datagenerator_framewise.set_mean_zero(cluster_lines)
+
                 cluster_valid_mask = np.zeros((1, max_cluster_line_count), dtype=bool)
                 cluster_geometries = np.zeros((1, max_cluster_line_count, frame_geometries.shape[2]))
                 cluster_images = np.zeros((1, max_cluster_line_count,
                                            frame_images.shape[2], frame_images.shape[3], frame_images.shape[4]))
                 cluster_valid_mask[:, :cluster_line_count] = True
-                cluster_geometries[:, :cluster_line_count, :] = \
-                    frame_geometries[:, line_indices[:cluster_line_count], :]
+                cluster_geometries[0:, :cluster_line_count, :] = cluster_lines
                 cluster_images[:, :cluster_line_count, :, :, :] = \
                     frame_images[:, line_indices[:cluster_line_count], :, :, :]
 
@@ -303,28 +474,27 @@ def get_full_embeddings(cluster_model, descriptor_model, frame_data, min_cluster
                     'ones_model': np.expand_dims(np.ones((1, 1)), axis=0)
                 }
                 cluster_embedding = descriptor_model.predict_on_batch(cluster_data)
-                cluster_embeddings.append(np.array(cluster_embedding)[0, :])
+                cluster_embedding = np.array(cluster_embedding)[0, :]
+                cluster_embeddings.append(cluster_embedding)
+
+                query_frame.clusters.append(QueryCluster(cluster_lines_render, cluster_embedding))
+
+        # image = query_frame.draw_frame()
+
+        query_scenes[scene_id].frames.append(query_frame)
+        if query_scenes[scene_id] not in query_floors[floor_id].scenes:
+            query_floors[floor_id].scenes.append(query_scenes[scene_id])
 
         print("Scene {}, frame {}, number of clusters: {}".format(scene_id, frame_id, len(cluster_embeddings)))
-        if len(cluster_embeddings) > 0:
-            if frame_id in query_frames:
-                query_frame_embeddings.append(cluster_embeddings)
-                query_scene_ids.append(floor_id)
-                query_scene_names.append(scenes[scene_id].name + "_frame_{}".format(frame_id))
-            else:
-                map_embeddings += cluster_embeddings
-                map_scene_ids += [floor_id for l in range(len(cluster_embeddings))]
-                map_scene_names += [scenes[scene_id].name + "_frame_{}".format(frame_id)
-                                    for l in range(len(cluster_embeddings))]
 
-    return query_frame_embeddings, query_scene_ids, query_scene_names, map_embeddings, map_scene_ids, map_scene_names
+    return query_floors
 
 
 if __name__ == '__main__':
 
     map_dir = "/nvme/line_ws/val_map"
     model_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/description_040620_1846/weights_only.20.hdf5"
-    line_model_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_060620_0111/weights_only.10.hdf5"
+    line_model_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_060620_0111/weights_only.18.hdf5"
     pickle_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/description_040620_1846"
     line_num_attr = 15
     img_shape = (64, 96, 3)
@@ -345,16 +515,22 @@ if __name__ == '__main__':
     if os.path.isfile(pickle_path):
         print("Found map, loading.")
         with open(pickle_path, 'rb') as f:
-            (query_frame_embeddings, query_scene_ids, query_scene_names,
-             map_embeddings, map_scene_ids, map_scene_names) = pickle.load(f)
+            if query_mode == 'full':
+                query_floors = pickle.load(f)
+            else:
+                (query_frame_embeddings, query_scene_ids, query_scene_names,
+                 map_embeddings, map_scene_ids, map_scene_names) = pickle.load(f)
     else:
         print("Loading data.")
         if query_mode == 'only_clusters' or query_mode == 'sift':
             map_data = datagenerator_framewise.ClusterDataSequence(map_dir, batch_size, bg_classes, valid_classes,
-                                                                   shuffle=False, data_augmentation=False,
-                                                                   img_shape=img_shape, min_line_count=min_cluster_line_count,
+                                                                   shuffle=False,
+                                                                   data_augmentation=False,
+                                                                   img_shape=img_shape,
+                                                                   min_line_count=min_cluster_line_count,
                                                                    max_line_count=max_cluster_line_count,
-                                                                   load_images=True, training_mode=False)
+                                                                   load_images=True,
+                                                                   training_mode=False)
 
         if query_mode == 'only_clusters':
             physical_devices = tf.config.list_physical_devices('GPU')
@@ -366,12 +542,18 @@ if __name__ == '__main__':
             print("Computing embeddings.")
             query_frame_embeddings, query_scene_ids, query_scene_names, \
                 map_embeddings, map_scene_ids, map_scene_names = get_embeddings(model, map_data)
+            with open(pickle_path, 'wb') as f:
+                pickle.dump((query_frame_embeddings, query_scene_ids, query_scene_names,
+                             map_embeddings, map_scene_ids, map_scene_names), f)
         elif query_mode == 'sift':
             interiornet_path = "/nvme/datasets/interiornet"
 
             query_frame_embeddings, query_scene_ids, query_scene_names, \
                 map_embeddings, map_scene_ids, map_scene_names = \
-                    get_sift_embeddings(interiornet_path, map_data, num_scenes=10)
+                    get_sift_embeddings(interiornet_path, map_data)
+            with open(pickle_path, 'wb') as f:
+                pickle.dump((query_frame_embeddings, query_scene_ids, query_scene_names,
+                             map_embeddings, map_scene_ids, map_scene_names), f)
         elif query_mode == 'full':
             print("Using end to end clustering.")
 
@@ -390,29 +572,38 @@ if __name__ == '__main__':
                                                                   batch_size,
                                                                   bg_classes,
                                                                   fuse=False,
+                                                                  data_augmentation=False,
                                                                   img_shape=img_shape,
                                                                   min_line_count=min_frame_line_count,
                                                                   max_line_count=max_frame_line_count,
                                                                   max_cluster_count=max_clusters,
                                                                   training_mode=False)
 
-            query_frame_embeddings, query_scene_ids, query_scene_names, \
-                map_embeddings, map_scene_ids, map_scene_names = \
-                    get_full_embeddings(line_model, embedding_model, frame_data,
-                                        max_cluster_line_count=max_cluster_line_count)
+            query_floors = get_full_embeddings(line_model, embedding_model, frame_data,
+                                               min_cluster_line_count=min_cluster_line_count,
+                                               max_cluster_line_count=max_cluster_line_count)
+
+            with open(pickle_path, 'wb') as f:
+                pickle.dump(query_floors, f)
         else:
             print("ERROR, query_mode not valid.")
             exit()
-        with open(pickle_path, 'wb') as f:
-            pickle.dump((query_frame_embeddings, query_scene_ids, query_scene_names,
-                         map_embeddings, map_scene_ids, map_scene_names), f)
 
     print("Starting query.")
-    if query_mode == 'only_clusters' or query_mode == 'full':
+    if query_mode == 'only_clusters':
         query_on_frames(query_frame_embeddings, query_scene_ids, query_scene_names, map_embeddings, map_scene_ids,
-                        map_scene_names, k=1, min_num_clusters=1)
+                        map_scene_names, k=10, min_num_clusters=1)
+    elif query_mode == 'full':
+        query_on_floors(query_floors, k=10)
+        exit()
+        for scene in query_floors[0].scenes:
+            for frame in scene.frames:
+                img = frame.draw_frame()
+                import matplotlib.pyplot as plt
+                plt.imshow(img)
+                plt.show()
     elif query_mode == 'sift':
-        query_on_sift_frames(query_frame_embeddings, query_scene_ids, map_embeddings, map_scene_ids, k=6)
+        query_on_sift_frames(query_frame_embeddings, query_scene_ids, map_embeddings, map_scene_ids, k=1)
 
     # query_data = datagenerator_framewise.ClusterDataSequence(query_dir, batch_size, bg_classes, valid_classes,
     #                                                          shuffle=False, data_augmentation=False,
