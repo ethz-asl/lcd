@@ -160,7 +160,7 @@ def get_embeddings(model, map_data, num_scenes=None, query_frames=list(range(2))
                 for j in range(len(scene.clusters[i])):
                     if scene.clusters[i][j].frame_id == frame_id:
                         line_count, cluster_lines, cluster_label, cluster_class, cluster_images, cluster_id = \
-                            scene.get_cluster(i, map_data.max_line_count,
+                            scene.get_cluster(i, map_data.max_cluster_line_count,
                                               False, center=True, forced_choice=j)
 
                         geometries, valid_mask, images = map_data.process_cluster(line_count, cluster_lines,
@@ -206,6 +206,7 @@ def query_on_frames(query_frame_embeddings, query_scene_ids, query_scene_names,
     print("Finished computing KD tree.")
     correctly_matched_num = 0
     total_frame_num = 0
+    valid_frame_num = 0
     total_cluster_count = 0
     map_scene_ids = np.array(map_scene_ids)
 
@@ -216,33 +217,43 @@ def query_on_frames(query_frame_embeddings, query_scene_ids, query_scene_names,
             print("==========")
             for embedding in embeddings:
                 dist, ind = map_tree.query(np.array(embedding).reshape(-1, 1).T, k=k)
-                print("Distances: ")
-                print(dist)
+                # print("Distances: ")
+                # print(dist)
                 new_matches = map_scene_ids[np.array(ind[0])]
-                for match in ind[0]:
-                    print(map_scene_names[match])
-                # print(map_embeddings[ind[0][0], :])
-                # print(embedding)
-                # print(map_embeddings.shape[0])
-                print("Matches: ")
-                print(new_matches)
+                # for match in ind[0]:
+                #     print(map_scene_names[match])
+                # print("Matches: ")
+                # print(new_matches)
                 matches += new_matches.tolist()
             most_common_matches = Counter(matches).most_common(10)
-            print("Query scene id: {}".format(query_scene_id))
-            print("Query scene name: {}".format(query_scene_names[i]))
-            print("Most common matches: {}".format(most_common_matches))
+            # print("Query scene id: {}".format(query_scene_id))
+            # print("Query scene name: {}".format(query_scene_names[i]))
+            # print("Most common matches: {}".format(most_common_matches))
             if most_common_matches[0][0] == query_scene_id:
-                print("NICE, correctly matched.")
                 correctly_matched_num += 1
-            total_frame_num += 1
+                for embedding in embeddings:
+                    dist, ind = map_tree.query(np.array(embedding).reshape(-1, 1).T, k=k)
+                    print("Distances: ")
+                    print(dist)
+                    new_matches = map_scene_ids[np.array(ind[0])]
+                    print("Matches: ")
+                    print(new_matches)
+                    for match in ind[0]:
+                        print(map_scene_names[match])
+                print("NICE, correctly matched.")
+                print("Query scene name: {}".format(query_scene_names[i]))
             total_cluster_count += len(embeddings)
+            valid_frame_num += 1
+        total_frame_num += 1
 
     print("Ratio of correctly matched frames is {}".format(correctly_matched_num / total_frame_num))
-    print("Number of frames: {}".format(total_frame_num))
+    print("Number of frames queried: {}".format(total_frame_num))
+    print("Ratio of successfully queried frames: {}".format(correctly_matched_num / 397. / 2.))
     print("Average number of clusters per frame: {}".format(total_cluster_count / total_frame_num))
 
 
-def get_full_embeddings(cluster_model, descriptor_model, frame_data, query_frames=[0, 1]):
+def get_full_embeddings(cluster_model, descriptor_model, frame_data, min_cluster_line_count=4,
+                        max_cluster_line_count=50, query_frames=[0, 1]):
     scenes = frame_data.scenes
     floor_ids = get_floor_ids(scenes)
     training_plan = frame_data.training_plan
@@ -263,20 +274,48 @@ def get_full_embeddings(cluster_model, descriptor_model, frame_data, query_frame
         frame_images = data['images']
         valid_mask = data['valid_input_mask']
 
-        cluster_output = cluster_model.predict_on_batch(data)[0, valid_mask, :]
+        cluster_output = cluster_model.predict_on_batch(data)
+        cluster_output = cluster_output[0, valid_mask[0, :], :]
         cluster_output = np.argmax(cluster_output, axis=-1)
         unique_output = np.unique(cluster_output)
         unique_output = unique_output[np.where(unique_output != 0)]
-        cluster_count = 0
+        cluster_embeddings = []
         for label_idx in unique_output:
             assert(label_idx != 0)
-            line_indices = np.where(cluster_output == label_idx)
+            line_indices = np.where(cluster_output == label_idx)[0][:max_cluster_line_count]
+            cluster_line_count = len(line_indices)
             # Min cluster line count is 4.
-            if len(line_indices[0]) >= 4:
-                cluster_count += 1
+            if cluster_line_count >= 4:
+                cluster_valid_mask = np.zeros((1, max_cluster_line_count), dtype=bool)
+                cluster_geometries = np.zeros((1, max_cluster_line_count, frame_geometries.shape[2]))
+                cluster_images = np.zeros((1, max_cluster_line_count,
+                                           frame_images.shape[2], frame_images.shape[3], frame_images.shape[4]))
+                cluster_valid_mask[:, :cluster_line_count] = True
+                cluster_geometries[:, :cluster_line_count, :] = \
+                    frame_geometries[:, line_indices[:cluster_line_count], :]
+                cluster_images[:, :cluster_line_count, :, :, :] = \
+                    frame_images[:, line_indices[:cluster_line_count], :, :, :]
 
-        print("Valid number of clusters is: ".format(cluster_count))
-        exit()
+                cluster_data = {
+                    'lines': cluster_geometries,
+                    'valid_input_mask': cluster_valid_mask,
+                    'images': cluster_images,
+                    'ones_model': np.expand_dims(np.ones((1, 1)), axis=0)
+                }
+                cluster_embedding = descriptor_model.predict_on_batch(cluster_data)
+                cluster_embeddings.append(np.array(cluster_embedding)[0, :])
+
+        print("Scene {}, frame {}, number of clusters: {}".format(scene_id, frame_id, len(cluster_embeddings)))
+        if len(cluster_embeddings) > 0:
+            if frame_id in query_frames:
+                query_frame_embeddings.append(cluster_embeddings)
+                query_scene_ids.append(floor_id)
+                query_scene_names.append(scenes[scene_id].name + "_frame_{}".format(frame_id))
+            else:
+                map_embeddings += cluster_embeddings
+                map_scene_ids += [floor_id for l in range(len(cluster_embeddings))]
+                map_scene_names += [scenes[scene_id].name + "_frame_{}".format(frame_id)
+                                    for l in range(len(cluster_embeddings))]
 
     return query_frame_embeddings, query_scene_ids, query_scene_names, map_embeddings, map_scene_ids, map_scene_names
 
@@ -289,8 +328,8 @@ if __name__ == '__main__':
     pickle_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/description_040620_1846"
     line_num_attr = 15
     img_shape = (64, 96, 3)
-    max_line_count = 50
-    min_line_count = 4
+    max_cluster_line_count = 70
+    min_cluster_line_count = 4
     batch_size = 1
     margin = 0.3
     embedding_dim = 256
@@ -313,15 +352,15 @@ if __name__ == '__main__':
         if query_mode == 'only_clusters' or query_mode == 'sift':
             map_data = datagenerator_framewise.ClusterDataSequence(map_dir, batch_size, bg_classes, valid_classes,
                                                                    shuffle=False, data_augmentation=False,
-                                                                   img_shape=img_shape, min_line_count=min_line_count,
-                                                                   max_line_count=max_line_count,
+                                                                   img_shape=img_shape, min_line_count=min_cluster_line_count,
+                                                                   max_line_count=max_cluster_line_count,
                                                                    load_images=True, training_mode=False)
 
         if query_mode == 'only_clusters':
             physical_devices = tf.config.list_physical_devices('GPU')
             tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
-            model = model.load_cluster_embedding_model(model_path, line_num_attr, max_line_count,
+            model = model.load_cluster_embedding_model(model_path, line_num_attr, max_cluster_line_count,
                                                        embedding_dim, img_shape, margin)
 
             print("Computing embeddings.")
@@ -344,7 +383,7 @@ if __name__ == '__main__':
             tf.config.experimental.set_memory_growth(physical_devices[0], True)
             line_model = model.load_line_net_model(line_model_path, line_num_attr, max_frame_line_count,
                                                    max_clusters, img_shape)
-            embedding_model = model.load_cluster_embedding_model(model_path, line_num_attr, max_line_count,
+            embedding_model = model.load_cluster_embedding_model(model_path, line_num_attr, max_cluster_line_count,
                                                                  embedding_dim, img_shape, margin)
 
             frame_data = datagenerator_framewise.LineDataSequence(map_dir,
@@ -359,13 +398,17 @@ if __name__ == '__main__':
 
             query_frame_embeddings, query_scene_ids, query_scene_names, \
                 map_embeddings, map_scene_ids, map_scene_names = \
-                    get_full_embeddings(line_model, embedding_model, frame_data)
+                    get_full_embeddings(line_model, embedding_model, frame_data,
+                                        max_cluster_line_count=max_cluster_line_count)
+        else:
+            print("ERROR, query_mode not valid.")
+            exit()
         with open(pickle_path, 'wb') as f:
             pickle.dump((query_frame_embeddings, query_scene_ids, query_scene_names,
                          map_embeddings, map_scene_ids, map_scene_names), f)
 
     print("Starting query.")
-    if query_mode == 'only_clusters':
+    if query_mode == 'only_clusters' or query_mode == 'full':
         query_on_frames(query_frame_embeddings, query_scene_ids, query_scene_names, map_embeddings, map_scene_ids,
                         map_scene_names, k=1, min_num_clusters=1)
     elif query_mode == 'sift':

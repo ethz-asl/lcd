@@ -56,7 +56,12 @@ class LearningRateCallback(tf_keras.callbacks.Callback):
         super().__init__()
         self.decay = decay
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_begin(self, epoch, logs=None):
+        for key in sorted(self.decay.keys()):
+            if epoch >= key:
+                print("Setting learning rate to {}.".format(self.decay[key]))
+                self.model.optimizer.learning_rate = self.decay[key]
+
         if epoch + 1 in self.decay:
             print("Setting learning rate to {}.".format(self.decay[epoch + 1]))
             self.model.optimizer.learning_rate = self.decay[epoch + 1]
@@ -191,9 +196,9 @@ def train():
     max_clusters = 15
     # TODO: Check if 0 is background or naw.
     bg_classes = [0, 1, 2, 20, 22]
-    load_past = False
-    past_epoch = 1
-    past_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_060620_1704"
+    load_past = True
+    past_epoch = 10
+    past_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_060620_0111"
     image_weight_path = "/home/felix/line_ws/src/line_tools/python/line_net/weights/image_weights.hdf5"
 
     pretrain_images = False
