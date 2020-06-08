@@ -15,6 +15,24 @@ from collections import Counter
 
 
 COLORS = (visualize_lines.get_colors() * 255).astype(int)
+COLORS = np.vstack([np.array([
+    [255, 0, 0],
+    [128, 64, 64],
+    [255, 128, 0],
+    [255, 255, 0],
+    [255, 128, 0],
+    [0, 128, 0],
+    [0, 255, 64],
+    [0, 255, 255],
+    [0, 0, 255],
+    [128, 128, 255],
+    [128, 128, 0],
+    [255, 0, 255],
+    [64, 128, 128],
+    [128, 128, 64],
+    [128, 64, 128],
+    [128, 0, 255],
+]), COLORS])
 INTERIORNET_PATH = "/nvme/datasets/interiornet"
 
 
@@ -29,11 +47,12 @@ class QueryScene:
 
 
 class QueryFrame:
-    def __init__(self, geometry, labels, path, clusters):
+    def __init__(self, geometry, labels, path, clusters, gt_clusters):
         self.geometry = geometry
         self.labels = labels
         self.path = path
         self.clusters = clusters
+        self.gt_clusters = gt_clusters
 
     def draw_frame(self, cluster_id=None):
         scene_name = self.path.split('/')[-2]
@@ -46,18 +65,19 @@ class QueryFrame:
         for i, cluster in enumerate(self.clusters):
             if cluster_id is not None and i != cluster_id:
                 continue
-            color = (int(COLORS[self.labels[i], 0]),
-                     int(COLORS[self.labels[i], 1]),
-                     int(COLORS[self.labels[i], 2]), 255)
+            color = (int(COLORS[cluster.label, 0]),
+                     int(COLORS[cluster.label, 1]),
+                     int(COLORS[cluster.label, 2]), 255)
             image = draw_cluster(image, cluster.geometry, color)
 
         return image
 
 
 class QueryCluster:
-    def __init__(self, geometry, embedding):
+    def __init__(self, geometry, embedding, label):
         self.geometry = geometry
         self.embedding = embedding
+        self.label = label
 
 
 def unnormalize(line_geometries):
@@ -126,7 +146,6 @@ def get_floor_ids(scenes):
 
 def get_sift_vocabulary(interiornet_path, map_data, vocabulary_dim=768, num_scenes=None):
     scene_paths = [os.path.join(interiornet_path, scene.name) for scene in map_data.scenes]
-    floor_ids = map_data.floor_ids
 
     sift = cv2.xfeatures2d.SIFT_create()
 
@@ -370,8 +389,15 @@ def query_on_frames(query_frame_embeddings, query_scene_ids, query_scene_names,
 def query_on_floors(query_floors, k=10):
     num_floors = 100
 
-    embeddings = []
+    sift_data = []
+    gt_data = []
     data = []
+
+    # Get fully predicted, gt clustered and sift embeddings.
+
+    embeddings = []
+    gt_embeddings = []
+    sift_embeddings = []
 
     for floor in query_floors[:num_floors]:
         for scene in floor.scenes:
@@ -379,17 +405,41 @@ def query_on_floors(query_floors, k=10):
                 for cluster in frame.clusters:
                     embeddings.append(cluster.embedding)
                     data.append((floor, scene, frame, cluster))
+                for gt_cluster in frame.gt_clusters:
+                    gt_embeddings.append(gt_cluster.embedding)
+                    gt_data.append((floor, scene, frame, gt_cluster))
+                sift_embeddings.append(frame.sift_embedding)
+                sift_data.append((floor, scene, frame))
 
     embeddings = np.vstack(embeddings)
-    # Generating map tree.
-    print("Generating map tree.")
+    gt_embeddings = np.vstack(gt_embeddings)
+    sift_embeddings = np.vstack(sift_embeddings)
+    # Generating map trees.
+    print("Generating map trees.")
     map_tree = sn.KDTree(embeddings, leaf_size=10)
+    gt_tree = sn.KDTree(gt_embeddings, leaf_size=10)
+    sift_tree = sn.KDTree(sift_embeddings, leaf_size=10)
 
-    matched_num = 0
+    print("Starting query.")
+
+    matched_num_clusters = 0
     tot_num_clusters = 0
+    matched_num_frames = 0
+    empty_num_frames = 0
+    tot_num_frames = 0
+
+    tot_num_gt_clusters = 0
+    matched_num_gt_clusters = 0
+    matched_num_gt_frames = 0
+
+    num_sift_frames = 0
+    matched_num_sift_frames = 0
     for floor in query_floors[:num_floors]:
         for scene in floor.scenes:
             for frame in scene.frames:
+                # Query fully predicted clusters.
+
+                frame_matches = []
                 for i, cluster in enumerate(frame.clusters):
                     dist, nearest = map_tree.query(cluster.embedding.reshape(-1, 1).T, k=k+1)
                     # Warning, the nearest one is of course the very same cluster.
@@ -400,22 +450,86 @@ def query_on_floors(query_floors, k=10):
                         if data_point[0] is floor:
                             matched = True
                         cluster_matches.append(query_floors.index(data_point[0]))
-                    # if nearest_data[0] is floor:
                     if matched:
-                        # print("Match.")
-                        matched_num += 1
-                    else:
-                        ...
-                        # print("Mismatch.")
+                        matched_num_clusters += 1
+
+                    frame_matches += cluster_matches
                     tot_num_clusters += 1
                     # image_1 = frame.draw_frame(i)
-                    # image_2 = nearest_data[2].draw_frame(nearest_data[2].clusters.index(nearest_data[3]))
+                    # image_2 = nearest_data[0][2].draw_frame(nearest_data[0][2].clusters.index(nearest_data[0][3]))
                     # plt.imshow(np.concatenate([image_1, image_2], axis=1))
                     # plt.show()
 
-    print("Correctly matched clusters: {}".format(matched_num))
-    print("Total number of clusters: {}".format(tot_num_clusters))
-    print("Ratio of correctly matched clusters: {}".format(matched_num / tot_num_clusters))
+                if len(frame_matches) > 0:
+                    most_common_matches = Counter(frame_matches).most_common(1)
+                    if query_floors[most_common_matches[0][0]] is floor:
+                        # print("Match.")
+                        matched_num_frames += 1
+                    else:
+                        ...
+                        # print("...")
+                else:
+                    print("Empty frame.")
+                    empty_num_frames += 1
+
+                # Query gt clusters.
+
+                gt_frame_matches = []
+                for i, gt_cluster in enumerate(frame.gt_clusters):
+                    dist, nearest = gt_tree.query(gt_cluster.embedding.reshape(-1, 1).T, k=k + 1)
+                    # Warning, the nearest one is of course the very same cluster.
+                    nearest_data = [gt_data[nearest[0][j]] for j in range(1, k + 1)]
+                    matched = False
+                    cluster_matches = []
+                    for data_point in nearest_data:
+                        if data_point[0] is floor:
+                            matched = True
+                        cluster_matches.append(query_floors.index(data_point[0]))
+                    if matched:
+                        matched_num_gt_clusters += 1
+
+                    gt_frame_matches += cluster_matches
+                    tot_num_gt_clusters += 1
+
+                if len(gt_frame_matches) > 0:
+                    most_common_matches = Counter(gt_frame_matches).most_common(1)
+                    if query_floors[most_common_matches[0][0]] is floor:
+                        matched_num_gt_frames += 1
+
+                # Query sift embeddings.
+
+                if frame.sift_embedding is not None:
+                    dist, ind = sift_tree.query(frame.sift_embedding.reshape(-1, 1).T, k=2)
+                    if sift_data[ind[0][1]][0] is floor:
+                        matched_num_sift_frames += 1
+                    num_sift_frames += 1
+
+                tot_num_frames += 1
+
+    print("==================================================")
+    print("Fully predicted:")
+    print(" ")
+    print("Correctly matched clusters: {}/{}".format(matched_num_clusters, tot_num_clusters))
+    print("Ratio of correctly matched clusters: {}".format(matched_num_clusters / tot_num_clusters))
+    print(" ")
+    print("Correctly matched frames: {}/{}".format(matched_num_frames, tot_num_frames))
+    # print("Number of empty frames: {}".format(empty_num_frames))
+    print("Ratio of correctly matched frames: {}".format(matched_num_frames / tot_num_frames))
+    print("==================================================")
+    print("Predictions with ground truth clusters:")
+    print(" ")
+    print("Correctly matched clusters: {}/{}".format(matched_num_gt_clusters, tot_num_gt_clusters))
+    print("Ratio of correctly matched clusters: {}".format(matched_num_gt_clusters / tot_num_gt_clusters))
+    print(" ")
+    print("Correctly matched frames: {}/{}".format(matched_num_gt_frames, tot_num_frames))
+    print("Ratio of correctly matched frames: {}".format(matched_num_gt_frames / tot_num_frames))
+    print("==================================================")
+    print("Predictions sift image similarity:")
+    print(" ")
+    print("Correctly matched frames: {}/{}".format(matched_num_sift_frames, tot_num_frames))
+    print("Ratio of correctly matched frames: {}".format(matched_num_sift_frames / tot_num_frames))
+    print("Number of sift frames: {}".format(num_sift_frames))
+    print("==================================================")
 
 
 def get_full_embeddings(cluster_model, descriptor_model, frame_data,
@@ -424,6 +538,10 @@ def get_full_embeddings(cluster_model, descriptor_model, frame_data,
     scenes = frame_data.scenes
     floor_ids = get_floor_ids(scenes)
     training_plan = frame_data.training_plan
+
+    vocabulary_dim = 768
+    kmeans = get_sift_vocabulary(INTERIORNET_PATH, frame_data, 768)
+    sift = cv2.xfeatures2d.SIFT_create()
 
     query_floors = [QueryFloor([]) for i in range(np.unique(floor_ids).shape[0])]
     query_scenes = [QueryScene([]) for i in range(len(scenes))]
@@ -434,16 +552,19 @@ def get_full_embeddings(cluster_model, descriptor_model, frame_data,
         frame_id = element[1]
         frame_path = scenes[scene_id].frame_paths[frame_id]
 
+        # Get predicted embeddings using full prediction.
+
         data, _ = frame_data.__getitem__(idx)
         frame_geometries = data['lines']
         frame_images = data['images']
         valid_mask = data['valid_input_mask']
+        gt_labels = data['labels']
 
         cluster_output = cluster_model.predict_on_batch(data)
         cluster_output = cluster_output[0, valid_mask[0, :], :]
         cluster_output = np.argmax(cluster_output, axis=-1)
 
-        query_frame = QueryFrame(frame_geometries[0, valid_mask[0, :], :], cluster_output, frame_path, [])
+        query_frame = QueryFrame(frame_geometries[0, valid_mask[0, :], :], cluster_output, frame_path, [], [])
 
         unique_output = np.unique(cluster_output)
         # unique_output = unique_output[np.where(unique_output != 0)]
@@ -477,15 +598,67 @@ def get_full_embeddings(cluster_model, descriptor_model, frame_data,
                 cluster_embedding = np.array(cluster_embedding)[0, :]
                 cluster_embeddings.append(cluster_embedding)
 
-                query_frame.clusters.append(QueryCluster(cluster_lines_render, cluster_embedding))
+                query_frame.clusters.append(QueryCluster(cluster_lines_render, cluster_embedding, label_idx))
 
-        # image = query_frame.draw_frame()
+        # Get embeddings from ground truth clustering.
+
+        gt_labels = gt_labels[0, valid_mask[0, :]]
+        unique_gt = np.unique(gt_labels)
+        gt_embeddings = []
+        for j, label_idx in enumerate(unique_gt):
+            line_indices = np.where(gt_labels == label_idx)[0][:max_cluster_line_count]
+            cluster_line_count = len(line_indices)
+            # Min cluster line count is 4.
+            if cluster_line_count >= min_cluster_line_count:
+                cluster_lines = frame_geometries[0, line_indices[:cluster_line_count], :]
+                cluster_lines_render = unnormalize(cluster_lines.copy())
+                cluster_lines = datagenerator_framewise.set_mean_zero(cluster_lines)
+
+                cluster_valid_mask = np.zeros((1, max_cluster_line_count), dtype=bool)
+                cluster_geometries = np.zeros((1, max_cluster_line_count, frame_geometries.shape[2]))
+                cluster_images = np.zeros((1, max_cluster_line_count,
+                                           frame_images.shape[2], frame_images.shape[3], frame_images.shape[4]))
+                cluster_valid_mask[:, :cluster_line_count] = True
+                cluster_geometries[0:, :cluster_line_count, :] = cluster_lines
+                cluster_images[:, :cluster_line_count, :, :, :] = \
+                    frame_images[:, line_indices[:cluster_line_count], :, :, :]
+
+                cluster_data = {
+                    'lines': cluster_geometries,
+                    'valid_input_mask': cluster_valid_mask,
+                    'images': cluster_images,
+                    'ones_model': np.expand_dims(np.ones((1, 1)), axis=0)
+                }
+                gt_embedding = descriptor_model.predict_on_batch(cluster_data)
+                gt_embedding = np.array(gt_embedding)[0, :]
+                gt_embeddings.append(gt_embedding)
+
+                query_frame.gt_clusters.append(QueryCluster(cluster_lines_render, gt_embedding, j))
+
+        # Get SIFT embeddings.
+
+        scene_name = frame_path.split('/')[-2]
+        frame_id = frame_path.split('_')[-1]
+        image_path = os.path.join(INTERIORNET_PATH, scene_name, 'cam0/data', frame_id + '.png')
+        frame_im = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+        keypoints, descriptors = sift.detectAndCompute(frame_im, None)
+        if descriptors is not None:
+            indices = kmeans.predict(descriptors)
+            sift_embedding = np.histogram(indices, np.arange(vocabulary_dim))[0].astype(float)
+            query_frame.sift_embedding = sift_embedding
+        else:
+            query_frame.sift_embedding = None
+
+        # Add everything to the list.
 
         query_scenes[scene_id].frames.append(query_frame)
         if query_scenes[scene_id] not in query_floors[floor_id].scenes:
             query_floors[floor_id].scenes.append(query_scenes[scene_id])
 
-        print("Scene {}, frame {}, number of clusters: {}".format(scene_id, frame_id, len(cluster_embeddings)))
+        print("Scene {}, frame {}, number of clusters: {}, gt clusters: {}".format(scene_id,
+                                                                                   frame_id,
+                                                                                   len(cluster_embeddings),
+                                                                                   len(gt_embeddings)))
 
     return query_floors
 
@@ -558,7 +731,7 @@ if __name__ == '__main__':
             print("Using end to end clustering.")
 
             max_frame_line_count = 220
-            min_frame_line_count = 30
+            min_frame_line_count = 20
             max_clusters = 15
 
             physical_devices = tf.config.list_physical_devices('GPU')
@@ -594,7 +767,7 @@ if __name__ == '__main__':
         query_on_frames(query_frame_embeddings, query_scene_ids, query_scene_names, map_embeddings, map_scene_ids,
                         map_scene_names, k=10, min_num_clusters=1)
     elif query_mode == 'full':
-        query_on_floors(query_floors, k=10)
+        query_on_floors(query_floors, k=8)
         exit()
         for scene in query_floors[0].scenes:
             for frame in scene.frames:
