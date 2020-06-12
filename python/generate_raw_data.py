@@ -12,12 +12,23 @@ import split_dataset_framewise
 
 
 def generate_hd7():
+    light_type = 'original'
+
     path_to_data = "/nvme/datasets/interiornet/*"
+
     line_path_master = "/nvme/line_ws/line_files"
     vci_path_master = "/nvme/line_ws/virtual_camera_images"
     train_path_master = "/nvme/line_ws/all_data"
 
-    light_type = 'original'
+    if light_type == 'random':
+        line_path_master = "/nvme/line_ws/line_files_random"
+        vci_path_master = "/nvme/line_ws/virtual_camera_images_random"
+        train_path_master = "/nvme/line_ws/all_data_random"
+
+    path_to_data = "/nvme/datasets/diml_depth/HD7/*"
+    line_path_master = "/nvme/line_ws/line_files_diml"
+    vci_path_master = "/nvme/line_ws/virtual_camera_images_diml"
+    train_path_master = "/nvme/line_ws/all_data_diml"
 
     rospy.init_node('interiornet_node', anonymous=True)
 
@@ -41,6 +52,7 @@ def generate_hd7():
 
         file_count = len([name for name in os.listdir(line_path)
                          if os.path.isfile(os.path.join(line_path, name))])
+        num_frames = len([name for name in os.listdir(os.path.join(dir_path, "cam0", "data"))])
         if file_count < 60:
             interiornet_to_rosbag.convert(
                 scene_path=dir_path,
@@ -48,7 +60,7 @@ def generate_hd7():
                 light_type=light_type,
                 traj=0,
                 frame_step=1,
-                to_frame=20000,
+                to_frame=num_frames,
                 output_bag='none',
                 publishers=publishers,
                 publish=True)

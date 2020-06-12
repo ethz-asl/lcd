@@ -92,7 +92,10 @@ class SaveCallback(tf_keras.callbacks.Callback):
         self.cluster = cluster
 
     def on_epoch_end(self, epoch, logs=None):
-        model.save_line_net_model(self.model, self.path.format(epoch + 1))
+        if self.cluster:
+            model.save_cluster_model(self.model, self.path.format(epoch + 1))
+        else:
+            model.save_line_net_model(self.model, self.path.format(epoch + 1))
 
 
 def train_cluster():
@@ -108,10 +111,10 @@ def train_cluster():
     img_shape = (64, 96, 3)
     min_line_count = 4
     max_line_count = 50
-    batch_size = 3
+    batch_size = 5
     num_epochs = 40
     margin = 0.6
-    embedding_dim = 256
+    embedding_dim = 128
     # max_clusters = 15
     bg_classes = [0, 1, 2, 20, 22]
     # valid_classes = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 25, 30]
@@ -119,7 +122,7 @@ def train_cluster():
     num_classes = 1 + len(valid_classes)
     image_weight_path = "/home/felix/line_ws/src/line_tools/python/line_net/weights/image_weights.hdf5"
 
-    load_past = True
+    load_past = False
     past_epoch = 12
     log_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/description_040620_1846"
 
@@ -167,7 +170,7 @@ def train_cluster():
     cluster_model.fit(x=train_data_generator,
                       verbose=1,
                       max_queue_size=16,
-                      workers=1,
+                      workers=4,
                       epochs=num_epochs,
                       # steps_per_epoch=10,
                       # validation_steps=10,
@@ -194,9 +197,9 @@ def train():
     num_epochs = 40
     # Do not forget to delete pickle files when this config is changed.
     max_clusters = 15
-    # TODO: Check if 0 is background or naw.
+    # Careful: in InteriorNet, 0 is not background, but some random class. In theory, class 0 should not exist.
     bg_classes = [0, 1, 2, 20, 22]
-    load_past = True
+    load_past = False
     past_epoch = 10
     past_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_060620_0111"
     image_weight_path = "/home/felix/line_ws/src/line_tools/python/line_net/weights/image_weights.hdf5"

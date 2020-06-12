@@ -20,11 +20,12 @@ def infer():
     img_shape = (64, 96, 3)
     max_line_count = 300
     bg_classes = [0, 1, 2, 20, 22]
+    max_clusters = 15
 
-    log_dir = "/home/felix/line_ws/src/line_tools/python/line_net/logs/180520_2229"
-    epoch = 25
+    log_dir = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_060620_0111"
+    epoch = 18
 
-    model, loss, opt, metrics = line_net_model_4(line_num_attr, max_line_count, img_shape)
+    model, loss, opt, metrics = line_net_model_4(line_num_attr, max_line_count, max_clusters, img_shape)
 
     # transfer_layers = ["block3_conv1", "block3_conv2", "block3_conv3"]
     # for layer_name in transfer_layers:
@@ -61,6 +62,7 @@ def infer_on_test_set(model, test_path, log_dir, epoch, bg_classes, img_shape, m
                                            min_line_count=0,
                                            max_line_count=max_line_count,
                                            data_augmentation=False,
+                                           training_mode=False,
                                            max_cluster_count=max_clusters)
     for i in range(test_data_generator.frame_count):
         data, gt = test_data_generator.__getitem__(i)

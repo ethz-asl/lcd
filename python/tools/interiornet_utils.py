@@ -50,6 +50,7 @@ class InteriorNetCameraModel:
 
         # Find z coordinate of each pixel given the depth in ray length.
         z = euclidean_ray_length_to_z_coordinate(depth_image, self)
+        # z = depth_image
         # Convert the z coordinate from mm to m.
         z = z / 1000.0
 
@@ -70,6 +71,7 @@ class InteriorNetCameraModel:
         return pointcloud
 
 
+# fx was 600, w was 640, h was 480
 def get_camera_model(fx=600, fy=600, pixel_width=640, pixel_height=480):
     """ Camera model for SceneNetRGBD dataset. Adjusted from
         https://github.com/ethz-asl/scenenet_ros_tools/blob/master/nodes/scenenet_to_rosbag.py

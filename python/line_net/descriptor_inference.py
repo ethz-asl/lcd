@@ -1,6 +1,7 @@
 import numpy as np
 import sklearn.neighbors as sn
 import sklearn.cluster as sc
+import sklearn.metrics as sm
 import datagenerator_framewise
 import visualize_lines
 import model
@@ -8,11 +9,15 @@ import pickle
 import os
 import cv2
 import matplotlib.pyplot as plt
+import inference_classical
 
 import tensorflow as tf
 
 from collections import Counter
 
+import sys
+sys.path.append("../tools/")
+import interiornet_utils
 
 COLORS = (visualize_lines.get_colors() * 255).astype(int)
 COLORS = np.vstack([np.array([
@@ -20,7 +25,7 @@ COLORS = np.vstack([np.array([
     [128, 64, 64],
     [255, 128, 0],
     [255, 255, 0],
-    [255, 128, 0],
+    [220, 255, 0],
     [0, 128, 0],
     [0, 255, 64],
     [0, 255, 255],
@@ -33,7 +38,6 @@ COLORS = np.vstack([np.array([
     [128, 64, 128],
     [128, 0, 255],
 ]), COLORS])
-INTERIORNET_PATH = "/nvme/datasets/interiornet"
 
 
 class QueryFloor:
@@ -54,20 +58,26 @@ class QueryFrame:
         self.clusters = clusters
         self.gt_clusters = gt_clusters
 
-    def draw_frame(self, cluster_id=None):
+    def draw_frame(self, cluster_id=None, predicted=True):
         scene_name = self.path.split('/')[-2]
         frame_id = self.path.split('_')[-1]
         path = os.path.join(INTERIORNET_PATH, scene_name, 'cam0/data', frame_id + '.png')
         # print("Loading image from path " + path)
 
         image = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+        image[:, :, :3] = (image[:, :, :3] * 0.6).astype(np.uint8)
 
-        for i, cluster in enumerate(self.clusters):
+        if predicted:
+            clusters = self.clusters
+        else:
+            clusters = self.gt_clusters
+        for i, cluster in enumerate(clusters):
             if cluster_id is not None and i != cluster_id:
                 continue
-            color = (int(COLORS[cluster.label, 0]),
-                     int(COLORS[cluster.label, 1]),
-                     int(COLORS[cluster.label, 2]), 255)
+            color_idx = cluster.label
+            color = (int(COLORS[color_idx, 2]),
+                     int(COLORS[color_idx, 1]),
+                     int(COLORS[color_idx, 0]), 255)
             image = draw_cluster(image, cluster.geometry, color)
 
         return image
@@ -89,25 +99,8 @@ def unnormalize(line_geometries):
     return line_geometries
 
 
-def camera_intrinsic_transform(fx=600,
-                               fy=600,
-                               pixel_width=640,
-                               pixel_height=480):
-    """ Gets camera intrinsics matrix for InteriorNet dataset.
-    """
-    camera_intrinsics = np.zeros((4, 4))
-    camera_intrinsics[2, 2] = 1.
-    camera_intrinsics[0, 0] = fx
-    camera_intrinsics[0, 2] = pixel_width / 2.0
-    camera_intrinsics[1, 1] = fy
-    camera_intrinsics[1, 2] = pixel_height / 2.0
-    camera_intrinsics[3, 3] = 1.
-
-    return camera_intrinsics
-
-
 def draw_cluster(image, line_geometries, color):
-    t_cam = camera_intrinsic_transform()
+    t_cam = interiornet_utils.camera_intrinsic_transform()
     start_points = line_geometries[:, :3]
     start_points = np.vstack([start_points.T, np.ones((start_points.shape[0],))])
     start_points = t_cam.dot(start_points).T
@@ -122,7 +115,7 @@ def draw_cluster(image, line_geometries, color):
         out_image = cv2.line(out_image,
                              (start_points[i, 0], start_points[i, 1]),
                              (end_points[i, 0], end_points[i, 1]),
-                             color, 3)
+                             color, 2)
 
     return out_image
 
@@ -420,6 +413,10 @@ def query_on_floors(query_floors, k=10):
     gt_tree = sn.KDTree(gt_embeddings, leaf_size=10)
     sift_tree = sn.KDTree(sift_embeddings, leaf_size=10)
 
+    rendered_pred_matches = 0
+    rendered_clusterings = 0
+    max_render = 100
+
     print("Starting query.")
 
     matched_num_clusters = 0
@@ -437,6 +434,7 @@ def query_on_floors(query_floors, k=10):
     for floor in query_floors[:num_floors]:
         for scene in floor.scenes:
             for frame in scene.frames:
+
                 # Query fully predicted clusters.
 
                 frame_matches = []
@@ -455,22 +453,52 @@ def query_on_floors(query_floors, k=10):
 
                     frame_matches += cluster_matches
                     tot_num_clusters += 1
-                    # image_1 = frame.draw_frame(i)
-                    # image_2 = nearest_data[0][2].draw_frame(nearest_data[0][2].clusters.index(nearest_data[0][3]))
-                    # plt.imshow(np.concatenate([image_1, image_2], axis=1))
-                    # plt.show()
 
+                    if rendered_clusterings < max_render and RENDER:
+                        image_1 = frame.draw_frame(i)
+                        image_2 = nearest_data[0][2].draw_frame(nearest_data[0][2].clusters.index(nearest_data[0][3]))
+                        match_img = np.concatenate([image_1, image_2], axis=1)
+                        cv2.imwrite("visualization/matches/{}_{}.png".format(rendered_clusterings,
+                                                                             rendered_pred_matches),
+                                    match_img,
+                                    [cv2.IMWRITE_PNG_COMPRESSION, 9])
+
+                        for j in range(1, k):
+                            next_img = nearest_data[j][2].draw_frame(
+                                nearest_data[j][2].clusters.index(nearest_data[j][3]))
+                            match_img = np.concatenate([match_img, next_img], axis=1)
+                        cv2.imwrite("visualization/matches_top10/{}_{}_{}.png".format(rendered_clusterings,
+                                                                                      rendered_pred_matches,
+                                                                                      matched),
+                                    match_img,
+                                    [cv2.IMWRITE_PNG_COMPRESSION, 5])
+
+                        rendered_pred_matches += 1
+
+                matched = False
                 if len(frame_matches) > 0:
                     most_common_matches = Counter(frame_matches).most_common(1)
                     if query_floors[most_common_matches[0][0]] is floor:
                         # print("Match.")
                         matched_num_frames += 1
+                        matched = True
                     else:
                         ...
                         # print("...")
                 else:
                     print("Empty frame.")
                     empty_num_frames += 1
+
+                # Render frame:
+                if rendered_clusterings < max_render and RENDER:
+                    pred_img = frame.draw_frame()
+                    gt_img = frame.draw_frame(predicted=False)
+                    cv2.imwrite("visualization/pred_clusters/{}_{}.png".format(rendered_clusterings, matched), pred_img,
+                                [cv2.IMWRITE_PNG_COMPRESSION, 9])
+                    cv2.imwrite("visualization/gt_clusters/{}_{}.png".format(rendered_clusterings,
+                                                                             frame.path.split('/')[-1]), gt_img,
+                                [cv2.IMWRITE_PNG_COMPRESSION, 9])
+                    rendered_clusterings += 1
 
                 # Query gt clusters.
 
@@ -546,6 +574,9 @@ def get_full_embeddings(cluster_model, descriptor_model, frame_data,
     query_floors = [QueryFloor([]) for i in range(np.unique(floor_ids).shape[0])]
     query_scenes = [QueryScene([]) for i in range(len(scenes))]
 
+    total_nmi_nn = 0.
+    total_nmi_agglo = 0.
+
     for idx, element in enumerate(training_plan):
         scene_id = element[0]
         floor_id = floor_ids[scene_id]
@@ -564,9 +595,19 @@ def get_full_embeddings(cluster_model, descriptor_model, frame_data,
         cluster_output = cluster_output[0, valid_mask[0, :], :]
         cluster_output = np.argmax(cluster_output, axis=-1)
 
+        if INFER_NMI:
+            nmi_nn = sm.normalized_mutual_info_score(gt_labels[0, valid_mask[0, :]], cluster_output)
+            total_nmi_nn += nmi_nn
+            _, nmi_agglo = inference_classical.infer_on_frame(data)
+            total_nmi_agglo += nmi_agglo
+        else:
+            nmi_nn = 0.
+            nmi_agglo = 0.
+
         query_frame = QueryFrame(frame_geometries[0, valid_mask[0, :], :], cluster_output, frame_path, [], [])
 
         unique_output = np.unique(cluster_output)
+        unique_output.sort()
         # unique_output = unique_output[np.where(unique_output != 0)]
         cluster_embeddings = []
         for label_idx in unique_output:
@@ -604,6 +645,7 @@ def get_full_embeddings(cluster_model, descriptor_model, frame_data,
 
         gt_labels = gt_labels[0, valid_mask[0, :]]
         unique_gt = np.unique(gt_labels)
+        unique_gt.sort()
         gt_embeddings = []
         for j, label_idx in enumerate(unique_gt):
             line_indices = np.where(gt_labels == label_idx)[0][:max_cluster_line_count]
@@ -655,29 +697,45 @@ def get_full_embeddings(cluster_model, descriptor_model, frame_data,
         if query_scenes[scene_id] not in query_floors[floor_id].scenes:
             query_floors[floor_id].scenes.append(query_scenes[scene_id])
 
-        print("Scene {}, frame {}, number of clusters: {}, gt clusters: {}".format(scene_id,
+        print("Scene {}, frame {}, number of clusters: {}, gt clusters: {}, nmi nn: {}, nmi agglo: {}".format(scene_id,
                                                                                    frame_id,
                                                                                    len(cluster_embeddings),
-                                                                                   len(gt_embeddings)))
+                                                                                   len(gt_embeddings),
+                                                                                   nmi_nn, nmi_agglo))
+
+    with open("results/nmis.txt", 'w') as f:
+        f.write("NMI of neural network: {} \n".format(total_nmi_nn / len(training_plan)))
+        f.write("NMI of agglomerative clustering: {} \n".format(total_nmi_agglo / len(training_plan)))
 
     return query_floors
 
 
 if __name__ == '__main__':
-
-    map_dir = "/nvme/line_ws/val_map"
-    model_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/description_040620_1846/weights_only.20.hdf5"
+    # embedding_model_path = \
+    #     "/home/felix/line_ws/src/line_tools/python/line_net/logs/description_040620_1846/weights_only.20.hdf5"
+    embedding_model_path = \
+        "/home/felix/line_ws/src/line_tools/python/line_net/logs/description_100620_1644/weights_only.27.hdf5"
     line_model_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_060620_0111/weights_only.18.hdf5"
-    pickle_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/description_040620_1846"
+    pickle_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/description_100620_1644"
+    map_dir = "/nvme/line_ws/val_map"
+    # pickle_path = "/nvme/line_ws/all_data_diml"
+    # map_dir = "/nvme/line_ws/all_data_diml"
+    INTERIORNET_PATH = "/nvme/datasets/interiornet"
+    # INTERIORNET_PATH = "/nvme/datasets/diml_depth/HD7"
+    RENDER = False
+    INFER_NMI = False
     line_num_attr = 15
     img_shape = (64, 96, 3)
     max_cluster_line_count = 70
-    min_cluster_line_count = 4
+    min_cluster_line_count = 5
     batch_size = 1
     margin = 0.3
-    embedding_dim = 256
+    embedding_dim = 128
     bg_classes = [0, 1, 2, 20, 22]
     valid_classes = [i for i in range(41) if i not in bg_classes]
+
+    # K
+    k = 10
 
     # only_clusters, sift or full
     query_mode = 'full'
@@ -709,7 +767,7 @@ if __name__ == '__main__':
             physical_devices = tf.config.list_physical_devices('GPU')
             tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
-            model = model.load_cluster_embedding_model(model_path, line_num_attr, max_cluster_line_count,
+            model = model.load_cluster_embedding_model(embedding_model_path, line_num_attr, max_cluster_line_count,
                                                        embedding_dim, img_shape, margin)
 
             print("Computing embeddings.")
@@ -738,7 +796,7 @@ if __name__ == '__main__':
             tf.config.experimental.set_memory_growth(physical_devices[0], True)
             line_model = model.load_line_net_model(line_model_path, line_num_attr, max_frame_line_count,
                                                    max_clusters, img_shape)
-            embedding_model = model.load_cluster_embedding_model(model_path, line_num_attr, max_cluster_line_count,
+            embedding_model = model.load_cluster_embedding_model(embedding_model_path, line_num_attr, max_cluster_line_count,
                                                                  embedding_dim, img_shape, margin)
 
             frame_data = datagenerator_framewise.LineDataSequence(map_dir,
@@ -767,14 +825,7 @@ if __name__ == '__main__':
         query_on_frames(query_frame_embeddings, query_scene_ids, query_scene_names, map_embeddings, map_scene_ids,
                         map_scene_names, k=10, min_num_clusters=1)
     elif query_mode == 'full':
-        query_on_floors(query_floors, k=8)
-        exit()
-        for scene in query_floors[0].scenes:
-            for frame in scene.frames:
-                img = frame.draw_frame()
-                import matplotlib.pyplot as plt
-                plt.imshow(img)
-                plt.show()
+        query_on_floors(query_floors, k=k)
     elif query_mode == 'sift':
         query_on_sift_frames(query_frame_embeddings, query_scene_ids, map_embeddings, map_scene_ids, k=1)
 

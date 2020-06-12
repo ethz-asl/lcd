@@ -300,6 +300,7 @@ def fuse_normals(normal_1, normal_2, length_1, length_2, angle_1_2, max_angle):
 
 
 def load_image(path, img_shape):
+    # FAIL: This reads images as BGR, but we want RGB for the pretrained vgg net...
     img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
     if img is None:
         print("WARNING: VIRTUAL CAMERA IMAGE NOT FOUND AT {}".format(path))
@@ -311,9 +312,10 @@ def load_image(path, img_shape):
 
 
 class Cluster:
-    def __init__(self, frame_id, lines):
+    def __init__(self, frame_id, frame_path_id, lines):
         self.lines = lines
         self.frame_id = frame_id
+        self.frame_path_id = frame_path_id
 
 
 class Scene:
@@ -345,7 +347,7 @@ class Scene:
         for i, frame in enumerate(self.frame_paths):
             frame_idx = int(frame.split('_')[-1])
             count, geometries, labels, classes, vci_paths, transform = load_frame(frame)
-            frame_clusters = Counter(labels[get_bg_mask(classes, self.bg_classes)]).most_common()
+            frame_clusters = Counter(labels[get_non_bg_mask(classes, self.bg_classes)]).most_common()
 
             if count > self.min_line_count and len(frame_clusters) > 0:
                 self.valid_frames.append(i)
@@ -362,7 +364,7 @@ class Scene:
                     elif cluster_class not in self.valid_classes:
                         continue
 
-                    new_cluster = Cluster(frame_idx, cluster_lines)
+                    new_cluster = Cluster(i, frame_idx, cluster_lines)
                     if cluster_label in cluster_labels:
                         clusters[cluster_labels.index(cluster_label)].append(new_cluster)
                     else:
@@ -437,7 +439,7 @@ class Scene:
         classes = np.stack(classes)
 
         # Delete lines of small clusters so that the number of clusters is below maximum.
-        cluster_line_counts = Counter(np.array(labels)[get_bg_mask(classes, self.bg_classes)]).most_common()
+        cluster_line_counts = Counter(np.array(labels)[get_non_bg_mask(classes, self.bg_classes)]).most_common()
         for pair in cluster_line_counts[self.max_clusters:]:
             delete_idx = np.where(labels == pair[0])
             labels = np.delete(labels, delete_idx)
@@ -462,7 +464,7 @@ class Scene:
             np.concatenate([np.expand_dims(img, axis=0) for img in np.array(vcis)[indices]], axis=0)
 
 
-def get_bg_mask(classes, bg_classes):
+def get_non_bg_mask(classes, bg_classes):
     return np.where(np.isin(classes, bg_classes, invert=True))
 
 
@@ -594,6 +596,8 @@ class LineDataSequence(Sequence):
             if self.data_augmentation and np.random.binomial(1, 0.5):
                 # augment_flip(line_geometries, line_images)
                 augment_global(line_geometries, np.radians(15.), 0.3)
+            if self.data_augmentation and np.random.binomial(1, 0.5):
+                augment_images(line_images)
 
             line_geometries = normalize(line_geometries, 2.0)
             line_geometries = add_length(line_geometries)
@@ -606,10 +610,13 @@ class LineDataSequence(Sequence):
 
             out_valid_mask[:line_count] = True
             out_geometries[:line_count, :] = line_geometries
-            out_labels[:line_count] = line_labels
             out_classes[:line_count] = line_class_ids
-            out_bg[np.isin(out_classes, self.bg_classes)] = True
             out_bg[line_count:self.max_line_count] = False
+            out_bg[np.isin(out_classes, self.bg_classes)] = True
+            for i, label in enumerate(np.unique(line_labels)):
+                # We reserve label 0 for background lines.
+                out_labels[np.where(line_labels == label)] = i + 1
+            out_labels[out_bg] = 0
 
             if self.load_images:
                 out_images = line_images
@@ -741,7 +748,8 @@ class ClusterDataSequence(Sequence):
     def process_cluster(self, line_count, cluster_lines, cluster_label, cluster_class, cluster_images):
         if self.data_augmentation and np.random.binomial(1, 0.5):
             # augment_flip(cluster_lines, cluster_images)
-            augment_global(cluster_lines, np.radians(15.), 0.0)
+            augment_global(cluster_lines, np.radians(8.), 0.0)
+            augment_images(cluster_images)
 
         line_geometries = normalize(cluster_lines, 2.0)
         line_geometries = add_length(line_geometries)
@@ -916,8 +924,14 @@ def augment_global(line_geometries, angle_deviation, offset_deviation):
     line_geometries[:, 9:12] = np.transpose(C.dot(np.transpose(line_geometries[:, 9:12])))
 
 
-def augment_local(line_geometries, offset_deviation, length_deviation, ):
-    print("To be implemented.")
+def augment_images(images):
+    if np.random.binomial(1, 0.1):
+        darkness = np.random.normal(1., 0.2)
+        images[:, :, :, :] = images * darkness
+    elif np.random.binomial(1, 0.1):
+        images[:, :, :, :] = 0.
+    elif np.random.binomial(1, 0.1):
+        images[:, :, :, :] = np.random.normal(0., 30., images.shape)
 
 
 def augment_flip(line_geometries, images):

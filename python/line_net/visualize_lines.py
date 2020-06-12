@@ -38,7 +38,7 @@ class LineRenderer:
         vis = o3d.visualization.VisualizerWithKeyCallback()
         vis.create_window()
         opt = vis.get_render_option()
-        opt.background_color = np.asarray([0, 0, 0])
+        opt.background_color = np.asarray([1.0, 1.0, 1.0])
         ctr = vis.get_view_control()
         ctr.rotate(1100.0, 0.0)
 
@@ -199,6 +199,25 @@ def get_colors():
         rgb = np.random.randint(255, size=(1, 3)) / 255.0
         colors[i, :] = rgb
 
+    colors = np.vstack([np.array([
+        [255, 0, 0],
+        [128, 64, 64],
+        [255, 128, 0],
+        [255, 255, 0],
+        [128, 255, 0],
+        [0, 128, 0],
+        [0, 255, 64],
+        [0, 255, 255],
+        [0, 0, 255],
+        [128, 128, 255],
+        [128, 128, 0],
+        [255, 0, 255],
+        [64, 128, 128],
+        [128, 128, 64],
+        [128, 64, 128],
+        [128, 0, 255],
+    ]) / 255., colors])
+
     return colors
 
 
@@ -281,6 +300,13 @@ def render_compare(lines, labels, bg_mask, predictions):
     )
     line_set.colors = o3d.utility.Vector3dVector(colors)
     return line_set
+
+
+def render_pcl():
+    import cv2
+    depth = cv2.imread("/nvme/datasets/interiornet/3FO4INA2NM3R_Dining_room/depth0/data/13.png")
+    z_depth_image = euclidean_ray_length_to_z_coordinate(
+        depth_image, camera_model)
 
 
 def render_gt_connections(lines, labels, bg_mask):
@@ -370,19 +396,11 @@ def print_iou(pred_labels, pred_bg, gt, bg, valid):
     print("Background accuracy: {}".format(np.sum(np.logical_and(valid, np.equal(pred_bg, bg))) / np.sum(valid)))
 
 
-def load_lines(path):
-    try:
-        data_lines = pd.read_csv(path, sep=" ", header=None)
-        data_lines = data_lines.values
-    except pd.errors.EmptyDataError:
-        print("Error, empty data.")
-    return data_lines
-
-
 if __name__ == '__main__':
-    # data_path = "/nvme/line_ws/test"
     data_path = "/nvme/line_ws/test"
+    # data_path = "/nvme/line_ws/all_data_diml"
     result_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_060620_0111/results_18"
+    # result_path = "results"
 
     predictions = np.load(os.path.join(result_path, "predictions.npy"))
     # print(predictions.shape)
@@ -403,7 +421,8 @@ if __name__ == '__main__':
                                       min_line_count=0,
                                       max_line_count=max_line_count,
                                       data_augmentation=False,
+                                      training_mode=False,
                                       max_cluster_count=15)
 
-    renderer = LineRenderer(data_generator, results, predictions, 0.7, get_colors(), max_line_count)
+    renderer = LineRenderer(data_generator, results, predictions, 0.7, get_colors() * 0.5, max_line_count)
     renderer.run()

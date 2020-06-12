@@ -2,6 +2,7 @@ import numpy as np
 import datagenerator_framewise
 import losses_and_metrics
 
+import sklearn.metrics as sm
 from numba import jit, njit
 
 from sklearn.cluster import AgglomerativeClustering
@@ -106,9 +107,6 @@ def closest_distance_between_lines(a0, a1, b0, b1,
     return pA,pB,np.linalg.norm(pA-pB)
 
 
-
-
-
 def compute_distance_matrix(lines, valid_mask):
     lines = lines[valid_mask, :]
     distance_matrix = np.zeros((lines.shape[0], lines.shape[0]))
@@ -121,12 +119,79 @@ def compute_distance_matrix(lines, valid_mask):
     return distance_matrix
 
 
+def infer_on_frame(data, max_clusters=16):
+    geometries = data['lines'][0]
+    labels = data['labels']
+    valid_mask = data['valid_input_mask']
+    bg_mask = data['background_mask']
+    cluster_count = data['cluster_count']
+    unique_labels = data['unique_labels']
+
+    max_line_count = geometries.shape[0]
+
+    num_lines = np.sum(valid_mask)
+
+    ious = []
+    nmis = []
+    sil_scores = [0., 0.]
+    agglo_predictions = []
+
+    if num_lines > 1:
+        dist_matrix = compute_distance_matrix(geometries, valid_mask[0])
+        for num_clusters in range(1, min(num_lines, max_clusters + 1)):
+            agglo = AgglomerativeClustering(n_clusters=num_clusters, affinity='precomputed', linkage='single')
+            agglo.fit(dist_matrix)
+            computed_labels = agglo.labels_
+
+            cluster_output = np.zeros((max_line_count, max_clusters + 1))
+            cluster_output[valid_mask[0, :], computed_labels + 1] = 1.
+            cluster_output = np.expand_dims(cluster_output, axis=0)
+            # print(unique_labels[0, :])
+            # print(np.vstack([computed_labels, labels[0, :][valid_mask[0, :]]]).T)
+
+            # iou = losses_and_metrics.iou_metric(labels,
+            #                                     unique_labels,
+            #                                     cluster_count,
+            #                                     bg_mask,
+            #                                     valid_mask,
+            #                                     max_clusters)(None, cluster_output)
+            # iou = np.array(iou)
+            nmi = sm.normalized_mutual_info_score(labels[0, valid_mask[0, :]], computed_labels)
+            # ious.append(iou)
+            nmis.append(nmi)
+            agglo_predictions.append(cluster_output)
+
+            if num_clusters >= 2:
+                sil = sm.silhouette_score(dist_matrix, computed_labels)
+                sil_scores.append(sil)
+    else:
+        ious = [1]
+        nmis = [1]
+        agglo_predictions.append(np.zeros((1, max_line_count, max_clusters + 1)))
+
+    # amax = int(np.argmax(ious))
+    # amax_nmi = int(np.argmax(nmis))
+    amax_sil = int(np.argmax(sil_scores))
+    # max_iou = np.max(ious)
+    # pred_num_clusters = amax + 1
+
+    # print("NMI: {}, IoU: {}, SIL: {}, GT: {}".format(amax_nmi + 1, amax + 1, amax_sil,
+    #                                         np.unique(labels[0, valid_mask[0, :]]).shape[0]))
+    # print("Ground truth number of clusters: {}, predicted number of clusters: {}, iou: {}".format(
+    #       np.unique(labels[0, valid_mask[0, :]]).shape[0], pred_num_clusters, max_iou))
+    # print(np.array(ious))
+    # print(np.array([ious, nmis]).round(2))
+
+    return agglo_predictions[max(0, min(amax_sil - 1, len(agglo_predictions)))], nmis[max(0, amax_sil - 1)]
+
+
 if __name__ == '__main__':
     import tensorflow as tf
     tf.config.set_visible_devices([], 'GPU')
 
     # Paths to line files.
-    val_files = "/nvme/line_ws/val"
+    val_files = "/nvme/line_ws/test"
+    results_path = "results/"
 
     # The length of the geometry vector of a line.
     line_num_attr = 15
@@ -136,7 +201,6 @@ if __name__ == '__main__':
     num_epochs = 40
     # Do not forget to delete pickle files when this config is changed.
     max_clusters = 15
-    # TODO: Check if 0 is background or naw.
     bg_classes = [0, 1, 2, 20, 22]
 
     val_data_generator = datagenerator_framewise.LineDataSequence(val_files,
@@ -144,35 +208,16 @@ if __name__ == '__main__':
                                                                   bg_classes,
                                                                   fuse=False,
                                                                   img_shape=img_shape,
-                                                                  min_line_count=30,
+                                                                  min_line_count=0,
                                                                   max_line_count=max_line_count,
                                                                   max_cluster_count=max_clusters)
 
-    data = val_data_generator.__getitem__(0)[0]
-    geometries = data['lines'][0]
-    labels = data['labels']
-    valid_mask = data['valid_input_mask']
-    bg_mask = data['background_mask']
-    cluster_count = data['cluster_count']
-    unique_labels = data['unique_labels']
+    predictions = []
+    for idx in range(val_data_generator.__len__()):
+        print("Processing frame {}/{}".format(idx + 1, val_data_generator.__len__()))
+        data = val_data_generator.__getitem__(idx)
+        predictions.append(infer_on_frame(data, max_clusters))
 
-    dist_matrix = compute_distance_matrix(geometries, valid_mask[0])
-    print(dist_matrix)
-    num_clusters = 3
-    agglo = AgglomerativeClustering(n_clusters=num_clusters, affinity='precomputed', linkage='single')
-    agglo.fit(dist_matrix)
-    computed_labels = agglo.labels_
-
-    cluster_output = np.zeros((max_line_count, max_clusters + 1))
-    cluster_output[valid_mask[0], computed_labels + 1] = 1.
-    print(unique_labels[0])
-    print(np.vstack([computed_labels, labels[0][valid_mask[0]]]).T)
-
-    iou = losses_and_metrics.iou_metric(labels,
-                                        unique_labels,
-                                        cluster_count,
-                                        bg_mask,
-                                        valid_mask,
-                                        max_clusters)
-    print(np.array(iou(None, np.expand_dims(cluster_output, axis=0))))
+    import os
+    np.save(os.path.join(results_path, "predictions"), np.array(predictions))
 

@@ -66,7 +66,6 @@ def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path, dataset_na
         f.write("fraction_nonempty_pixels_threshold=%.3f\n" %
                 min_fraction_nonempty_pixels)
 
-
     # Camera to world matrix retriever.
     cam_to_world = camera_utils.SceneNetCameraToWorldMatrixRetriever(trajectory,
                                                                      dataset_name,
@@ -184,13 +183,6 @@ def get_virtual_camera_images_scenenet_rgbd(trajectory, dataset_path, dataset_na
                         cv2.INPAINT_NS)
                 end_time_line = timer()
                 average_time_per_line += (end_time_line - start_time_line)
-
-                # Upscaling to 320 x 240 resolution.
-                #dim = (320, 240)
-                #rgb_image_from_line_view = cv2.resize(
-                #    rgb_image_from_line_view, dim, interpolation=cv2.INTER_AREA)
-                #depth_image_from_line_view = cv2.resize(
-                #    depth_image_from_line_view, dim, interpolation=cv2.INTER_AREA)
 
                 # Print images to file.
                 cv2.imwrite(
