@@ -53,8 +53,8 @@ public:
     void pclFromInteriorNetToMat(const pcl::PointCloud<pcl::PointXYZRGB>& pcl_cloud,
                                  cv::Mat* mat_cloud) {
         CHECK_NOTNULL(mat_cloud);
-        const size_t width = 672;
-        const size_t height = 378;
+        const size_t width = 640;
+        const size_t height = 480;
         CHECK_EQ(pcl_cloud.points.size(), width * height);
         mat_cloud->create(height, width, CV_32FC3);
         for (size_t i = 0; i < height; ++i) {
