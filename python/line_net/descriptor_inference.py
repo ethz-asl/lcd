@@ -61,7 +61,7 @@ class QueryFrame:
     def draw_frame(self, cluster_id=None, predicted=True):
         scene_name = self.path.split('/')[-2]
         frame_id = self.path.split('_')[-1]
-        path = os.path.join(INTERIORNET_PATH, scene_name, 'cam0/data', frame_id + '.png')
+        path = os.path.join(INTERIORNET_PATH, scene_name, 'random_lighting_cam0/data', frame_id + '.png')
         # print("Loading image from path " + path)
 
         image = cv2.imread(path, cv2.IMREAD_UNCHANGED)
@@ -715,15 +715,20 @@ if __name__ == '__main__':
     #     "/home/felix/line_ws/src/line_tools/python/line_net/logs/description_040620_1846/weights_only.20.hdf5"
     embedding_model_path = \
         "/home/felix/line_ws/src/line_tools/python/line_net/logs/description_100620_1644/weights_only.27.hdf5"
-    line_model_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_060620_0111/weights_only.18.hdf5"
-    pickle_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/description_100620_1644"
-    map_dir = "/nvme/line_ws/val_map"
+    # line_model_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_060620_0111/weights_only.18.hdf5"
+    # Best:
+    line_model_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_110620_2345/weights_only.26.hdf5"
+    # line_model_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_130620_1857/weights_only.21.hdf5"
+    pickle_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_110620_2345"
+    # pickle_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_130620_1857"
+    map_dir = "/nvme/line_ws/val_map_random"
+    pickle_path = map_dir
     # pickle_path = "/nvme/line_ws/all_data_diml"
     # map_dir = "/nvme/line_ws/all_data_diml"
     INTERIORNET_PATH = "/nvme/datasets/interiornet"
     # INTERIORNET_PATH = "/nvme/datasets/diml_depth/HD7"
-    RENDER = False
-    INFER_NMI = False
+    RENDER = True
+    INFER_NMI = True
     line_num_attr = 15
     img_shape = (64, 96, 3)
     max_cluster_line_count = 70
@@ -735,7 +740,7 @@ if __name__ == '__main__':
     valid_classes = [i for i in range(41) if i not in bg_classes]
 
     # K
-    k = 10
+    k = 8
 
     # only_clusters, sift or full
     query_mode = 'full'

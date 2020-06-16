@@ -39,6 +39,8 @@ class LineRenderer:
         vis.create_window()
         opt = vis.get_render_option()
         opt.background_color = np.asarray([1.0, 1.0, 1.0])
+        print(opt.line_width)
+        opt.line_width = 20.
         ctr = vis.get_view_control()
         ctr.rotate(1100.0, 0.0)
 
@@ -72,6 +74,8 @@ class LineRenderer:
     def update_render(self, vis):
         view = vis.get_view_control().convert_to_pinhole_camera_parameters()
         vis.clear_geometries()
+        opt = vis.get_render_option()
+        opt.line_width = 20.
 
         pred_labels = self.pred_labels[self.pointer, :]
         pred_bg = np.where(pred_labels == 0, True, False)
@@ -119,6 +123,11 @@ class LineRenderer:
 
         if self.render_normals:
             vis.add_geometry(render_normals(self.line_geometries))
+
+        # ===================================== Add visualization pcl
+        if self.render_normals:
+            vis.clear_geometries()
+            vis.add_geometry(render_pcl())
 
         vis.update_renderer()
         vis.get_view_control().convert_from_pinhole_camera_parameters(view)
@@ -224,7 +233,7 @@ def get_colors():
 def render_lines(lines, labels, bg_mask, label_colors):
     bg_color = np.array([1.0, 0.0, 0.0])
 
-    points = np.vstack((lines[:, 0:3], lines[:, 3:6]))
+    points = np.vstack((lines[:, 0:3], lines[:, 3:6])) * 2.0 + np.array([0., 0., 3.])
     line_count = lines.shape[0]
     indices = np.hstack((np.arange(line_count).reshape(line_count, 1),
                          (np.arange(line_count) + line_count).reshape(line_count, 1)))
@@ -302,11 +311,92 @@ def render_compare(lines, labels, bg_mask, predictions):
     return line_set
 
 
+def convert_bgrd_to_pcl(bgr_image, depth_image, camera_model):
+    center_x = camera_model.cx
+    center_y = camera_model.cy
+
+    constant_x = 1 / camera_model.fx
+    constant_y = 1 / camera_model.fy
+
+    vs = np.array(
+        [(v - center_x) * constant_x for v in range(0, depth_image.shape[1])])
+    us = np.array(
+        [(u - center_y) * constant_y for u in range(0, depth_image.shape[0])])
+
+    # Convert depth from mm to m.
+    depth_image = depth_image / 1000.0
+
+    x = np.multiply(depth_image, vs)
+    y = depth_image * us[:, np.newaxis]
+
+    stacked = np.ma.dstack((x, y, depth_image))
+
+    coords = stacked.reshape(bgr_image.shape[1] * bgr_image.shape[0], 3)
+    colors = bgr_image.reshape(bgr_image.shape[1] * bgr_image.shape[0], 3) / 255.
+    colors = np.flip(colors, axis=-1)
+
+    return coords, colors
+
+
+def get_camera_info():
+    # Not entirely sure if it is correct. Check in ground truth ... cam0.ccam
+
+    class CameraInfo:
+        ...
+
+    camera_info = CameraInfo()
+    camera_info.height = 480
+    camera_info.width = 640
+
+    camera_info.distortion_model = "plumb_bob"
+    camera_info.D = [0.0, 0.0, 0.0, 0.0, 0.0]
+    camera_info.R = np.ndarray.flatten(np.identity(3))
+    camera_info.K = np.ndarray.flatten(np.array([[600., 0., 320.], [0., 600., 240.], [0., 0., 1.]]))
+    camera_info.P = np.ndarray.flatten(np.array([[600., 0., 320., 0.], [0., 600., 240., 0.], [0., 0., 1., 0.]]))
+    camera_info.cx = 320.
+    camera_info.cy = 240.
+    camera_info.fx = 600.
+    camera_info.fy = 600.
+    # fx = 525.
+    # camera_info.K = np.ndarray.flatten(np.array([[fx, 0., w / 2.], [0., fx, h / 2.], [0., 0., 1.]]))
+    # camera_info.P = np.ndarray.flatten(np.array([[fx, 0., w / 2., 0.], [0., fx, h / 2., 0.], [0., 0., 1., 0.]]))
+    return camera_info
+
+
+def euclidean_ray_length_to_z_coordinate(depth_image, camera_model):
+    center_x = camera_model.cx
+    center_y = camera_model.cy
+
+    constant_x = 1 / camera_model.fx
+    constant_y = 1 / camera_model.fy
+
+    vs = np.array(
+        [(v - center_x) * constant_x for v in range(0, depth_image.shape[1])])
+    us = np.array(
+        [(u - center_y) * constant_y for u in range(0, depth_image.shape[0])])
+
+    return (np.sqrt(
+        np.square(depth_image / 1000.0) /
+        (1 + np.square(vs[np.newaxis, :]) + np.square(us[:, np.newaxis]))) *
+            1000.0).astype(np.uint16)
+
+
 def render_pcl():
     import cv2
-    depth = cv2.imread("/nvme/datasets/interiornet/3FO4INA2NM3R_Dining_room/depth0/data/13.png")
-    z_depth_image = euclidean_ray_length_to_z_coordinate(
-        depth_image, camera_model)
+    depth_im = cv2.imread("/nvme/datasets/interiornet/3FO4INA2NM3R_Dining_room/depth0/data/13.png", cv2.IMREAD_UNCHANGED)
+    color_im = cv2.imread("/nvme/datasets/interiornet/3FO4INA2NM3R_Dining_room/cam0/data/13.png", cv2.IMREAD_COLOR)
+
+    sys.path.append("/home/felix/line_ws/src/interiornet_to_rosbag/nodes")
+    camera_model = get_camera_info()
+    z_depth_image = euclidean_ray_length_to_z_coordinate(depth_im, camera_model)
+    coords, colors = convert_bgrd_to_pcl(color_im, z_depth_image, camera_model)
+
+    pcl = o3d.geometry.PointCloud(
+        points=o3d.utility.Vector3dVector(coords)
+    )
+    pcl.colors = o3d.utility.Vector3dVector(colors)
+
+    return pcl
 
 
 def render_gt_connections(lines, labels, bg_mask):

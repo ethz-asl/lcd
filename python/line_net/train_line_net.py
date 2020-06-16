@@ -13,6 +13,7 @@ import datagenerator_framewise
 
 from datagenerator_framewise import LineDataSequence
 from model import line_net_model_4
+from model import line_net_model_fc
 from model import image_pretrain_model
 from inference import infer_on_test_set
 
@@ -210,7 +211,7 @@ def train():
     if pretrain_images:
         line_model, loss, opt, metrics = image_pretrain_model(line_num_attr, max_line_count, img_shape)
     else:
-        line_model, loss, opt, metrics = line_net_model_4(line_num_attr, max_line_count, max_clusters, img_shape)
+        line_model, loss, opt, metrics = line_net_model_fc(line_num_attr, max_line_count, max_clusters, img_shape)
         line_model.get_layer("image_features").summary()
         line_model.get_layer("image_features").load_weights(image_weight_path)
     line_model.summary()
