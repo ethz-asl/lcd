@@ -61,7 +61,7 @@ class QueryFrame:
     def draw_frame(self, cluster_id=None, predicted=True):
         scene_name = self.path.split('/')[-2]
         frame_id = self.path.split('_')[-1]
-        path = os.path.join(INTERIORNET_PATH, scene_name, 'random_lighting_cam0/data', frame_id + '.png')
+        path = os.path.join(DATASET_PATH, scene_name, 'cam0/data', frame_id + '.png')
         # print("Loading image from path " + path)
 
         image = cv2.imread(path, cv2.IMREAD_UNCHANGED)
@@ -84,10 +84,11 @@ class QueryFrame:
 
 
 class QueryCluster:
-    def __init__(self, geometry, embedding, label):
+    def __init__(self, geometry, embedding, label, line_count):
         self.geometry = geometry
         self.embedding = embedding
         self.label = label
+        self.line_count = line_count
 
 
 def unnormalize(line_geometries):
@@ -137,12 +138,12 @@ def get_floor_ids(scenes):
     return floor_ids
 
 
-def get_sift_vocabulary(interiornet_path, map_data, vocabulary_dim=768, num_scenes=None):
+def get_sift_vocabulary(interiornet_path, sift_vocabulary_path, map_data, vocabulary_dim=768, num_scenes=None):
     scene_paths = [os.path.join(interiornet_path, scene.name) for scene in map_data.scenes]
 
     sift = cv2.xfeatures2d.SIFT_create()
 
-    if not os.path.isfile("sift_vocabulary"):
+    if not os.path.isfile(sift_vocabulary_path):
         all_embeddings = []
 
         random_scene_paths = scene_paths.copy()
@@ -177,12 +178,13 @@ def get_sift_vocabulary(interiornet_path, map_data, vocabulary_dim=768, num_scen
         print("Saved clustering file sift_vocabulary")
     else:
         print("Loading sift vocabulary.")
-        with open("sift_vocabulary", 'rb') as f:
+        with open(sift_vocabulary_path, 'rb') as f:
             kmeans = pickle.load(f)
 
     return kmeans
 
 
+# Deprecated
 def get_sift_embeddings(interiornet_path, map_data, num_scenes=None):
     scene_paths = [os.path.join(interiornet_path, scene.name) for scene in map_data.scenes]
     floor_ids = map_data.floor_ids
@@ -231,6 +233,7 @@ def get_sift_embeddings(interiornet_path, map_data, num_scenes=None):
     return query_frame_embeddings, query_scene_ids, None, map_embeddings, map_scene_ids, None
 
 
+# Deprecated
 def query_on_sift_frames(query_frame_embeddings, query_scene_ids, map_embeddings, map_scene_ids, k=1):
     map_tree = sn.KDTree(map_embeddings, leaf_size=10)
     correctly_matched_num = 0
@@ -259,6 +262,7 @@ def query_on_sift_frames(query_frame_embeddings, query_scene_ids, map_embeddings
     print("Average number of clusters per frame: {}".format(total_cluster_count / total_frame_num))
 
 
+# Deprecated
 def get_embeddings(model, map_data, num_scenes=None, query_frames=list(range(2))):
     scenes = map_data.scenes
     floor_ids = map_data.floor_ids
@@ -324,6 +328,7 @@ def get_embeddings(model, map_data, num_scenes=None, query_frames=list(range(2))
     return query_frame_embeddings, query_scene_ids, query_scene_names, map_embeddings, map_scene_ids, map_scene_names
 
 
+# Deprecated
 def query_on_frames(query_frame_embeddings, query_scene_ids, query_scene_names,
                     map_embeddings, map_scene_ids, map_scene_names, k=20, min_num_clusters=1):
     print(len(map_embeddings))
@@ -379,8 +384,13 @@ def query_on_frames(query_frame_embeddings, query_scene_ids, query_scene_names,
     print("Average number of clusters per frame: {}".format(total_cluster_count / total_frame_num))
 
 
-def query_on_floors(query_floors, k=10):
-    num_floors = 100
+def query_on_floors(query_floors, min_cluster_line_count=8, k=10):
+    num_floors = 3300
+    min_frames = MIN_FRAMES
+    max_frames = MAX_FRAMES
+    blacklist = ["classroom", "computer_lab", "bathroom", "bookstore", "cafe", "excercise_room",
+                 "office", "study_room", "basement", "office_kitchen"]
+    whitelist = ["home_office"]
 
     sift_data = []
     gt_data = []
@@ -392,8 +402,32 @@ def query_on_floors(query_floors, k=10):
     gt_embeddings = []
     sift_embeddings = []
 
+    for floor in query_floors:
+        floor.scenes[:] = [scene for scene in floor.scenes if len(scene.frames) >= min_frames]
+        for scene in floor.scenes:
+            if len(scene.frames) > max_frames:
+                scene.frames[:] = np.random.choice(scene.frames, max_frames, replace=False)
+            for frame in scene.frames:
+                frame.clusters[:] = [cluster for cluster in frame.clusters
+                                     if cluster.line_count >= min_cluster_line_count]
+                frame.gt_clusters[:] = [cluster for cluster in frame.gt_clusters
+                                        if cluster.line_count >= min_cluster_line_count]
+    if len(query_floors) > num_floors:
+        query_floors[:] = np.random.choice(query_floors, num_floors, replace=False)
+
+    number_of_scenes = 0
     for floor in query_floors[:num_floors]:
         for scene in floor.scenes:
+            wrong_scene = False
+            for blacklisted in blacklist:
+                if blacklisted in scene.frames[0].path:
+                    wrong_scene = True
+            for whitelisted in whitelist:
+                if whitelisted in scene.frames[0].path:
+                    wrong_scene = False
+            if wrong_scene:
+                continue
+
             for frame in scene.frames:
                 for cluster in frame.clusters:
                     embeddings.append(cluster.embedding)
@@ -403,6 +437,10 @@ def query_on_floors(query_floors, k=10):
                     gt_data.append((floor, scene, frame, gt_cluster))
                 sift_embeddings.append(frame.sift_embedding)
                 sift_data.append((floor, scene, frame))
+            number_of_scenes += 1
+
+    print("Number of scenes: {}".format(number_of_scenes))
+    print("k = {}".format(k))
 
     embeddings = np.vstack(embeddings)
     gt_embeddings = np.vstack(gt_embeddings)
@@ -428,28 +466,48 @@ def query_on_floors(query_floors, k=10):
     tot_num_gt_clusters = 0
     matched_num_gt_clusters = 0
     matched_num_gt_frames = 0
+    matched_num_only_cluster = 0
 
     num_sift_frames = 0
     matched_num_sift_frames = 0
     for floor in query_floors[:num_floors]:
         for scene in floor.scenes:
             for frame in scene.frames:
+                wrong_scene = False
+                for blacklisted in blacklist:
+                    if blacklisted in frame.path:
+                        wrong_scene = True
+                for whitelisted in whitelist:
+                    if whitelisted in frame.path:
+                        wrong_scene = False
+
+                if wrong_scene:
+                    continue
 
                 # Query fully predicted clusters.
 
                 frame_matches = []
                 for i, cluster in enumerate(frame.clusters):
-                    dist, nearest = map_tree.query(cluster.embedding.reshape(-1, 1).T, k=k+1)
+                    dist, nearest = map_tree.query(cluster.embedding.reshape(-1, 1).T, k=k*2+1)
                     # Warning, the nearest one is of course the very same cluster.
-                    nearest_data = [data[nearest[0][j]] for j in range(1, k+1)]
+                    nearest_data = [data[nearest[0][j]] for j in range(1, k*2+1)]
                     matched = False
                     cluster_matches = []
+                    num_queries = 0
                     for data_point in nearest_data:
-                        if data_point[0] is floor:
-                            matched = True
-                        cluster_matches.append(query_floors.index(data_point[0]))
+                        if num_queries >= k:
+                            break
+                        if data_point[2] is frame:
+                            ...
+                        else:
+                            if data_point[0] is floor:
+                                matched = True
+                            cluster_matches.append(query_floors.index(data_point[0]))
+                            num_queries += 1
                     if matched:
                         matched_num_clusters += 1
+                    if num_queries < k:
+                        print("HOOOLLYYY SHITTT")
 
                     frame_matches += cluster_matches
                     tot_num_clusters += 1
@@ -475,16 +533,14 @@ def query_on_floors(query_floors, k=10):
 
                         rendered_pred_matches += 1
 
-                matched = False
+                cluster_matched = False
                 if len(frame_matches) > 0:
                     most_common_matches = Counter(frame_matches).most_common(1)
                     if query_floors[most_common_matches[0][0]] is floor:
-                        # print("Match.")
                         matched_num_frames += 1
-                        matched = True
+                        cluster_matched = True
                     else:
                         ...
-                        # print("...")
                 else:
                     print("Empty frame.")
                     empty_num_frames += 1
@@ -493,8 +549,8 @@ def query_on_floors(query_floors, k=10):
                 if rendered_clusterings < max_render and RENDER:
                     pred_img = frame.draw_frame()
                     gt_img = frame.draw_frame(predicted=False)
-                    cv2.imwrite("visualization/pred_clusters/{}_{}.png".format(rendered_clusterings, matched), pred_img,
-                                [cv2.IMWRITE_PNG_COMPRESSION, 9])
+                    cv2.imwrite("visualization/pred_clusters/{}_{}.png".format(rendered_clusterings, cluster_matched),
+                                pred_img, [cv2.IMWRITE_PNG_COMPRESSION, 9])
                     cv2.imwrite("visualization/gt_clusters/{}_{}.png".format(rendered_clusterings,
                                                                              frame.path.split('/')[-1]), gt_img,
                                 [cv2.IMWRITE_PNG_COMPRESSION, 9])
@@ -504,20 +560,38 @@ def query_on_floors(query_floors, k=10):
 
                 gt_frame_matches = []
                 for i, gt_cluster in enumerate(frame.gt_clusters):
-                    dist, nearest = gt_tree.query(gt_cluster.embedding.reshape(-1, 1).T, k=k + 1)
+                    dist, nearest = gt_tree.query(gt_cluster.embedding.reshape(-1, 1).T, k=k*2+1)
                     # Warning, the nearest one is of course the very same cluster.
-                    nearest_data = [gt_data[nearest[0][j]] for j in range(1, k + 1)]
+                    nearest_data = [gt_data[nearest[0][j]] for j in range(1, k*2+1)]
                     matched = False
                     cluster_matches = []
+                    num_queries = 0
                     for data_point in nearest_data:
-                        if data_point[0] is floor:
-                            matched = True
-                        cluster_matches.append(query_floors.index(data_point[0]))
+                        if num_queries >= k:
+                            break
+                        if data_point[2] is frame:
+                            ...
+                        else:
+                            if data_point[0] is floor:
+                                matched = True
+                            cluster_matches.append(query_floors.index(data_point[0]))
+                            num_queries += 1
                     if matched:
                         matched_num_gt_clusters += 1
+                    if num_queries < k:
+                        print("HOOOLLYYY SHITTT")
 
                     gt_frame_matches += cluster_matches
                     tot_num_gt_clusters += 1
+
+                    if rendered_clusterings < max_render and RENDER:
+                        image_1 = frame.draw_frame(i, predicted=False)
+                        image_2 = nearest_data[0][2].draw_frame(nearest_data[0][2].gt_clusters.index(nearest_data[0][3]),
+                                                                predicted=False)
+                        match_img = np.concatenate([image_1, image_2], axis=1)
+                        cv2.imwrite("visualization/gt_matches/{}_{}.png".format(rendered_clusterings,
+                                                                                rendered_pred_matches),
+                                    match_img)
 
                 if len(gt_frame_matches) > 0:
                     most_common_matches = Counter(gt_frame_matches).most_common(1)
@@ -527,9 +601,17 @@ def query_on_floors(query_floors, k=10):
                 # Query sift embeddings.
 
                 if frame.sift_embedding is not None:
-                    dist, ind = sift_tree.query(frame.sift_embedding.reshape(-1, 1).T, k=2)
-                    if sift_data[ind[0][1]][0] is floor:
+                    k_sift = 1
+                    dist, ind = sift_tree.query(frame.sift_embedding.reshape(-1, 1).T, k=k_sift+1)
+                    nearest_data = [sift_data[ind[0][j]] for j in range(1, k_sift+1)]
+                    sift_matches = []
+                    for data_point in nearest_data:
+                        sift_matches.append(query_floors.index(data_point[0]))
+                    most_common_sift = Counter(sift_matches).most_common(1)
+                    if query_floors[most_common_sift[0][0]] is floor:
                         matched_num_sift_frames += 1
+                    elif cluster_matched:
+                        matched_num_only_cluster += 1
                     num_sift_frames += 1
 
                 tot_num_frames += 1
@@ -556,7 +638,7 @@ def query_on_floors(query_floors, k=10):
     print(" ")
     print("Correctly matched frames: {}/{}".format(matched_num_sift_frames, tot_num_frames))
     print("Ratio of correctly matched frames: {}".format(matched_num_sift_frames / tot_num_frames))
-    print("Number of sift frames: {}".format(num_sift_frames))
+    print("Number of frames not detected by SIFT but by line clustering: {}".format(matched_num_only_cluster))
     print("==================================================")
 
 
@@ -567,8 +649,8 @@ def get_full_embeddings(cluster_model, descriptor_model, frame_data,
     floor_ids = get_floor_ids(scenes)
     training_plan = frame_data.training_plan
 
-    vocabulary_dim = 768
-    kmeans = get_sift_vocabulary(INTERIORNET_PATH, frame_data, 768)
+    vocabulary_dim = SIFT_VOCABULARY_DIM  # was 768
+    kmeans = get_sift_vocabulary(DATASET_PATH, SIFT_VOCABULARY_PATH, frame_data, vocabulary_dim)
     sift = cv2.xfeatures2d.SIFT_create()
 
     query_floors = [QueryFloor([]) for i in range(np.unique(floor_ids).shape[0])]
@@ -639,7 +721,8 @@ def get_full_embeddings(cluster_model, descriptor_model, frame_data,
                 cluster_embedding = np.array(cluster_embedding)[0, :]
                 cluster_embeddings.append(cluster_embedding)
 
-                query_frame.clusters.append(QueryCluster(cluster_lines_render, cluster_embedding, label_idx))
+                query_frame.clusters.append(QueryCluster(cluster_lines_render, cluster_embedding, label_idx,
+                                                         cluster_line_count))
 
         # Get embeddings from ground truth clustering.
 
@@ -675,14 +758,17 @@ def get_full_embeddings(cluster_model, descriptor_model, frame_data,
                 gt_embedding = np.array(gt_embedding)[0, :]
                 gt_embeddings.append(gt_embedding)
 
-                query_frame.gt_clusters.append(QueryCluster(cluster_lines_render, gt_embedding, j))
+                query_frame.gt_clusters.append(QueryCluster(cluster_lines_render, gt_embedding, j, cluster_line_count))
 
         # Get SIFT embeddings.
 
         scene_name = frame_path.split('/')[-2]
         frame_id = frame_path.split('_')[-1]
-        image_path = os.path.join(INTERIORNET_PATH, scene_name, 'cam0/data', frame_id + '.png')
+        image_path = os.path.join(DATASET_PATH, scene_name, 'cam0/data', frame_id + '.png')
         frame_im = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+        if frame_im is None:
+            print(image_path)
+
         keypoints, descriptors = sift.detectAndCompute(frame_im, None)
         if descriptors is not None:
             indices = kmeans.predict(descriptors)
@@ -711,6 +797,9 @@ def get_full_embeddings(cluster_model, descriptor_model, frame_data,
 
 
 if __name__ == '__main__':
+    # For reproducability
+    np.random.seed(123)
+
     # embedding_model_path = \
     #     "/home/felix/line_ws/src/line_tools/python/line_net/logs/description_040620_1846/weights_only.20.hdf5"
     embedding_model_path = \
@@ -718,29 +807,61 @@ if __name__ == '__main__':
     # line_model_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_060620_0111/weights_only.18.hdf5"
     # Best:
     line_model_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_110620_2345/weights_only.26.hdf5"
+    # FC:
     # line_model_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_130620_1857/weights_only.21.hdf5"
-    pickle_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_110620_2345"
-    # pickle_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_130620_1857"
-    map_dir = "/nvme/line_ws/val_map_random"
-    pickle_path = map_dir
-    # pickle_path = "/nvme/line_ws/all_data_diml"
-    # map_dir = "/nvme/line_ws/all_data_diml"
-    INTERIORNET_PATH = "/nvme/datasets/interiornet"
-    # INTERIORNET_PATH = "/nvme/datasets/diml_depth/HD7"
+    # Old:
+    # line_model_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/description_040620_1846/weights_only.20.hdf5"
+
+    dataset = "interiornet"
+
+    # INTERIORNET:
+    if dataset == "interiornet":
+        pickle_path = "/nvme/line_ws/val_map"
+        map_dir = "/nvme/line_ws/val_map"
+        DATASET_PATH = "/nvme/datasets/interiornet"
+        SIFT_VOCABULARY_PATH = "/nvme/line_ws/val_map"
+
+        MIN_FRAMES = 0
+        MAX_FRAMES = 100
+        SIFT_VOCABULARY_DIM = 800
+
+    # DIML:
+    if dataset == "diml":
+        pickle_path = "/nvme/line_ws/all_data_diml"
+        map_dir = "/nvme/line_ws/all_data_diml"
+        DATASET_PATH = "/nvme/datasets/diml_depth/HD7"
+        SIFT_VOCABULARY_PATH = "/nvme/line_ws/all_data_diml"
+
+        MIN_FRAMES = 8
+        MAX_FRAMES = 8
+        SIFT_VOCABULARY_DIM = 512
+
+    # NYU:
+    if dataset == "nyu":
+        pickle_path = "/nvme/line_nyu/all_data_4_or_more"
+        map_dir = pickle_path
+        DATASET_PATH = "/nvme/datasets/nyu_v2/HD7"
+        SIFT_VOCABULARY_PATH = "/nvme/line_nyu/all_data_4_or_more"
+
+        MIN_FRAMES = 5
+        MAX_FRAMES = 8
+        SIFT_VOCABULARY_DIM = 512
+
     RENDER = True
-    INFER_NMI = True
+    INFER_NMI = False
     line_num_attr = 15
     img_shape = (64, 96, 3)
     max_cluster_line_count = 70
-    min_cluster_line_count = 5
+    min_cluster_line_count = 2
     batch_size = 1
     margin = 0.3
     embedding_dim = 128
     bg_classes = [0, 1, 2, 20, 22]
     valid_classes = [i for i in range(41) if i not in bg_classes]
 
-    # K
+    # K:
     k = 8
+    min_lines = 4
 
     # only_clusters, sift or full
     query_mode = 'full'
@@ -763,7 +884,7 @@ if __name__ == '__main__':
                                                                    shuffle=False,
                                                                    data_augmentation=False,
                                                                    img_shape=img_shape,
-                                                                   min_line_count=min_cluster_line_count,
+                                                                   min_line_count=1,
                                                                    max_line_count=max_cluster_line_count,
                                                                    load_images=True,
                                                                    training_mode=False)
@@ -826,18 +947,10 @@ if __name__ == '__main__':
             exit()
 
     print("Starting query.")
-    if query_mode == 'only_clusters':
-        query_on_frames(query_frame_embeddings, query_scene_ids, query_scene_names, map_embeddings, map_scene_ids,
-                        map_scene_names, k=10, min_num_clusters=1)
-    elif query_mode == 'full':
-        query_on_floors(query_floors, k=k)
-    elif query_mode == 'sift':
-        query_on_sift_frames(query_frame_embeddings, query_scene_ids, map_embeddings, map_scene_ids, k=1)
-
-    # query_data = datagenerator_framewise.ClusterDataSequence(query_dir, batch_size, bg_classes, valid_classes,
-    #                                                          shuffle=False, data_augmentation=False,
-    #                                                          img_shape=img_shape, max_line_count=50,
-    #                                                          load_images=True, training_mode=False)
+    # 128 for diml
+    # 129 for nyu
+    np.random.seed(128)
+    query_on_floors(query_floors, min_cluster_line_count=min_lines, k=k)
 
 
 

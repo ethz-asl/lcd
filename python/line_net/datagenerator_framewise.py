@@ -306,6 +306,7 @@ def load_image(path, img_shape):
         print("WARNING: VIRTUAL CAMERA IMAGE NOT FOUND AT {}".format(path))
         return np.zeros(img_shape)
     else:
+        # img = np.flip(img, axis=-1)
         img = preprocess_input(img)
         img = cv2.resize(img, dsize=(img_shape[1], img_shape[0]), interpolation=cv2.INTER_LINEAR)
         return img

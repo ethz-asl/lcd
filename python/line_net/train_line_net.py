@@ -26,30 +26,32 @@ class LayerUnfreezeCallback(tf_keras.callbacks.Callback):
         self.opt = opt
         self.metrics = metrics
 
-    def on_epoch_end(self, epoch, logs=None):
-        if epoch == 15:
+    def on_epoch_begin(self, epoch, logs=None):
+        if epoch >= 7:
             transfer_layers = ["block3_conv1", "block3_conv2", "block3_conv3"]
             for layer_name in transfer_layers:
                 self.model.get_layer("image_features").get_layer("vgg16_features").get_layer(layer_name).trainable = \
                     True
                 print("Unfreezing layer {}.".format(layer_name))
 
-            self.model.compile(loss=self.loss,
-                               optimizer=self.opt,
-                               metrics=self.metrics,
-                               experimental_run_tf_function=False)
-
-        if epoch == 30:
+        if epoch >= 13:
             transfer_layers = ["block2_conv1", "block2_conv2"]
             for layer_name in transfer_layers:
                 self.model.get_layer("image_features").get_layer("vgg16_features").get_layer(layer_name).trainable = \
                     True
                 print("Unfreezing layer {}.".format(layer_name))
 
-            self.model.compile(loss=self.loss,
-                               optimizer=self.opt,
-                               metrics=self.metrics,
-                               experimental_run_tf_function=False)
+        if epoch >= 19:
+            transfer_layers = ["block1_conv1", "block1_conv2"]
+            for layer_name in transfer_layers:
+                self.model.get_layer("image_features").get_layer("vgg16_features").get_layer(layer_name).trainable = \
+                    True
+                print("Unfreezing layer {}.".format(layer_name))
+
+        self.model.compile(loss=self.loss,
+                           optimizer=self.opt,
+                           metrics=self.metrics,
+                           experimental_run_tf_function=False)
 
 
 class LearningRateCallback(tf_keras.callbacks.Callback):
@@ -84,6 +86,14 @@ class InferenceCallback(tf_keras.callbacks.Callback):
         infer_on_test_set(self.model, self.test_dir, self.log_dir, epoch + 1, self.bg_classes, self.img_shape,
                           self.max_line_count, self.max_clusters)
         print("Inference done.")
+
+
+class SaveImageWeightsCallback(tf_keras.callbacks.Callback):
+    def __init__(self, path):
+        self.path = path
+
+    def on_epoch_end(self, epoch, logs=None):
+        self.model.get_layer("image_features").save_weights(self.path)
 
 
 class SaveCallback(tf_keras.callbacks.Callback):
@@ -195,7 +205,7 @@ def train():
     img_shape = (64, 96, 3)
     max_line_count = 160
     batch_size = 2
-    num_epochs = 40
+    num_epochs = 50
     # Do not forget to delete pickle files when this config is changed.
     max_clusters = 15
     # Careful: in InteriorNet, 0 is not background, but some random class. In theory, class 0 should not exist.
@@ -205,13 +215,13 @@ def train():
     past_path = "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_060620_0111"
     image_weight_path = "/home/felix/line_ws/src/line_tools/python/line_net/weights/image_weights.hdf5"
 
-    pretrain_images = False
+    pretrain_images = True
 
     # Create line net Keras model.
     if pretrain_images:
         line_model, loss, opt, metrics = image_pretrain_model(line_num_attr, max_line_count, img_shape)
     else:
-        line_model, loss, opt, metrics = line_net_model_fc(line_num_attr, max_line_count, max_clusters, img_shape)
+        line_model, loss, opt, metrics = line_net_model_4(line_num_attr, max_line_count, max_clusters, img_shape)
         line_model.get_layer("image_features").summary()
         line_model.get_layer("image_features").load_weights(image_weight_path)
     line_model.summary()
@@ -226,9 +236,15 @@ def train():
             layer.trainable = True
         line_model.get_layer("image_features").trainable = False
     else:
-        log_path = "./logs/cluster_{}".format(datetime.datetime.now().strftime("%d%m%y_%H%M"))
+        if pretrain_images:
+            log_path = "./logs/pretrain_{}".format(datetime.datetime.now().strftime("%d%m%y_%H%M"))
+        else:
+            log_path = "./logs/cluster_{}".format(datetime.datetime.now().strftime("%d%m%y_%H%M"))
 
     # train_set_mean = np.array([-0.00246431839, 0.0953982015,  3.15564408])
+    data_augmentation = True
+    if pretrain_images:
+        data_augmentation = False
 
     train_data_generator = LineDataSequence(train_files,
                                             batch_size,
@@ -238,7 +254,7 @@ def train():
                                             img_shape=img_shape,
                                             min_line_count=30,
                                             max_line_count=max_line_count,
-                                            data_augmentation=True,
+                                            data_augmentation=data_augmentation,
                                             max_cluster_count=max_clusters)
     # train_set_mean = train_data_generator.get_mean()
     # train_data_generator.set_mean(train_set_mean)
@@ -256,9 +272,13 @@ def train():
     tensorboard_callback = tf_keras.callbacks.TensorBoard(log_dir=log_path, write_graph=False, write_images=True)
     save_callback = SaveCallback(os.path.join(log_path, "weights_only.{:02d}.hdf5"))
     inference_callback = InferenceCallback(test_files, log_path, bg_classes, img_shape, max_line_count, max_clusters)
-    learning_rate_callback = LearningRateCallback({10: 0.000025, 15: 0.00001, 20: 0.000005})
-    callbacks = [save_weights_callback, tensorboard_callback, save_callback, inference_callback, learning_rate_callback]
     if pretrain_images:
+        learning_rate_callback = LearningRateCallback({8: 0.00025, 14: 0.0001, 20: 0.00005})
+    else:
+        learning_rate_callback = LearningRateCallback({10: 0.000025, 15: 0.00001, 20: 0.000005})
+    callbacks = [save_weights_callback, tensorboard_callback, save_callback, learning_rate_callback]
+    if pretrain_images:
+        callbacks += [SaveImageWeightsCallback(os.path.join(log_path, "image_weights.{:02d}.hdf5"))]
         unfreeze_callback = LayerUnfreezeCallback(loss, opt, metrics)
         callbacks += [unfreeze_callback]
 

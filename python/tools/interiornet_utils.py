@@ -49,8 +49,8 @@ class InteriorNetCameraModel:
         ])
 
         # Find z coordinate of each pixel given the depth in ray length.
-        z = euclidean_ray_length_to_z_coordinate(depth_image, self)
-        # z = depth_image
+        # z = euclidean_ray_length_to_z_coordinate(depth_image, self)
+        z = depth_image
         # Convert the z coordinate from mm to m.
         z = z / 1000.0
 
@@ -73,6 +73,7 @@ class InteriorNetCameraModel:
 
 # fx was 600, w was 640, h was 480
 def get_camera_model(fx=600, fy=600, pixel_width=640, pixel_height=480):
+# def get_camera_model(fx=519., fy=519., pixel_width=624, pixel_height=464):
     """ Camera model for SceneNetRGBD dataset. Adjusted from
         https://github.com/ethz-asl/scenenet_ros_tools/blob/master/nodes/scenenet_to_rosbag.py
     """
@@ -82,11 +83,8 @@ def get_camera_model(fx=600, fy=600, pixel_width=640, pixel_height=480):
     camera_model = InteriorNetCameraModel(camera_intrinsic_matrix)
     return camera_model
 
-
-def camera_intrinsic_transform(fx=600,
-                               fy=600,
-                               pixel_width=640,
-                               pixel_height=480):
+def camera_intrinsic_transform(fx=600, fy=600, pixel_width=640, pixel_height=480):
+# def camera_intrinsic_transform(fx=519., fy=519., pixel_width=624, pixel_height=464):
     """ Gets camera intrinsics matrix for InteriorNet dataset.
     """
     camera_intrinsics = np.zeros((3, 4))

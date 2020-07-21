@@ -25,10 +25,18 @@ def generate_hd7():
         vci_path_master = "/nvme/line_ws/virtual_camera_images_random"
         train_path_master = "/nvme/line_ws/all_data_random"
 
-    path_to_data = "/nvme/datasets/diml_depth/HD7/*"
-    line_path_master = "/nvme/line_ws/line_files_diml"
-    vci_path_master = "/nvme/line_ws/virtual_camera_images_diml"
-    train_path_master = "/nvme/line_ws/all_data_diml"
+    # diml:
+    if False:
+        path_to_data = "/nvme/datasets/diml_depth/HD7/*"
+        line_path_master = "/nvme/line_ws/line_files_diml"
+        vci_path_master = "/nvme/line_ws/virtual_camera_images_diml"
+        train_path_master = "/nvme/line_ws/all_data_diml"
+
+    if True:
+        path_to_data = "/nvme/datasets/nyu_v2/HD7/*"
+        line_path_master = "/nvme/line_nyu/line_files"
+        vci_path_master = "/nvme/line_nyu/virtual_camera_images"
+        train_path_master = "/nvme/line_nyu/all_data"
 
     rospy.init_node('interiornet_node', anonymous=True)
 

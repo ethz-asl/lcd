@@ -10,6 +10,8 @@ InteriorNet to ROS:
 rosrun interiornet_to_rosbag interiornet_to_rosbag.py --scene-path /home/felix/line_ws/data/interiorNet/data/HD7/3FO4IDEI1LAV_Dining_room --output-bag-path /home/felix/line_ws/data/bags/HD7/3FO4IDEI1LAV_Dining_room.bag --frame-step 1  --light-type original --traj 1 --publish
 rosrun interiornet_to_rosbag interiornet_to_rosbag.py --scene-path /home/felix/line_ws/data/interiorNet/data/HD1/3FO4K3112LAW --output-bag-path /home/felix/line_ws/data/bags/HD7/3FO4IDEI1LAV_Dining_room.bag --frame-step 1  --light-type original --traj 1 --publish
 
+rosrun interiornet_to_rosbag interiornet_to_rosbag.py --scene-path /nvme/datasets/nyu_v2/HD7/dining_room_0036 --output-bag-path /home/felix/line_ws/data/bags/HD7/3FO4IDEI1LAV_Dining_room.bag --frame-step 1 --light-type original --traj 1 --publish
+
 Create Folders:
 bash create_data_dir_interiornet.sh 1 /home/felix/line_ws/data/line_tools interiornet 0 20 1
 bash create_data_dir_interiornet.sh 1 /home/felix/line_ws/data/line_tools interiornet 0 1000 1
