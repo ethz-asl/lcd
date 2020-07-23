@@ -9,6 +9,8 @@ namespace line_ros_utility {
     const std::string frame_id = "line_tools_id";
     const bool write_labeled_lines = true;
     const bool clustering_with_random_forest = false;
+    // Background classes to determine which classes are preferred. Lines with adjacent background
+    // planes are always assigned the instance label if it exists.
     const std::vector<int> background_classes = {1, 2, 20, 22};
 
     std::vector<int> clusterLinesAfterClassification(
@@ -163,8 +165,8 @@ namespace line_ros_utility {
             //    21: label
             // 22-24: normal 1
             // 25-27: normal 2
-            //    28: open 1
-            //    29: open 2
+            //    28: occluded 1
+            //    29: occluded 2
             // 30-32: camera origin
             // 33-36: camera rotation
             for (size_t i = 0u; i < lines3D.size(); ++i) {
@@ -183,7 +185,7 @@ namespace line_ros_utility {
                 } else {
                     file << 3 << " ";
                 }
-                file << labels[i] << " ";//std::endl;
+                file << labels[i] << " ";
                 file << classes[i] << " ";
 
                 for (int j = 0; j < 3; ++j) file << line_normals[i][0][j] << " ";
@@ -1315,9 +1317,11 @@ namespace line_ros_utility {
 
         cv::Vec3f start;
         cv::Vec3f end;
+        // Iterate over all lines to check for occludedness.
         for (size_t i = 0u; i < lines.size(); ++i) {
             start = {lines[i].line[0], lines[i].line[1], lines[i].line[2]};
             end = {lines[i].line[3], lines[i].line[4], lines[i].line[5]};
+            // Check for start and end point.
             opens->at(i) = {checkLineOpen(end, start, depth_map, camera_info),
                             checkLineOpen(start, end, depth_map, camera_info)};
         }
@@ -1343,7 +1347,6 @@ namespace line_ros_utility {
         cv::Point2f check_2D = end_2D + line_2D / line_length_2D * offset_length_2D;
 
         cv::Vec3f line_3D = end_point - start_point;
-        // float line_length_3D = cv::norm(line_3D);
         // Here we assume the line has the same 3D to 2D ratio anywhere on the screen.
         // This probably not correct, but since the distance is so small, acceptable.
         cv::Vec3f check_3D = end_point + line_3D / line_length_2D * offset_length_2D;
@@ -1356,7 +1359,9 @@ namespace line_ros_utility {
         float depth_check = cv::norm(check_3D);
         float depth_from_map = depth_map.at<uint16_t>(check_3D_to_2D) / 1000.0f;
 
+        // Check if the line end point is inside the camera frame.
         bool open = !check_3D_to_2D.inside(camera_model.rawRoi());
+        // Check if the line end point is occluded by some object.
         open = open || depth_from_map < (depth_check - threshold);
 
         return open;

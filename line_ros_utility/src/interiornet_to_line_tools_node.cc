@@ -51,10 +51,12 @@ public:
     }
 
     void pclFromInteriorNetToMat(const pcl::PointCloud<pcl::PointXYZRGB>& pcl_cloud,
+                                 const size_t img_height,
+                                 const size_t img_width,
                                  cv::Mat* mat_cloud) {
         CHECK_NOTNULL(mat_cloud);
-        const size_t width = 624;
-        const size_t height = 464;
+        const size_t width = img_width;
+        const size_t height = img_height;
         CHECK_EQ(pcl_cloud.points.size(), width * height);
         mat_cloud->create(height, width, CV_32FC3);
         for (size_t i = 0; i < height; ++i) {
@@ -77,7 +79,9 @@ public:
         tf::StampedTransform transform;
         geometry_msgs::TransformStamped transform_msg;
         pcl::fromROSMsg(*rosmsg_cloud, pcl_cloud_);
-        pclFromInteriorNetToMat(pcl_cloud_, &(cvimage_cloud_.image));
+        const size_t height = rosmsg_image->height;
+        const size_t width = rosmsg_image->width;
+        pclFromInteriorNetToMat(pcl_cloud_, height, width, &(cvimage_cloud_.image));
         cvimage_cloud_.header = rosmsg_cloud->header;
         cvimage_cloud_.encoding = "32FC3";
 

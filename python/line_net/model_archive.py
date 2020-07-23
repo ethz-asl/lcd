@@ -15,9 +15,6 @@ import tensorflow as tf
 import numpy as np
 np.random.seed(123)
 
-from datagenerator_framewise import LineDataGenerator
-from datagenerator_framewise import data_generator
-
 
 def drop_diagonal_and_mask(shape, validity_mask):
     eye = K.expand_dims(tf.eye(num_rows=shape[0], dtype='float32'), axis=-1)
@@ -483,3 +480,74 @@ def line_net_model_3(line_num_attr, num_lines, img_shape):
                        metrics=[iou] + metrics + debug_metrics(debug_layer),
                        experimental_run_tf_function=False)
     return line_model
+
+
+# NOT USED
+def cluster_class_model(line_num_attr, num_lines, num_classes, img_shape):
+    # Inputs for geometric line information.
+    img_input_shape = (num_lines, img_shape[0], img_shape[1], img_shape[2])
+    img_inputs = kl.Input(shape=img_input_shape, dtype='float32', name='images')
+    line_inputs = kl.Input(shape=(num_lines, line_num_attr), dtype='float32', name='lines')
+    valid_input = kl.Input(shape=(num_lines,), dtype='bool', name='valid_input_mask')
+    one_input = kl.Input(shape=(1, 1), dtype='float32', name='ones')
+
+    img_feature_size = 128
+    geometric_size = 384
+    head_units = 512
+    hidden_units = head_units * 4
+
+    num_multis = 4
+    num_adds = 4
+    key_size = 64
+
+    dropout = 0.0
+
+    # The geometric embedding layer:
+    line_embeddings = kl.Masking(mask_value=0.0)(line_inputs)
+    line_embeddings = kl.TimeDistributed(kl.Dense(geometric_size, kernel_constraint=kc.max_norm(3)),
+                                         name='geometric_features')(line_embeddings)
+    line_embeddings = kl.TimeDistributed(kl.Dropout(dropout))(line_embeddings)
+    line_embeddings = kl.TimeDistributed(kl.BatchNormalization())(line_embeddings)
+    line_embeddings = kl.LeakyReLU()(line_embeddings)
+
+    # The virtual camera image feature cnn:
+    line_img_features = kl.Masking(mask_value=0.0)(img_inputs)
+    line_img_features = get_img_model(img_input_shape, img_feature_size, dropout=0.,
+                                      trainable=False)(line_img_features)
+
+    line_embeddings = kl.Concatenate()([line_img_features, line_embeddings])
+
+    # Build 5 multi head attention layers. Hopefully this will work.
+    layer = get_inter_attention_layer(num_lines, head_units=head_units, dropout=dropout, key_size=key_size,
+                                      hidden_units=hidden_units, idx=0, n_multi_heads=num_multis,
+                                      n_add_heads=num_adds)(line_embeddings)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units, dropout=dropout, key_size=key_size,
+                                      hidden_units=hidden_units, idx=1, n_multi_heads=num_multis,
+                                      n_add_heads=num_adds)(layer)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units, dropout=dropout, key_size=key_size,
+                                      hidden_units=hidden_units, idx=2, n_multi_heads=num_multis,
+                                      n_add_heads=num_adds)(layer)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units, dropout=dropout, key_size=key_size,
+                                      hidden_units=hidden_units, idx=3, n_multi_heads=num_multis,
+                                      n_add_heads=num_adds)(layer)
+    layer = get_inter_attention_layer(num_lines, head_units=head_units, dropout=dropout, key_size=key_size,
+                                      hidden_units=hidden_units, idx=4, n_multi_heads=num_multis,
+                                      n_add_heads=num_adds)(layer)
+    output = get_global_attention_layer(num_lines, head_units=head_units, dropout=dropout, key_size=key_size,
+                                        hidden_units=hidden_units, n_multi_heads=num_multis,
+                                        n_add_heads=num_adds)([layer, one_input])
+    output = kl.Dense(num_classes)(output)
+    output = kl.BatchNormalization()(output)
+    output = kl.Softmax(name='class_logits')(output)
+
+    model = km.Model(inputs=[line_inputs, valid_input, img_inputs, one_input],
+                     outputs=output,
+                     name='cluster_model')
+
+    opt = Adam(learning_rate=0.0001)
+    model.compile(loss='categorical_crossentropy',
+                       optimizer=opt,
+                       metrics=['categorical_accuracy'],
+                       experimental_run_tf_function=False)
+
+    return model

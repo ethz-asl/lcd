@@ -458,9 +458,12 @@ namespace line_ros_utility {
                 const cv::Mat& image, const cv::Mat& instances,
                 sensor_msgs::CameraInfoConstPtr camera_info);
 
-        // Extracts the normal facing the camera from the hessians and stores them
+        // Extracts the normal facing the camera from the hessians and stores them.
+        // Normals of non-existent planes are zero-padded.
         // in the lines.
-        // Input: lines:       Lines with 3D start and endpoints.
+        // Input: lines:       Lines with 3D start and endpoints and the hessian forms of the planes.
+        //
+        // Output: normals:    The normals for each plane of the line.
         void extractNormalsFromLines(
                 const std::vector<line_detection::LineWithPlanes>& lines,
                 std::vector<std::vector<cv::Vec3f>>* normals);
@@ -473,6 +476,8 @@ namespace line_ros_utility {
         //        depth:       Depth image.
         //
         //        camera_info: Used to reproject 3D points onto depth image.
+        //
+        // Output: opens:      The boolean values if the line end points are occluded or not.
         void checkLinesOpen(
                 const std::vector<line_detection::LineWithPlanes>& lines,
                 const cv::Mat& depth_map, sensor_msgs::CameraInfoConstPtr camera_info,
@@ -482,7 +487,7 @@ namespace line_ros_utility {
         // Input: startpoint:  Point where the line starts in 3D.
         //
         //        endpoint:    Point where the line ends in 3D. This is where
-        //                     openness is checked.
+        //                     occlusion is checked.
         //
         //        depth:       Depth image.
         //
@@ -494,10 +499,19 @@ namespace line_ros_utility {
         void instanceToClassIDMap(const cv::Mat& instances, const cv::Mat& classes,
                                  std::map<uint16_t, uint16_t>* instance_to_class_map);
 
+        // Helper function to assign each line a class label. The class label is determined
+        // using the precomputed instance to class map.
+        // Input: instance_labels:       The instance labels of each line.
+        //
+        //        instance_to_class_map: The precomputed instance to class map containing a class
+        //                               label for each instance present in the frame.
+        //
+        // Output: class_labels:         The resulting class labels.
         void labelLinesWithClasses(const std::vector<int>& instance_labels,
                 const std::map<uint16_t, uint16_t>& instance_to_class_map,
                 std::vector<int>* class_labels);
 
+        // The callback function to save the path where the lines should be saved to.
         void pathCallback(const std_msgs::String::ConstPtr& path_msg);
 
 

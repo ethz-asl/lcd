@@ -95,26 +95,20 @@ def project_pcl_to_image_orthogonal(pointcloud,
                 Point cloud in the format [x, y, z, r, g, b] for each point.
             camera_width (float): Camera width in meters.
             camera_height (float): Camera height in meters.
-            image_width (int): Image width.
-            image_height (int): Image height.
+            camera_depth (float): Camera clipping depth in meters.
+            image_width (int): Image width in pixels.
+            image_height (int): Image height in pixels.
 
         Returns:
             rbg_image (numpy array of shape (image_height, image_width, 3),
                 dtype=np.uint8): RGB image.
             depth_image (numpy array of shape (image_height, image_width),
                 dtype=np.float32): Depth image, with depth in mm.
-            num_nonempty_pixels (int): Number of pixels that are not empty in the
-                image obtained by reprojecting the point cloud.
         """
 
     rgb_image = np.zeros((image_height, image_width, 3), dtype=np.uint8)
     depth_image = np.zeros((image_height, image_width), dtype=np.float32)
-    pixel_is_empty = np.full((image_height, image_width), fill_value=True)
 
-    from timeit import default_timer as timer
-    tic = timer()
-
-    num_nonempty_pixels = 0
     # Z is optical axis, remove all points that lie behind camera plane.
     min_x = -camera_width / 2
     min_y = -camera_height / 2
@@ -127,17 +121,11 @@ def project_pcl_to_image_orthogonal(pointcloud,
     bound_z = np.logical_and(pointcloud[:, 2] >= min_z, pointcloud[:, 2] < max_z)
 
     pcl_inside_view = pointcloud[np.logical_and(np.logical_and(bound_x, bound_y), bound_z), :]
-    #pcl_inside_view = pointcloud[pointcloud[:, 2] >= 0 and pointcloud[:, 1] >= 0, :]
 
     # Move pixels into sensor space and convert to ints.
-    #pixel_floats = np.vstack((pcl_inside_view[:, 0] / camera_width * image_width + image_width / 2,
-    #                   pcl_inside_view[:, 1] / camera_height * image_height + image_height / 2))
     pixel_floats = (pcl_inside_view[:, :2] * np.array([image_width / camera_width, image_height / camera_height]) +
                     np.array([image_width / 2, image_height / 2])).transpose()
-    pixel = pixel = pixel_floats.astype(int) # np.rint(pixel_floats).astype(int)
-
-    #print(pixel_floats.shape)
-    #print("Transform took {} seconds.".format(timer() - tic))
+    pixel = pixel_floats.astype(int)
 
     # Remove pixels outside of view frame.
     index_bool = np.logical_and(
