@@ -10,20 +10,21 @@ The following repository contains packages to detect lines and use them for the 
 
 
 The repository consists of the following packages, *each of which is described in more detail in the associated folder*:
-1. `line_detection`: Package to detect lines in 2D, backproject them in 3D using the depth information, fit planes around them, assign them line types and readjust them in 3D.
-2. `line_description`: Package to describe lines (either with _neural-network embeddings_ or with a binary descriptor). It is a test-like package mainly developed to allow execution of the entire pipeline (from line extraction, to virtual-camera images extraction and retrieval of neural-network embeddings from a previously-trained model) 'online', i.e., without saving data to disk, but transferring them through ROS. Please note that virtual-camera images and embeddings can be retrieved also 'offline' (i.e., saving data to disk and subsequently reading them, without using ROS), by using the scripts in `python` (cf. below). The binary descriptor, instead, was only introduced as an initial test for comparison, but it is not meant to be currently used. Indeed, the latter is a regular feature descriptor, whereas _the neural-network embeddings are not descriptors for the line features, but are rather needed to define the clusters for the instances in the embedding space_ (cf. above).
-3. `line_ros_utility`: Package containing ROS utilities mainly to allow extraction of lines from ROS bags generated from the SceneNetRGBD or SceneNN datasets (cf. [Datasets](#datasets)). The lines extracted are labelled with ground-truth instance labels and saved (with 2D and 3D info) for later use in the pipeline. The package also includes a node to create a histogram of the line lengths and one to launch a test 'online' pipeline to detect, describe and match lines.
+1. `line_detection`: Package to detect lines in 2D, backproject them in 3D using the depth information, fit planes around them and readjust them in 3D. 
+2. `line_description`: Package to describe lines (either with _neural-network embeddings_ or with a binary descriptor). It is a test-like package mainly developed to allow execution of the entire pipeline (from line extraction, to virtual-camera images extraction and retrieval of neural-network embeddings from a previously-trained model) 'online', i.e., without saving data to disk, but transferring them through ROS. Please note that the virtual-camera images and embeddings can currently only be retrieved 'offline' (i.e., saving data to disk and subsequently reading them, without using ROS), by using the scripts in `python` (cf. below). The binary descriptor, instead, was only introduced as an initial test for comparison, but it is not meant to be used currently. Indeed, the latter is a regular feature descriptor, whereas _the neural-network embeddings are not descriptors for the line features, but are rather needed to define the clusters for the instances in the embedding space_ (cf. above). This package is currently not in use.
+3. `line_ros_utility`: Package containing ROS utilities mainly to allow extraction of lines and geometric information from ROS messages generated from the InteriorNet dataset (cf. [Datasets](#datasets)). The lines extracted are labelled with ground-truth instance labels and saved (with 2D and 3D info) for later use in the pipeline. The package also includes a node to create a histogram of the line lengths and one to launch a test 'online' pipeline to detect, describe and match lines.
 4. `python`: Collection of Python scripts to serve several purposes:
   - Generate virtual-camera images for the detected lines;
-  - Generate data (*pickle files*) that can be used to either train the neural network that generates the embeddings or to obtain the embeddings, using a previously-trained model;
-  - Train the neural network that generates the embeddings;
-  - 'Test' the neural network, i.e., retrieve the embeddings for a certain dataset;
+  - Generate data using the full pipeline for a large amount of InteriorNet scenes;
+  - Train the neural network for clustering of lines;
+  - Train the neural network for the description of clusters;
+  - Evaluate the full place recognition pipeline;
   - Visualization.
 
 The following 'auxiliary' packages are also part of the repository:
 1. `line_clustering`: Deprecated package developed to perform clustering of lines.
 2. `line_detection_python`: Currently-unused (and not up-to-date) C++-to-Python bindings of the package `line_detection`.
-3. `line_matching`: Package to match lines extracted in one frame to lines extracted in another frame. Since the neural-network embeddings are not meant to be line-features descriptors (cf. above), one should currently not expect to obtain line-to-line matching, but rather (line from one instance)-to-(line from the same instance).
+3. `line_matching`: Deprecated package to match lines extracted in one frame to lines extracted in another frame. 
 
 
 ## Build instructions for ROS packages
@@ -49,8 +50,7 @@ $ catkin init
 * [line_tools](https://github.com/ethz-asl/line_tools/)
 * [opencv3_catkin](https://github.com/ethz-asl/opencv3_catkin/)
 * [pcl_catkin](https://github.com/ethz-asl/pcl_catkin/)
-* [scenenet_ros_tools](https://github.com/ethz-asl/scenenet_ros_tools/) (make sure you use the [following version](https://github.com/ethz-asl/scenenet_ros_tools/pull/8))
-* [scenenn_ros_tools](https://github.com/ethz-asl/scenenn_ros_tools/) (make sure you use the [following version](https://github.com/ethz-asl/scenenn_ros_tools/pull/4))
+* [interior_net_to_rosbag](https://github.com/ethz-asl/interiornet_to_rosbag)
 * [vision_opencv](https://github.com/ethz-asl/vision_opencv)
 
 You also need to edit the file `CMakeLists.txt` in the `opencv3_catkin` directory by:
@@ -74,7 +74,7 @@ opencv_ximgproc
 
 (For a safer operation, just make sure that `opencv3_catkin` points to commit [bd876bc](https://github.com/ethz-asl/opencv3_catkin/commit/bd876bcf5ad393190e6c771be3f19e9e0df6470d)).
 
-Build them (it could take 1 hour for the first time):
+Build them (it could take up to 1 hour for the first time):
 ```
 $ cd ~/catkin_ws/
 $ catkin config --isolate-devel
@@ -84,68 +84,22 @@ $ catkin build
 
 
 ## Datasets
-- The main dataset used is `SceneNetRGBD`.  
-Please download the [dataset](https://robotvault.bitbucket.io/scenenet-rgbd.html) (or at least the 'subset' `train_0`) and the protobuf files (available at the main page of the dataset, or, e.g., from [here](www.doc.ic.ac.uk/~ahanda/train_protobufs.tar.gz), for the training set). Also clone the repository [pySceneNetRGBD](https://github.com/jmccormac/pySceneNetRGBD), that contains scripts needed to handle the data from SceneNetRGBD. You may use the following steps (replace `<folder_where_the_data_will_be_stored>` with the path where you will store the data you download):
-```bash
-cd <folder_where_the_data_will_be_stored>
-git clone https://github.com/jmccormac/pySceneNetRGBD.git
-cd pySceneNetRGBD
-mkdir data && cd data
-wget http://www.doc.ic.ac.uk/~ahanda/train_split/train_0.tar.gz train_0.tar.gz
-wget http://www.doc.ic.ac.uk/~ahanda/train_protobufs.tar.gz train_protobufs.tar.gz
-tar -xvzf train_0.tar.gz train_protobufs.tar.gz
-cd .. && make
-```
-- The pipeline is also configured to use the `SceneNN` dataset, although the latter has not been used in testing yet.  
-Please download the [dataset](http://www.scenenn.net/) with _instance annotation_ (currently [this](https://drive.google.com/drive/folders/0B-aa7y5Ox4eZWE8yMkRkNkU4Tk0) is the direct link) or even only few scenes from it. You may want to follow the instructions on the [scenenn repository](https://github.com/scenenn/scenenn). Make sure you also download the `.oni` files, as well as the `intrinsic/` folder, and that the structure of your folder matches the one described in the `scenenn` repository. Use the tool in the `playback/` folder of the [scenenn repository](https://github.com/scenenn/scenenn) to extract depth and color images from the `.oni` files.
+- The main dataset used is `InteriorNet`.  
+Please download the [dataset](https://interiornet.org/), specifically the HD7 scenes. Not all scenes have to be downloaded. In the python/dataset_utils directory there is a python script (download_interiornet.py) that automatically downloads scenes from the HD7 directory. The path were the dataset is stored can be set in the script.
+- Other datasets can be used as well, as long as they are converted into the InteriorNet format. As an example, scripts for converting the DIML dataset and NYU dataset are located in the python/dataset_utils/ directory. The files used from the InteriorNet scene directories include cam0.render and the images in cam0/data/ (or random_lighting_cam0/data/, if set in python/generate_raw_data.py), label0/data/, depth0/data/. Note that cam0.render is currently only used to determine the frame count for the interiornet_to_rosbag node. Also, no ground truth instancing labels are required for the place recognition pipeline to work. However, "fake" instance and semantic masks need to be created in the label0/data/ directory. Lastly, the InteriorNet dataset depth images are stored as euclidean ray lengths from the camera center. If the depth data is stored in the z coordinate (as it is the case with the NYU and DIML dataset), it needs to be converted accordingly.
 
 ## Data generation
-The following section explains how to obtain the data that should be fed to the neural-network, starting from the datasets downloaded above. In particular:
-- ROS bags are generated from the datasets;
-- Using the utilities in `line_ros_utility`, lines are extracted from the ROS bags previously generated and are saved to disk;
+The following section explains how to obtain the data that is fed to the neural-network, starting from the dataset downloaded above. In particular:
+- The dataset is published as ROS messages;
+- Using the utilities in `line_ros_utility`, lines and their geometric information are extracted from the ROS messages previously generated and are saved to disk;
 - The lines data previoùsly saved are used to generate the virtual-camera images, which are also saved to disk;
-- Lines are converted from camera-frame coordinates to world-frame coordinates (using the camera-to-world matrices obtained from the datasets) and are split in a training, testing and validation set;
-- Lines and virtual-camera images are compactly stored in _pickle files_ (one file for the training set, one file for the testing set and one for the validation set);
-- All the generated data can be stored in a `.tar.gz` archive file.
+- After some post processing, the geometric information and the virtual-camera image of the line are merged and saved to disk. Each directory corresponds to one scene from the dataset. These files are used for training later;
 
-
-Before starting generating the data, make sure that the following variables are set as indicated below:
-- In `scenenet_ros_tools/nodes/scenenet_to_rosbag.py`, function `convert`:
-  - `write_scene_pcl = True`
-  - `write_rgbd = True`
-  - `write_instances = True`
-  - `write_instances_color = False`
-  - You may also set `write_object_segments = False`, as object segments are not used for this project, but make the ROS bags heavier.
-- In `scenenn_ros_tools/nodes/scenenn_to_rosbag.py`, function `publish`:
-  - `publish_scene_pcl = True`
-  - `publish_rgbd = True`
-  - `publish_instances = True`
-  - `publish_instances_color = False`
-  - It is suggested that `publish_object_segments` be set to `False`, as object segments are not used for this project, but make the ROS bags much heavier and largely increase the time required for generation.
-
-Data generation can be performed automatically by using the Bash script `generate_trajectory_files.sh`. Before using it, make sure you properly set the _paths_ and _variables_ in the two following configuration scripts (the meaning of each variable is explained in detail in the scripts themselves):
-* **config_paths_and_variables.sh**: Stores the paths where the datasets are located, where the intermediate data generated by the 'offline' pipeline are saved and where the auxiliary scripts are located. This configuration script is required to coordinate the handling of paths for all the scripts and nodes in the pipeline (i.e., both C++ executables and Python scripts).  
-_For the purpose of data generation_ it also contains two variables, that specify for which trajectory and which dataset the data should be generated:
-  - `TRAJ_NUM`: index of the trajectory (called 'scene' in SceneNN) in the original dataset (e.g., `0`, `1`, `2`, etc. for any subset of SceneNetRGBD, or `005` or any other three-digit ID for SceneNN);
-  - `DATASET_NAME`: name of the dataset that contains the trajectory.
-    - For SceneNetRGBD: either `train_<NUM>` or `val` (where `<NUM>` is an integer between 0 and 16), indicates respectively one of the 17 subsets in which the original SceneNetRGBD training set is split or the original SceneNetRGBD validation set.
-    - For SceneNN: `scenenn`.
-
-    Please note that you need to have previously downloaded the dataset `DATASET_NAME` (as indicated in [Datasets](#datasets)). For SceneNetRGBD, you also need to store the corresponding protobuf file in `config_protobuf_paths` (cf. below).
-* **config_protobuf_paths**: 'Dictionary' of the protobuf files for all the subsets of SceneNetRGBD that you intend to use. The information in the protobuf file is required to associate a trajectory index to its location on disk (called _render path_), as well as to retrieve the camera-to-world matrix.
-
-After editing the two configuration files above, you can start generating the data with `generate_trajectory_files.sh`, as follows:
-```bash
-chmod +x generate_trajectory_files.sh
-./generate_trajectory_files.sh
-```
-
-
-Data generation can also be performed manually by following the same steps as those in the script `generate_trajectory_files.sh`. However, this is not suggested, as the handling of the intermediate data generated, as well as of the right paths and variables to use, is rather intricate. If you intend to manually execute all the steps, make sure you use the correct arguments for each script (cf. usage in `generate_trajectory_files.sh` and description in the README of the packages).
+Data generation can be performed automatically by using the bash script **generate_data.sh**. Before using it, make sure you properly set the _paths_ and _variables_ in the python/**generate_raw_data.py** script file (the meaning of each variable is explained in detail in the scripts themselves). Note that the dataset needs to be downloaded prior to this step.
 
 
 ### Training the model
-To train the model with the data previously generated, as well as to obtain the embeddings for a test set and cluster them, please look at the package `python`.
+To train the models with the data previously generated and to perform place recognition experiments, please take a look at the package `python`.
 
 
 ### Utility files
