@@ -4,14 +4,6 @@
   <version>0.0.1</version>
   <description>Package to match 3D lines in line_tools.</description>
 
-  <maintainer email="fmilano@student.ethz.ch">Francesco Milano</maintainer>
-  <maintainer email="fadri.furrer@mavt.ethz.ch">Fadri Furrer</maintainer>
-  <maintainer email="tonci.novkovic@mavt.ethz.ch">Tonci Novkovic</maintainer>
-
-  <author>Francesco Milano</author>
-  <author>Fadri Furrer</author>
-  <author>Tonci Novkovic</author>
-
   <license>BSD</license>
 
   <buildtool_depend>catkin</buildtool_depend>
