@@ -27,6 +27,11 @@ def train_clustering(pretrain_images=False, past_path=None, past_epoch=None):
     # list of callbacks. The inference results can be viewed with visualize_clusters.py
     test_files = "/nvme/line_ws/test"
 
+    if not os.path.exists(train_files):
+        print("ERROR: The path to the train set does not exist. Please set it in train_clustering.py.")
+        print("Path to train set: " + train_files)
+        exit(0)
+
     # Hyper-parameters of the neural network:
     # The dimensionality of the geometry vector of a line.
     line_num_attr = 15
@@ -68,7 +73,7 @@ def train_clustering(pretrain_images=False, past_path=None, past_epoch=None):
         log_path = past_path
         for layer in line_model.layers:
             layer.trainable = False
-        line_model.load_weights(os.path.join(log_path, "weights_only.{:02d}.hdf5".format(past_epoch)),
+        line_model.load_weights(os.path.join(log_path, "weights.{:02d}.hdf5".format(past_epoch)),
                                 by_name=True)
         for layer in line_model.layers:
             layer.trainable = True
@@ -121,11 +126,11 @@ def train_clustering(pretrain_images=False, past_path=None, past_epoch=None):
                                                                    max_cluster_count=max_clusters)
 
     # Callback to save the model after every epoch (This doesn't work because Keras cannot load custom models).
-    save_model_callback = tf_keras.callbacks.ModelCheckpoint(os.path.join(log_path, "weights.{epoch:02d}.hdf5"))
+    # save_model_callback = tf_keras.callbacks.ModelCheckpoint(os.path.join(log_path, "weights.{epoch:02d}.hdf5"))
     # Callback to visualize the training progress on tensorboard.
     tensorboard_callback = tf_keras.callbacks.TensorBoard(log_dir=log_path, write_graph=False, write_images=True)
     # Callback to save the
-    save_callback = callback_utils.SaveCallback(os.path.join(log_path, "weights_only.{:02d}.hdf5"))
+    save_callback = callback_utils.SaveCallback(os.path.join(log_path, "weights.{:02d}.hdf5"))
     # Callback to perform inference on the test set. These results can be visualized to check progress.
     inference_callback = callback_utils.InferenceCallback(test_data_generator, log_path)
     # Add a callback for learning rate decay.

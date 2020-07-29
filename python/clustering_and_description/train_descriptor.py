@@ -26,6 +26,11 @@ def train_descriptor(past_path=None, past_epoch=None):
     # Path to the validation scenes.
     val_files = "/nvme/line_ws/val"
 
+    if not os.path.exists(train_files):
+        print("ERROR: The path to the train set does not exist. Please set it in train_descriptor.py.")
+        print("Path to train set: " + train_files)
+        exit(0)
+
     # Hyper-parameters of the neural network:
     # The dimensionality of the geometry vector of a line.
     line_num_attr = 15
@@ -58,7 +63,7 @@ def train_descriptor(past_path=None, past_epoch=None):
                                                          img_shape, margin)
         cluster_model.get_layer("cluster_embedding_model").get_layer("image_features").load_weights(image_weight_path)
     else:
-        load_path = os.path.join(log_path, "weights_only.{:02d}.hdf5".format(past_epoch))
+        load_path = os.path.join(log_path, "weights.{:02d}.hdf5".format(past_epoch))
         cluster_model = model.load_cluster_triplet_model(load_path, line_num_attr, max_line_count, embedding_dim,
                                                          img_shape, margin)
     cluster_model.summary()
@@ -85,7 +90,7 @@ def train_descriptor(past_path=None, past_epoch=None):
     if not load_past:
         log_path = "./logs/description_{}".format(datetime.datetime.now().strftime("%d%m%y_%H%M"))
     tensorboard_callback = tf_keras.callbacks.TensorBoard(log_dir=log_path)
-    save_callback = callback_utils.SaveCallback(os.path.join(log_path, "weights_only.{:02d}.hdf5"), cluster=True)
+    save_callback = callback_utils.SaveCallback(os.path.join(log_path, "weights.{:02d}.hdf5"), cluster=True)
     learning_rate_callback = callback_utils.LearningRateCallback({5: 0.00005, 10: 0.000025, 20: 0.00001})
     callbacks = [tensorboard_callback, save_callback, learning_rate_callback]
 
