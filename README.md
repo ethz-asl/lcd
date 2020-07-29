@@ -89,16 +89,10 @@ Please download the [dataset](https://interiornet.org/), specifically the HD7 sc
 - Other datasets can be used as well, as long as they are converted into the InteriorNet format. As an example, scripts for converting the DIML dataset and NYU dataset are located in the python/dataset_utils/ directory. The files used from the InteriorNet scene directories include `cam0.render` and the images in `cam0/data/` (or `random_lighting_cam0/data/`, if set in python/generate_raw_data.py), `label0/data/`, `depth0/data/`. Note that cam0.render is currently only used to determine the frame count for the `interiornet_to_rosbag` node. Also, no ground truth instancing labels are required for the place recognition pipeline to work. However, "fake" instance and semantic masks need to be created in the label0/data/ directory. Lastly, the InteriorNet dataset depth images are stored as euclidean ray lengths from the camera center. If the depth data is stored in the z coordinate (as it is the case with the NYU and DIML dataset), it needs to be converted accordingly.
 
 ## Data generation
-The following section explains how to obtain the data that is fed to the neural-network, starting from the dataset downloaded above. In particular:
-- The dataset is published as ROS messages;
-- Using the utilities in `line_ros_utility`, lines and their geometric information are extracted from the ROS messages previously generated and are saved to disk;
-- The lines data previoùsly saved are used to generate the virtual-camera images, which are also saved to disk;
-- After some post processing, the geometric information and the virtual-camera image of the line are merged and saved to disk. Each directory corresponds to one scene from the dataset. These files are used for training later;
-
-Data generation can be performed automatically by using the bash script `generate_data.sh`. Before using it, make sure you properly set the _paths_ and _variables_ in the python/**generate_raw_data.py** script file (the meaning of each variable is explained in detail in the scripts themselves). Note that the dataset needs to be downloaded prior to this step.
+Please check the `python` package on how to generate the data needed for training and evaluation.
 
 
-### Training the model
+## Training the models and evaluation
 To train the models with the data previously generated and to perform place recognition experiments, please take a look at the package `python`.
 
 
