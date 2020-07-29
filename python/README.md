@@ -47,9 +47,9 @@ The resulting scene folders can be copied and pasted into different folders to c
 
   _Arguments_:
   
-  - `-pretrain`: If training the image encoding network. If not specified, the entire network will be trained. However, pretrained image encoding weights have to be provided;
-  - `-model_checkpoint_dir`: If specified, the model checkpoint from past training is loaded. Epoch needs to be specified as well;
-  - `-epoch`: The number of the epoch from past training;
+  - `--pretrain`: If training the image encoding network. If not specified, the entire network will be trained. However, pretrained image encoding weights have to be provided;
+  - `--model_checkpoint_dir`: If specified, the model checkpoint from past training is loaded. Epoch needs to be specified as well;
+  - `--epoch`: The number of the epoch from past training;
 
 - `visualize_clusters.py`: A script to visualize the outputs of the clustering network interactively. `train_clustering.py` generates clusterings of the test dataset that can be visualized with this script.
 
@@ -62,8 +62,8 @@ The resulting scene folders can be copied and pasted into different folders to c
 
   _Arguments_:
   
-  - `-model_checkpoint_dir`: If specified, the model checkpoint from past training is loaded. Epoch needs to be specified as well;
-  - `-epoch`: The number of the epoch from past training;
+  - `--model_checkpoint_dir`: If specified, the model checkpoint from past training is loaded. Epoch needs to be specified as well;
+  - `--epoch`: The number of the epoch from past training;
 
 
 - `evaluate_pipeline.py`: The script to evaluate the place recognition performance of the full pipeline, the full pipeline with ground truth clustering and the SIFT bag-of-words approach on the validation set. Also, the clustering performance (NMI) of the clustering network and agglomerative clustering can be evaluated. The paths and variables need to be set within the script.
