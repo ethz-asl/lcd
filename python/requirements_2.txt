@@ -1,0 +1,9 @@
+matplotlib==2.2.5
+numpy==1.16.6
+opencv-python~=3.4.2
+pandas==0.24.2
+rospy==1.14.5
+scikit-learn==0.20.4
+scipy==1.2.3
+sensor-msgs==1.12.7
+virtualenv==20.0.17
