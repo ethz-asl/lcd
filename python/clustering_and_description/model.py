@@ -299,7 +299,7 @@ def get_non_linearity():
 
 def image_pretrain_model(line_num_attr, num_lines, img_shape):
     """
-    Creates a model used to pretrain the image encoding weights. It is the same as the line_net model just without
+    Creates a model used to pretrain the image encoding weights. It is the same as the clustering_and_description model just without
     any geometric data, and reduced dimensionality of all layers.
     :param line_num_attr: The dimensionality of the geometric input data.
     :param num_lines: The maximum number of lines.
@@ -571,7 +571,7 @@ def line_net_model_4(line_num_attr, num_lines, max_clusters, img_shape):
 
 def save_line_net_model(model, path):
     """
-    Saves the line_net model weights during training.
+    Saves the clustering_and_description model weights during training.
     :param model: The model to be saved.
     :param path: The path the weights should be saved to.
     """
@@ -587,7 +587,7 @@ def save_line_net_model(model, path):
 
 def load_line_net_model(path, line_num_attr, max_line_count, max_clusters, img_shape):
     """
-    Loads the line_net model weights.
+    Loads the clustering_and_description model weights.
     :param path: The path to the file containing the weights.
     :param line_num_attr: The dimensionality of the geometric input data.
     :param max_line_count: The maximum number of lines.

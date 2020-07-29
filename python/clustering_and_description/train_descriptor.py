@@ -47,7 +47,7 @@ def train_descriptor(past_path=None, past_epoch=None):
     # Careful: in InteriorNet, 0 is not background, but some random class. In theory, class 0 should not exist.
     bg_classes = [0, 1, 2, 20, 22]
     # The path to the pretrained weights of the image encoding layer.
-    image_weight_path = "/home/felix/line_ws/src/line_tools/python/line_net/weights/image_weights.hdf5"
+    image_weight_path = "/clustering_and_description/weights/image_weights.hdf5"
 
     load_past = past_path is not None
     log_path = past_epoch
@@ -107,11 +107,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Train the cluster description network.')
     parser.add_argument(
-        "-model_checkpoint_dir",
+        "--model_checkpoint_dir",
         default=None,
         help="If specified, the model checkpoint from past training is loaded. Epoch needs to be specified as well.")
     parser.add_argument(
-        "-epoch",
+        "--epoch",
         default=None,
         help="Path where to write the txt files with the splitting.")
     args = parser.parse_args()

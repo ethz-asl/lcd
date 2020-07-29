@@ -24,7 +24,7 @@ def train_clustering(pretrain_images=False, past_path=None, past_epoch=None):
     # Path to the validation scenes.
     val_files = "/nvme/line_ws/val"
     # The path to the test files for inference. If inference is not desired, remove the inference callback from the
-    # list of callbacks. The inference results can be viewed with visualize_lines.py
+    # list of callbacks. The inference results can be viewed with visualize_clusters.py
     test_files = "/nvme/line_ws/test"
 
     # Hyper-parameters of the neural network:
@@ -49,7 +49,7 @@ def train_clustering(pretrain_images=False, past_path=None, past_epoch=None):
     # Check if past training weights should be loaded. For example if the training got interrupted.
     load_past = past_path is not None
     # The path to the pretrained weights of the image encoding layer.
-    image_weight_path = "/home/felix/line_ws/src/line_tools/python/line_net/weights/image_weights.hdf5"
+    image_weight_path = "/clustering_and_description/weights/image_weights.hdf5"
 
     # Create line net Keras model.
     if pretrain_images:
@@ -78,6 +78,9 @@ def train_clustering(pretrain_images=False, past_path=None, past_epoch=None):
             log_path = "./logs/pretrain_{}".format(datetime.datetime.now().strftime("%d%m%y_%H%M"))
         else:
             log_path = "./logs/cluster_{}".format(datetime.datetime.now().strftime("%d%m%y_%H%M"))
+
+    if not os.path.exists("./logs"):
+        os.mkdir("./logs")
 
     # Do not apply data augmentation if pretraining the image encoding network.
     data_augmentation = True
@@ -158,18 +161,18 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Train the clustering network or pretrain the image encoding network.')
     parser.add_argument(
-        "-pretrain",
+        "--pretrain",
         dest='pretrain',
         action='store_true',
         help="If set, pretrains and saves the image encoding weights.")
     parser.add_argument(
-        "-model_checkpoint_dir",
+        "--model_checkpoint_dir",
         default=None,
         help="If specified, the model checkpoint from past training is loaded. Epoch needs to be specified as well.")
     parser.add_argument(
-        "-epoch",
+        "--epoch",
         default=None,
-        help="Path where to write the txt files with the splitting.")
+        help="The number of the epoch from past training.")
     args = parser.parse_args()
 
     pretrain = args.pretrain

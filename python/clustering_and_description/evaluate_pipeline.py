@@ -6,7 +6,7 @@ import sklearn.neighbors as sn
 import sklearn.cluster as sc
 import sklearn.metrics as sm
 import datagenerator_framewise
-import visualize_lines
+import visualize_clusters
 import model
 import pickle
 import os
@@ -705,10 +705,10 @@ if __name__ == '__main__':
 
     # The path to the saved weights of the cluster description model.
     embedding_model_path = \
-        "/home/felix/line_ws/src/line_tools/python/line_net/logs/description_100620_1644/weights_only.27.hdf5"
+        "/clustering_and_description/logs/description_100620_1644/weights_only.27.hdf5"
     # The path to the saved weights of the clustering model.
     cluster_model_path = \
-        "/home/felix/line_ws/src/line_tools/python/line_net/logs/cluster_110620_2345/weights_only.26.hdf5"
+        "/clustering_and_description/logs/cluster_110620_2345/weights_only.26.hdf5"
     # The path to the pickled precomputed map (sift histograms and cluster descriptors) for all frames in the map.
     PICKLE_PATH = "/nvme/line_ws/val_map"
     # The path to the preprocessed dataset directory containing the line files for the frames of the scenes used for
@@ -851,8 +851,6 @@ if __name__ == '__main__':
     print("Starting query.")
 
     # Set seed for reproducibility during query.
-    # 128 for diml
-    # 129 for nyu
     np.random.seed(128)
 
     # Start place recognition experiments.

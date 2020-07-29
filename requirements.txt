@@ -1,6 +1,0 @@
-numpy
-protobuf
-sklearn
-opencv-python
-pathlib
-pandas

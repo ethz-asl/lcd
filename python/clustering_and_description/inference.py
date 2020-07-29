@@ -8,7 +8,7 @@ import numpy as np
 def infer_on_test_set(model, test_data_generator, log_dir, epoch):
     """
     Perform inference of the model on the specified test dataset.
-    The results will be saved in the log directory and can be viewed using visualize_lines.py.
+    The results will be saved in the log directory and can be viewed using visualize_clusters.py.
     :param model: The clustering model.
     :param test_data_generator: The data generator for the test set.
     :param log_dir: The directory where the output will be saved to.

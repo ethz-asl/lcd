@@ -16,8 +16,8 @@ from tools import line_file_utils
 def get_transform_to_world(camera_origin, camera_rotation):
     """
     Returns the 4x4 transformation matrix from the camera origin and camera rotation.
-    :param cam_origin: Cartesian origin of the camera. Numpy array of shape (3, 1)
-    :param cam_rotation: Quaternion of the rotation of the camera. Numpy array of shape (4, 1)
+    :param camera_origin: Cartesian origin of the camera. Numpy array of shape (3, 1)
+    :param camera_rotation: Quaternion of the rotation of the camera. Numpy array of shape (4, 1)
     :return: The 4x4 transformation matrix of the camera.
     """
     x = camera_origin[0]
@@ -280,10 +280,10 @@ if __name__ == '__main__':
     parser.add_argument("-line_files_path",
                         help="Path to folder containing the line files.")
     parser.add_argument(
-        "-virtual_images_path",
+        "--virtual_images_path",
         help="Path to folder containing the virtual images.")
     parser.add_argument(
-        "-output_path",
+        "--output_path",
         help="Path where to write the txt files with the splitting.")
 
     args = parser.parse_args()

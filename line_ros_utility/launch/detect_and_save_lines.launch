@@ -1,8 +1,6 @@
 <launch>
   <arg name="trajectory" default="1" />
   <arg name="write_path" />
-  <arg name="scenenet_true_scenenn_false" default="true" />
-  <arg name="interiornet" default="true" />
   <arg name="start_frame" default="0" />
   <arg name="frame_step" default="1" />
   <node
@@ -10,24 +8,7 @@
     type="rqt_reconfigure"
     name="rqt_reconfigure"
  ></node>
- <group if="$(eval interiornet == false)">
   <node
-    if="$(eval scenenet_true_scenenn_false == true)"
-    pkg="line_ros_utility"
-    type="scenenet_to_line_tools"
-    name="scenenet_to_line_tools"
-    output="screen"
-  ></node>
-  <node
-    if="$(eval scenenet_true_scenenn_false == false)"
-    pkg="line_ros_utility"
-    type="scenenn_to_line_tools"
-    name="scenenn_to_line_tools"
-    output="screen"
-  ></node>
- </group>
-  <node
-    if="$(eval interiornet == true)"
     pkg="line_ros_utility"
     type="interiornet_to_line_tools"
     name="interiornet_to_line_tools"
@@ -39,5 +20,5 @@
     name="detect_and_save_lines"
     args="$(arg trajectory) $(arg write_path) $(arg start_frame) $(arg frame_step)"
     output="screen"
- ></node>
+  ></node>
 </launch>

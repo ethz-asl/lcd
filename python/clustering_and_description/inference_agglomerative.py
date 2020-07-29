@@ -31,7 +31,7 @@ def closest_distance_between_lines(a0, a1, b0, b1,
     _A = A / magA
     _B = B / magB
 
-    cross = np.cross(_A, _B);
+    cross = np.cross(_A, _B)
     denom = np.linalg.norm(cross)**2
 
     # If lines are parallel (denom=0) test if lines overlap.
@@ -63,12 +63,12 @@ def closest_distance_between_lines(a0, a1, b0, b1,
         return None,None,np.linalg.norm(((d0*_A)+a0)-b0)
 
     # Lines criss-cross: Calculate the projected closest points
-    t = (b0 - a0);
+    t = (b0 - a0)
     detA = np.linalg.det([t, _B, cross])
     detB = np.linalg.det([t, _A, cross])
 
-    t0 = detA/denom;
-    t1 = detB/denom;
+    t0 = detA/denom
+    t1 = detB/denom
 
     pA = a0 + (_A * t0) # Projected closest point on segment A
     pB = b0 + (_B * t1) # Projected closest point on segment B
