@@ -14,12 +14,12 @@ The repository consists of the following packages, *each of which is described i
 2. `line_description`: Package to describe lines (either with _neural-network embeddings_ or with a binary descriptor). It is a test-like package mainly developed to allow execution of the entire pipeline (from line extraction, to virtual-camera images extraction and retrieval of neural-network embeddings from a previously-trained model) 'online', i.e., without saving data to disk, but transferring them through ROS. Please note that the virtual-camera images and embeddings can currently only be retrieved 'offline' (i.e., saving data to disk and subsequently reading them, without using ROS), by using the scripts in `python` (cf. below). The binary descriptor, instead, was only introduced as an initial test for comparison, but it is not meant to be used currently. Indeed, the latter is a regular feature descriptor, whereas _the neural-network embeddings are not descriptors for the line features, but are rather needed to define the clusters for the instances in the embedding space_ (cf. above). This package is currently not in use.
 3. `line_ros_utility`: Package containing ROS utilities mainly to allow extraction of lines and geometric information from ROS messages generated from the InteriorNet dataset (cf. [Datasets](#datasets)). The lines extracted are labelled with ground-truth instance labels and saved (with 2D and 3D info) for later use in the pipeline. The package also includes a node to create a histogram of the line lengths and one to launch a test 'online' pipeline to detect, describe and match lines.
 4. `python`: Collection of Python scripts to serve several purposes:
-  - Generate virtual-camera images for the detected lines;
-  - Generate data using the full pipeline for a large amount of InteriorNet scenes;
-  - Train the neural network for clustering of lines;
-  - Train the neural network for the description of clusters;
-  - Evaluate the full place recognition pipeline;
-  - Visualization.
+    - Generate virtual-camera images for the detected lines;
+    - Generate data using the full pipeline for a large amount of InteriorNet scenes;
+    - Train the neural network for clustering of lines;
+    - Train the neural network for the description of clusters;
+    - Evaluate the full place recognition pipeline;
+    - Visualization.
 
 The following 'auxiliary' packages are also part of the repository:
 1. `line_clustering`: Deprecated package developed to perform clustering of lines.
