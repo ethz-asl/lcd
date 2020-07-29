@@ -598,7 +598,7 @@ class ClusterDataSequence(Sequence):
     The data generator class for cluster descriptor training used for training with the Keras API.
     It inherits from the Sequence class.
     """
-    def __init__(self, files_dir, batch_size, bg_classes, classes, shuffle=False, data_augmentation=False,
+    def __init__(self, files_dir, batch_size, bg_classes, shuffle=False, data_augmentation=False,
                  img_shape=(64, 96, 3), min_line_count=5, max_line_count=50,
                  load_images=True, training_mode=True):
         """
@@ -617,8 +617,6 @@ class ClusterDataSequence(Sequence):
         """
         self.files_dir = files_dir
         self.bg_classes = bg_classes
-        self.classes = classes
-        self.class_count = 1 + len(classes)
         self.shuffle = shuffle
         self.data_augmentation = data_augmentation
         self.img_shape = img_shape

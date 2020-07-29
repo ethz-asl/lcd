@@ -36,7 +36,8 @@ def infer_on_test_set(model, test_data_generator, log_dir, epoch):
 
     # Write the results to numpy array files.
     results_path = os.path.join(log_dir, "results_{:02d}".format(epoch))
-    os.mkdir(results_path)
+    if not os.path.exists(results_path):
+        os.mkdir(results_path)
     np.save(os.path.join(results_path, "predictions"), np.array(predictions))
     np.save(os.path.join(results_path, "labels"), np.array(labels))
     np.save(os.path.join(results_path, "geometries"), np.array(geometries))

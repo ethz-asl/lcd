@@ -23,7 +23,7 @@ sys.path.append("../tools/")
 import interiornet_utils
 
 # Generate some colors for visualization.
-COLORS = (visualize_lines.get_colors() * 255).astype(int)
+COLORS = (visualize_clusters.get_colors() * 255).astype(int)
 COLORS = np.vstack([np.array([
     [255, 0, 0],
     [128, 64, 64],

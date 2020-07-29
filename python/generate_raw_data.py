@@ -41,7 +41,7 @@ def generate_hd7(path_to_data, line_path_master, vci_path_master, train_path_mas
     publishers = interiornet_to_rosbag.init_publishers()
 
     # Iterate over all scenes found in the dataset directory.
-    for dir_path in glob.iglob(path_to_data):
+    for dir_path in glob.iglob(os.path.join(path_to_data, "*")):
         if "Bathroom" in dir_path:
             continue
 

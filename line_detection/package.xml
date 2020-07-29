@@ -3,6 +3,9 @@
   <name>line_detection</name>
   <version>0.0.1</version>
   <description>Package for detecting lines in 3D.</description>
+  <maintainer email="anonymous@email.com">Anonymous</maintainer>
+
+  <author>Anonymous</author>
 
   <license>BSD</license>
 

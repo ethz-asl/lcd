@@ -3,6 +3,9 @@
   <name>line_matching</name>
   <version>0.0.1</version>
   <description>Package to match 3D lines in line_tools.</description>
+  <maintainer email="anonymous@email.com">Anonymous</maintainer>
+
+  <author>Anonymous</author>
 
   <license>BSD</license>
 

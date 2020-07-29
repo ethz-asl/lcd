@@ -1,6 +1,6 @@
 <launch>
   <arg name="trajectory" default="1" />
-  <arg name="write_path" />
+  <arg name="write_path" default=""/>
   <arg name="start_frame" default="0" />
   <arg name="frame_step" default="1" />
   <node

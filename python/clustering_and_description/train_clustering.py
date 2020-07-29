@@ -54,7 +54,7 @@ def train_clustering(pretrain_images=False, past_path=None, past_epoch=None):
     # Check if past training weights should be loaded. For example if the training got interrupted.
     load_past = past_path is not None
     # The path to the pretrained weights of the image encoding layer.
-    image_weight_path = "/clustering_and_description/weights/image_weights.hdf5"
+    image_weight_path = "./weights/image_weights.hdf5"
 
     # Create line net Keras model.
     if pretrain_images:
@@ -97,7 +97,6 @@ def train_clustering(pretrain_images=False, past_path=None, past_epoch=None):
                                                                     batch_size,
                                                                     bg_classes,
                                                                     shuffle=True,
-                                                                    fuse=False,
                                                                     img_shape=img_shape,
                                                                     min_line_count=min_line_count,
                                                                     max_line_count=max_line_count,
@@ -107,7 +106,6 @@ def train_clustering(pretrain_images=False, past_path=None, past_epoch=None):
     val_data_generator = datagenerator_framewise.LineDataSequence(val_files,
                                                                   batch_size,
                                                                   bg_classes,
-                                                                  fuse=False,
                                                                   img_shape=img_shape,
                                                                   min_line_count=min_line_count,
                                                                   max_line_count=max_line_count,
@@ -117,10 +115,9 @@ def train_clustering(pretrain_images=False, past_path=None, past_epoch=None):
                                                                    1,
                                                                    bg_classes,
                                                                    shuffle=False,
-                                                                   fuse=False,
                                                                    img_shape=img_shape,
                                                                    min_line_count=0,
-                                                                   max_line_count=220,
+                                                                   max_line_count=max_line_count,
                                                                    data_augmentation=False,
                                                                    training_mode=False,
                                                                    max_cluster_count=max_clusters)
@@ -155,6 +152,8 @@ def train_clustering(pretrain_images=False, past_path=None, past_epoch=None):
                    verbose=1,
                    max_queue_size=16,
                    workers=4,
+                   steps_per_epoch=10,
+                   validation_steps=10,
                    epochs=num_epochs,
                    initial_epoch=initial_epoch,
                    use_multiprocessing=True,

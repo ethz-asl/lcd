@@ -52,7 +52,7 @@ def train_descriptor(past_path=None, past_epoch=None):
     # Careful: in InteriorNet, 0 is not background, but some random class. In theory, class 0 should not exist.
     bg_classes = [0, 1, 2, 20, 22]
     # The path to the pretrained weights of the image encoding layer.
-    image_weight_path = "/clustering_and_description/weights/image_weights.hdf5"
+    image_weight_path = "./weights/image_weights.hdf5"
 
     load_past = past_path is not None
     log_path = past_epoch
