@@ -27,21 +27,20 @@ python -m ipykernel install --user --name line_tools
 Keras and tensorflow-gpu is used here. It is strongly recommended to use a GPU with sufficient memory for training. 
 
 ### Main scripts
-*NOTE: the arguments of the scripts below (apart from those in `tools/` can be avoided by using the data-generation script `../generate_data.sh`.
-- `generate_raw_data.py`: Runs all python scripts required for the generation and storage of the geometric information and virtual camera images. The scripts include:
+- `generate_raw_data.py`: Runs all python scripts required for the generation and storage of the geometric information and virtual camera images. This script will automatically be run by the `generate_data.sh` script. The scripts include:
   - `interiornet_to_rosbag`: Publishes the InteriorNet dataset to the ROS node
   - `get_virtual_camera_images.py`: Obtains the virtual camera images of each line.
   - `split_dataset_framewise.py`: Currently, the InteriorNet dataset contains an error that some instances of the same semantic label are assigned the same instance label. This script fixes it (in a makeshift way), by splitting the instances with a mean shift algorithm. The radius can be set in the corresponding file. 
 
   _Arguments_:
   
-  - `path_to_data`: The path where the dataset is stored.
-  - `line_files_path: The path where the ROS node output is stored.
+  - `dataset_path`: The path where the dataset is stored.
+  - `geometry_path: The path where the ROS node output is stored.
   - `vci_path`: The path where the virtual camera images are stored.
-  - `train_path`: The path where the files used for training are stored.
+  - `output_path`: The path where the files used for training are stored.
   - `light_type`: Either 'random' or 'original', specifying the type of lighting used for the InteriorNet scenes.
 
-The resulting scene folders can be copied and pasted into different folders to create a training and validation subset. Note that these subsets should not contain the same scenes, as this will distort the results. The scripts for training and evaluation of the neural networks are:
+The resulting scene folders can be copied and pasted into different folders to create a training and validation subset. Note that these subsets should not contain the same scenes, as this will distort the results. The scripts for training and evaluation of the neural networks are located in the `clustering_and_description` directory:
 
 
 - `train_clustering.py`: Trains the neural-network for the clustering of lines. Please note that there are several training parameters including the path to the train and validation set, that can be changed by editing directly the associated variables in the script and that are documented within the script itself. A test directory needs to be specified with scenes where the output of the neural network can be visualized with `visualize_clusters.py`.
