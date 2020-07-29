@@ -10,13 +10,13 @@ Python 2.7 is used for the generation of data (due to ROS packages being used) a
 ```bash
 virtualenv --python=python2.7 ~/.virtualenvs/line_tools_2
 source ~/.virtualenvs/line_tools/bin/activate
-pip install -r requirements.txt
+pip install -r requirements_2.txt
 ```
 or
 ```bash
 virtualenv --python=python2.7 ~/.virtualenvs/line_tools_3
 source ~/.virtualenvs/line_tools/bin/activate
-pip install -r requirements.txt
+pip install -r requirements_3.txt
 ```
 To use `jupyter notebook`, you need to type the following commands when you are inside the `line_tools` virtual environment:
 ```bash
