@@ -27,7 +27,7 @@ python -m ipykernel install --user --name line_tools
 Keras and tensorflow-gpu is used here. It is strongly recommended to use a GPU with sufficient memory for training. 
 
 ### Main scripts
-- `generate_raw_data.py`: Runs all python scripts required for the generation and storage of the geometric information and virtual camera images. This script will automatically be run by the `generate_data.sh` script. The scripts include:
+- `generate_raw_data.py`: Runs all python scripts required for the generation and storage of the geometric information and virtual camera images. The scripts include:
   - `interiornet_to_rosbag`: Publishes the InteriorNet dataset to the ROS node
   - `get_virtual_camera_images.py`: Obtains the virtual camera images of each line.
   - `split_dataset_framewise.py`: Currently, the InteriorNet dataset contains an error that some instances of the same semantic label are assigned the same instance label. This script fixes it (in a makeshift way), by splitting the instances with a mean shift algorithm. The radius can be set in the corresponding file. 
@@ -71,11 +71,11 @@ The resulting scene folders can be copied and pasted into different folders to c
 
 ## Usage
 **Data generation**
-Generate the data by using the data generation script `generate_data.sh` and specifying the corresponding paths. If it is needed to change settings of the line detector ROS node, it can be run separately:
+To generate the data used for training and evaluation, first run the ROS node for line detection:
 ```bash
 roslaunch line_ros_utility detect_and_save_lines.launch
 ```
-and then run `generate_raw_data.py` with arguments explained above.
+and then run `generate_raw_data.py` with the arguments explained above.
 
 The data used for training is stored in the directory specified by `train_path`. It consists of scene folders containing all frames of a scene. After generating all data, create a directory for the train, validation and test set each. Split the data by moving a fraction of the folder to the train and validation set. Careful not to have duplicates in the train and validation directories. Scenes where visualization is desired can be copied into the test directory. 
 
