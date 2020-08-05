@@ -40,6 +40,8 @@ $ cd ~/catkin_ws
 $ catkin init
 ```
 
+Copy the folder `line_tools` into the `src` directory in catkin workspace `catkin_ws`.
+
 `git clone` the following packages to your `src` directory in catkin workspace `catkin_ws`
 
 * [catkin_simple](https://github.com/catkin/catkin_simple)
@@ -47,7 +49,6 @@ $ catkin init
 * [eigen_checks](https://github.com/ethz-asl/eigen_checks)
 * [gflags_catkin](https://github.com/ethz-asl/gflags_catkin)
 * [glog_catkin](https://github.com/ethz-asl/glog_catkin/)
-* [line_tools](https://github.com/ethz-asl/line_tools/)
 * [opencv3_catkin](https://github.com/ethz-asl/opencv3_catkin/)
 * [pcl_catkin](https://github.com/ethz-asl/pcl_catkin/)
 * [interior_net_to_rosbag](https://github.com/ethz-asl/interiornet_to_rosbag)
