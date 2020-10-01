@@ -9,13 +9,13 @@ This package contains Python scripts that serve the following purposes:
 Python 2.7 is used for the generation of data (due to ROS packages being used) and python 3.7 is used for the training, evaluation and visualization. You can create virtual environments and install the packages:
 ```bash
 virtualenv --python=python2.7 ~/.virtualenvs/line_tools_2
-source ~/.virtualenvs/line_tools/bin/activate
+source ~/.virtualenvs/line_tools_2/bin/activate
 pip install -r requirements_2.txt
 ```
 or
 ```bash
-virtualenv --python=python2.7 ~/.virtualenvs/line_tools_3
-source ~/.virtualenvs/line_tools/bin/activate
+virtualenv --python=python3 ~/.virtualenvs/line_tools_3
+source ~/.virtualenvs/line_tools_3/bin/activate
 pip install -r requirements_3.txt
 ```
 To use `jupyter notebook`, you need to type the following commands when you are inside the `line_tools` virtual environment:
