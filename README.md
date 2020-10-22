@@ -1,4 +1,4 @@
-# Line Tools
+# LCD - Line Clustering and Description for Place Recognition
 The following repository contains packages to detect and cluster lines, and to describe these line clusters for use in place recognition. In particular, the pipeline for place recognition works as follows:
 1. We detect lines in the RGB images from a training set and backproject them to 3D using depth information. We then fit two planes around the lines (using the points around them), readjust the lines in 3D (to cope with noise). We check if the start or end point of the line are occluded by an object or the viewing edge. We save the geometric data of each line consisting of their start and end points, the normals of the two planes and the occlusion of the start and end points.
 2. We label the lines in the training set by assigning them the ground-truth instance label and semantic label of the object that they belong to.
