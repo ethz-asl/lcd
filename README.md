@@ -7,8 +7,11 @@ The following repository contains packages to detect and cluster lines, and to d
 5. We then feed all lines that are assigned the same cluster label into the neural network for line cluster description. This network uses the same virtual camera images and geometric data as the previous network, and outputs a cluster descriptor embedding for each cluster. This network is trained using triplet loss, with triplets of anchor, positive and negative clusters. The anchor and negative cluster have the same instance label. 
 6. The task of place recognition is reduced to matching these cluster descriptors in different scene. For this purpose, a test set is used, where all frames go through the pipeline to produce the cluster descriptors of all clusters in each frame. All clusters are assigned to a scene. The scene of a query frame is then determined by nearest neighbor matching of the clusters embeddings. 
 
-![](teaser_1.png) ![](teaser_2.png) ![](teaser_3.png)
-
+<p float="left">
+  <img src="teaser_1.png" width="300" />
+  <img src="teaser_2.png" width="300" /> 
+  <img src="teaser_3.png" width="300" />
+</p>
 
 The repository consists of the following packages, *each of which is described in more detail in the associated folder*:
 1. [line_detection](line_detection): Package to detect lines in 2D, backproject them in 3D using the depth information, fit planes around them and readjust them in 3D. 
