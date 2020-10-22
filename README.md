@@ -10,10 +10,10 @@ The following repository contains packages to detect and cluster lines, and to d
 
 
 The repository consists of the following packages, *each of which is described in more detail in the associated folder*:
-1. `line_detection`: Package to detect lines in 2D, backproject them in 3D using the depth information, fit planes around them and readjust them in 3D. 
-2. `line_description`: Package to describe lines (either with _neural-network embeddings_ or with a binary descriptor). It is a test-like package mainly developed to allow execution of the entire pipeline (from line extraction, to virtual-camera images extraction and retrieval of neural-network embeddings from a previously-trained model) 'online', i.e., without saving data to disk, but transferring them through ROS. Please note that the virtual-camera images and embeddings can currently only be retrieved 'offline' (i.e., saving data to disk and subsequently reading them, without using ROS), by using the scripts in `python` (cf. below). The binary descriptor, instead, was only introduced as an initial test for comparison, but it is not meant to be used currently. Indeed, the latter is a regular feature descriptor, whereas _the neural-network embeddings are not descriptors for the line features, but are rather needed to define the clusters for the instances in the embedding space_ (cf. above). This package is currently not in use.
-3. `line_ros_utility`: Package containing ROS utilities mainly to allow extraction of lines and geometric information from ROS messages generated from the InteriorNet dataset (cf. [Datasets](#datasets)). The lines extracted are labelled with ground-truth instance labels and saved (with 2D and 3D info) for later use in the pipeline. The package also includes a node to create a histogram of the line lengths and one to launch a test 'online' pipeline to detect, describe and match lines.
-4. `python`: Collection of Python scripts to serve several purposes:
+1. [line_detection](line_detection): Package to detect lines in 2D, backproject them in 3D using the depth information, fit planes around them and readjust them in 3D. 
+2. [line_description](line_description): Package to describe lines (either with _neural-network embeddings_ or with a binary descriptor). It is a test-like package mainly developed to allow execution of the entire pipeline (from line extraction, to virtual-camera images extraction and retrieval of neural-network embeddings from a previously-trained model) 'online', i.e., without saving data to disk, but transferring them through ROS. Please note that the virtual-camera images and embeddings can currently only be retrieved 'offline' (i.e., saving data to disk and subsequently reading them, without using ROS), by using the scripts in [python](python) (cf. below). The binary descriptor, instead, was only introduced as an initial test for comparison, but it is not meant to be used currently. Indeed, the latter is a regular feature descriptor, whereas _the neural-network embeddings are not descriptors for the line features, but are rather needed to define the clusters for the instances in the embedding space_ (cf. above). This package is currently not in use.
+3. [line_ros_utility](line_ros_utility): Package containing ROS utilities mainly to allow extraction of lines and geometric information from ROS messages generated from the InteriorNet dataset (cf. [Datasets](#datasets)). The lines extracted are labelled with ground-truth instance labels and saved (with 2D and 3D info) for later use in the pipeline. The package also includes a node to create a histogram of the line lengths and one to launch a test 'online' pipeline to detect, describe and match lines.
+4. [python](python): Collection of Python scripts to serve several purposes:
     - Generate virtual-camera images for the detected lines;
     - Generate data using the full pipeline for a large amount of InteriorNet scenes;
     - Train the neural network for clustering of lines;
@@ -22,9 +22,9 @@ The repository consists of the following packages, *each of which is described i
     - Visualization.
 
 The following 'auxiliary' packages are also part of the repository:
-1. `line_clustering`: Deprecated package developed to perform clustering of lines.
-2. `line_detection_python`: Currently-unused (and not up-to-date) C++-to-Python bindings of the package `line_detection`.
-3. `line_matching`: Deprecated package to match lines extracted in one frame to lines extracted in another frame. 
+1. [line_clustering](line_clustering): Deprecated package developed to perform clustering of lines.
+2. [line_detection_python](line_detection_python): Currently-unused (and not up-to-date) C++-to-Python bindings of the package `line_detection`.
+3. [line_matching](line_matching): Deprecated package to match lines extracted in one frame to lines extracted in another frame. 
 
 
 ## Build instructions for ROS packages
@@ -40,6 +40,8 @@ $ cd ~/catkin_ws
 $ catkin init
 ```
 
+Copy the folder `line_tools` into the `src` directory in catkin workspace `catkin_ws`.
+
 `git clone` the following packages to your `src` directory in catkin workspace `catkin_ws`
 
 * [catkin_simple](https://github.com/catkin/catkin_simple)
@@ -47,7 +49,6 @@ $ catkin init
 * [eigen_checks](https://github.com/ethz-asl/eigen_checks)
 * [gflags_catkin](https://github.com/ethz-asl/gflags_catkin)
 * [glog_catkin](https://github.com/ethz-asl/glog_catkin/)
-* [line_tools](https://github.com/ethz-asl/line_tools/)
 * [opencv3_catkin](https://github.com/ethz-asl/opencv3_catkin/)
 * [pcl_catkin](https://github.com/ethz-asl/pcl_catkin/)
 * [interior_net_to_rosbag](https://github.com/ethz-asl/interiornet_to_rosbag)
@@ -85,16 +86,16 @@ $ catkin build
 
 ## Datasets
 - The main dataset used is `InteriorNet`.  
-Please download the [dataset](https://interiornet.org/), specifically the HD7 scenes. Not all scenes have to be downloaded. In the python/dataset_utils directory there is a python script (`download_interiornet.py`) that automatically downloads scenes from the HD7 directory. The path were the dataset is stored can be set in the script.
-- Other datasets can be used as well, as long as they are converted into the InteriorNet format. As an example, scripts for converting the DIML dataset and NYU dataset are located in the python/dataset_utils/ directory. The files used from the InteriorNet scene directories include `cam0.render` and the images in `cam0/data/` (or `random_lighting_cam0/data/`, if set in python/generate_raw_data.py), `label0/data/`, `depth0/data/`. Note that cam0.render is currently only used to determine the frame count for the `interiornet_to_rosbag` node. Also, no ground truth instancing labels are required for the place recognition pipeline to work. However, "fake" instance and semantic masks need to be created in the label0/data/ directory. Lastly, the InteriorNet dataset depth images are stored as euclidean ray lengths from the camera center. If the depth data is stored in the z coordinate (as it is the case with the NYU and DIML dataset), it needs to be converted accordingly.
+Please download the [dataset](https://interiornet.org/), specifically the HD7 scenes. Not all scenes have to be downloaded. In the [python/dataset_utils](python/dataset_utils) directory there is a python script ([download_interiornet.py](python/dataset_utils/download_interiornet.py)) that automatically downloads scenes from the HD7 directory. The path were the dataset is stored can be set in the script.
+- Other datasets can be used as well, as long as they are converted into the InteriorNet format. As an example, scripts for converting the DIML dataset and NYU dataset are located in the [python/dataset_utils](python/dataset_utils) directory. The files used from the InteriorNet scene directories include `cam0.render` and the images in `cam0/data/` (or `random_lighting_cam0/data/`, if set in [python/generate_raw_data.py](python/generate_raw_data.py)), `label0/data/`, `depth0/data/`. Note that cam0.render is currently only used to determine the frame count for the `interiornet_to_rosbag` node. Also, no ground truth instancing labels are required for the place recognition pipeline to work. However, "fake" instance and semantic masks need to be created in the label0/data/ directory. Lastly, the InteriorNet dataset depth images are stored as euclidean ray lengths from the camera center. If the depth data is stored in the z coordinate (as it is the case with the NYU and DIML dataset), it needs to be converted accordingly.
 
 ## Data generation
-Please check the `python` package on how to generate the data needed for training and evaluation.
+Please check the [python](python) package on how to generate the data needed for training and evaluation.
 
 
 ## Training the models and evaluation
-To train the models with the data previously generated and to perform place recognition experiments, please take a look at the package `python`.
+To train the models with the data previously generated and to perform place recognition experiments, please take a look at the [python](python) package.
 
 
 ### Utility files
-Please look at `line_ros_utility` and `python` for a detailed explanation of the available utility files.
+Please look at [line_ros_utility](line_ros_utility) and [python](python) for a detailed explanation of the available utility files.
