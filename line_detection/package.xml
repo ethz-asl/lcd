@@ -3,9 +3,18 @@
   <name>line_detection</name>
   <version>0.0.1</version>
   <description>Package for detecting lines in 3D.</description>
-  <maintainer email="anonymous@email.com">Anonymous</maintainer>
 
-  <author>Anonymous</author>
+  <maintainer email="fmilano@student.ethz.ch">Francesco Milano</maintainer>
+  <maintainer email="lichengk@student.ethz.ch">Chengkun Li</maintainer>
+  <maintainer email="dwalder@student.ethz.ch">Dominik Walder</maintainer>
+  <maintainer email="fadri.furrer@mavt.ethz.ch">Fadri Furrer</maintainer>
+  <maintainer email="tonci.novkovic@mavt.ethz.ch">Tonci Novkovic</maintainer>
+
+  <author>Francesco Milano</author>
+  <author>Chengkun Li</author>
+  <author>Dominik Walder</author>
+  <author>Fadri Furrer</author>
+  <author>Tonci Novkovic</author>
 
   <license>BSD</license>
 
