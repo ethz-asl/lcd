@@ -72,7 +72,7 @@ class QueryFrame:
         self.clusters = clusters
         self.gt_clusters = gt_clusters
 
-    def draw_frame(self, cluster_id=None, predicted=True):
+    def draw_frame(self, cluster_id=None, predicted=True, use_random_lighting=False):
         """
         Renders the full frame on the corresponding RGB image using colored lines.
         :param cluster_id: If specified, renders only this cluster.
@@ -80,7 +80,8 @@ class QueryFrame:
         """
         scene_name = self.path.split('/')[-2]
         frame_id = self.path.split('_')[-1]
-        path = os.path.join(DATASET_PATH, scene_name, 'cam0/data', frame_id + '.png')
+        # path = os.path.join(DATASET_PATH, scene_name, 'cam0/data', frame_id + '.png')
+        path = get_rgb_path_from_line_path(self.path, DATASET_PATH, use_random_lighting)
 
         image = cv2.imread(path, cv2.IMREAD_UNCHANGED)
         image[:, :, :3] = (image[:, :, :3] * 0.6).astype(np.uint8)
@@ -154,6 +155,17 @@ def draw_cluster(image, line_geometries, color):
     return out_image
 
 
+def get_rgb_path_from_line_path(path, dataset_path, use_random_lighting=False):
+    scene_name = path.split('/')[-2]
+    frame_id = path.split('_')[-1]
+    if use_random_lighting:
+        image_path = os.path.join(dataset_path, scene_name, 'random_lighting_cam0/data', frame_id + '.png')
+    else:
+        image_path = os.path.join(dataset_path, scene_name, 'cam0/data', frame_id + '.png')
+
+    return image_path
+
+
 def get_floor_ids(scenes):
     """
     Returns the unique floor id of each scene by checking the scene names.
@@ -176,10 +188,32 @@ def get_floor_ids(scenes):
     return floor_ids
 
 
+def merge_maps_lighting(normal_lighting_floors, random_lighting_floors):
+    for i, normal_floor in enumerate(normal_lighting_floors):
+        random_floor = random_lighting_floors[i]
+        for j, normal_scene in enumerate(normal_floor.scenes):
+            if j >= len(random_floor.scenes):
+                print("Error")
+                continue
+            random_scene = random_floor.scenes[j]
+            random_frame_names = [frame.path.split("/")[-1] for frame in random_scene.frames]
+            for k, normal_frame in enumerate(normal_scene.frames):
+                normal_frame_name = normal_frame.path.split("/")[-1]
+                normal_scene_name = normal_frame_name.split("_")[0]
+                random_scene_name = random_frame_names[0].split("_")[0]
+                assert(normal_scene_name == random_scene_name)
+
+                if normal_frame_name in random_frame_names:
+                    random_idx = random_frame_names.index(normal_frame_name)
+                    normal_frame.random_lighting_frame = random_scene.frames[random_idx]
+
+
 def get_sift_vocabulary(interiornet_path, sift_vocabulary_path, map_data, vocabulary_dim=768, num_scenes=None):
     scene_paths = [os.path.join(interiornet_path, scene.name) for scene in map_data.scenes]
 
     sift = cv2.xfeatures2d.SIFT_create()
+
+    sift_vocabulary_path = sift_vocabulary_path + "_{}".format(vocabulary_dim)
 
     # If the sift vocabulary was already computed, use it.
     if not os.path.isfile(sift_vocabulary_path):
@@ -227,15 +261,27 @@ def get_sift_vocabulary(interiornet_path, sift_vocabulary_path, map_data, vocabu
 
 def get_full_embeddings(cluster_model, descriptor_model, frame_data,
                         min_cluster_line_count=4,
-                        max_cluster_line_count=50):
+                        max_cluster_line_count=50,
+                        use_random_lighting=False):
     scenes = frame_data.scenes
     floor_ids = get_floor_ids(scenes)
     training_plan = frame_data.training_plan
 
-    # Compute the SIFT vocubulary used in the bag-of-words approach.
+    # Compute the SIFT vocabulary used in the bag-of-words approach.
     vocabulary_dim = SIFT_VOCABULARY_DIM
     kmeans = get_sift_vocabulary(DATASET_PATH, SIFT_VOCABULARY_PATH, frame_data, vocabulary_dim)
     sift = cv2.xfeatures2d.SIFT_create()
+
+    if EVALUATE_NON_SIFT:
+        # Load NetVLAD descriptors.
+        print("Loading NetVLAD descriptors.")
+        with open(NETVLAD_DESCRIPTOR_PATH, 'rb') as netvlad_file:
+            netvlad_embeddings = pickle.load(netvlad_file, encoding='latin1')
+
+        # Load Superpoint descriptors.
+        print("Loading Superpoint descriptors")
+        with open(SUPERPOINT_DESCRIPTOR_PATH, 'rb') as superpoint_file:
+            superpoint_embeddings = pickle.load(superpoint_file, encoding='latin1')
 
     # In interiornet, different scenes can be in the same floor. These scenes are grouped into floors.
     query_floors = [QueryFloor([]) for i in range(np.unique(floor_ids).shape[0])]
@@ -363,7 +409,10 @@ def get_full_embeddings(cluster_model, descriptor_model, frame_data,
         # Load the corresponding RGB image.
         scene_name = frame_path.split('/')[-2]
         frame_id = frame_path.split('_')[-1]
-        image_path = os.path.join(DATASET_PATH, scene_name, 'cam0/data', frame_id + '.png')
+        if use_random_lighting:
+            image_path = os.path.join(DATASET_PATH, scene_name, 'random_lighting_cam0/data', frame_id + '.png')
+        else:
+            image_path = os.path.join(DATASET_PATH, scene_name, 'cam0/data', frame_id + '.png')
         frame_im = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
         if frame_im is None:
             print(image_path)
@@ -372,11 +421,16 @@ def get_full_embeddings(cluster_model, descriptor_model, frame_data,
         keypoints, descriptors = sift.detectAndCompute(frame_im, None)
         if descriptors is not None:
             indices = kmeans.predict(descriptors)
-            sift_embedding = np.histogram(indices, np.arange(vocabulary_dim))[0].astype(float)
+            sift_embedding = np.histogram(indices, np.arange(vocabulary_dim + 1))[0].astype(float)
             # Add the SIFT embedding to the frame.
             query_frame.sift_embedding = sift_embedding
         else:
             query_frame.sift_embedding = None
+
+        if EVALUATE_NON_SIFT:
+            # Load the NetVLAD and SuperPoint descriptor
+            query_frame.netvlad_embedding = netvlad_embeddings[image_path]
+            query_frame.superpoint_embedding = superpoint_embeddings[image_path]
 
         # Add the frame to the scene and the scene to the floor.
         query_scenes[scene_id].frames.append(query_frame)
@@ -399,7 +453,7 @@ def get_full_embeddings(cluster_model, descriptor_model, frame_data,
     return query_floors
 
 
-def query_on_floors(query_floors):
+def query_on_floors(query_floors, use_random_lighting=False):
     # Get fully predicted, gt clustered and sift embeddings.
 
     # The maximum number of floors to be used during the place recognition experiments.
@@ -421,6 +475,8 @@ def query_on_floors(query_floors):
     embeddings = []
     gt_embeddings = []
     sift_embeddings = []
+    netvlad_embeddings = []
+    superpoint_embeddings = []
 
     # Remove clusters with too few lines, remove scenes with too few frames and remove frames
     # so that the number of frames is less than max_frames.
@@ -467,6 +523,9 @@ def query_on_floors(query_floors):
                     gt_embeddings.append(gt_cluster.embedding)
                     gt_data.append((floor, scene, frame, gt_cluster))
                 sift_embeddings.append(frame.sift_embedding)
+                if EVALUATE_NON_SIFT:
+                    netvlad_embeddings.append(frame.netvlad_embedding)
+                    superpoint_embeddings.append(frame.superpoint_embedding)
                 sift_data.append((floor, scene, frame))
             number_of_scenes += 1
 
@@ -477,10 +536,16 @@ def query_on_floors(query_floors):
     embeddings = np.vstack(embeddings)
     gt_embeddings = np.vstack(gt_embeddings)
     sift_embeddings = np.vstack(sift_embeddings)
+    if EVALUATE_NON_SIFT:
+        netvlad_embeddings = np.vstack(netvlad_embeddings)
+        superpoint_embeddings = np.vstack(superpoint_embeddings)
     print("Generating map trees.")
     map_tree = sn.KDTree(embeddings, leaf_size=10)
     gt_tree = sn.KDTree(gt_embeddings, leaf_size=10)
     sift_tree = sn.KDTree(sift_embeddings, leaf_size=10)
+    if EVALUATE_NON_SIFT:
+        netvlad_tree = sn.KDTree(netvlad_embeddings, leaf_size=10)
+        superpoint_tree = sn.KDTree(superpoint_embeddings, leaf_size=10)
 
     rendered_pred_matches = 0
     rendered_clusterings = 0
@@ -500,6 +565,8 @@ def query_on_floors(query_floors):
             os.mkdir('visualization/gt_clusters')
         if not os.path.exists('visualization/gt_matches'):
             os.mkdir('visualization/gt_matches')
+        if not os.path.exists('visualization/netvlad_matches'):
+            os.mkdir('visualization/netvlad_matches')
 
     print("Starting query.")
 
@@ -516,6 +583,14 @@ def query_on_floors(query_floors):
 
     num_sift_frames = 0
     matched_num_sift_frames = 0
+    num_netvlad_frames = 0
+    matched_num_netvlad_frames = 0
+    num_superpoint_frames = 0
+    matched_num_superpoint_frames = 0
+
+    num_random_frames = 0
+    total_gt_frames = 0
+
     for floor in query_floors[:max_num_floors]:
         for scene in floor.scenes:
             for frame in scene.frames:
@@ -531,13 +606,24 @@ def query_on_floors(query_floors):
                 if wrong_scene:
                     continue
 
+                # If query is desired with random lighting, use the random lighting frame for query.
+                if use_random_lighting:
+                    total_gt_frames += 1
+                    if hasattr(frame, 'random_lighting_frame'):
+                        num_random_frames += 1
+                        query_frame = frame.random_lighting_frame
+                    else:
+                        continue
+                else:
+                    query_frame = frame
+
                 # Perform place recognition using fully predicted clusters.
                 frame_matches = []
-                for i, cluster in enumerate(frame.clusters):
+                for i, cluster in enumerate(query_frame.clusters):
                     # Query the KD tree for the nearest neighbor.
                     dist, nearest = map_tree.query(cluster.embedding.reshape(-1, 1).T, k=k*2+1)
                     # Warning, the nearest one is of course the very same cluster and is removed.
-                    nearest_data = [data[nearest[0][j]] for j in range(1, k*2+1)]
+                    nearest_data = [data[nearest[0][j]] for j in range(0, k*2+1)]
                     matched = False
                     cluster_matches = []
                     num_queries = 0
@@ -563,7 +649,7 @@ def query_on_floors(query_floors):
 
                     # Render the cluster matches if the maximum number of rendered clusters is not reached.
                     if rendered_clusterings < max_render and RENDER:
-                        image_1 = frame.draw_frame(i)
+                        image_1 = query_frame.draw_frame(i, use_random_lighting=use_random_lighting)
                         image_2 = nearest_data[0][2].draw_frame(nearest_data[0][2].clusters.index(nearest_data[0][3]))
                         match_img = np.concatenate([image_1, image_2], axis=1)
                         cv2.imwrite("visualization/matches/{}_{}.png".format(rendered_clusterings,
@@ -600,8 +686,8 @@ def query_on_floors(query_floors):
 
                 # Render frame with the ground truth and predicted clusterings.
                 if rendered_clusterings < max_render and RENDER:
-                    pred_img = frame.draw_frame()
-                    gt_img = frame.draw_frame(predicted=False)
+                    pred_img = query_frame.draw_frame()
+                    gt_img = query_frame.draw_frame(predicted=False)
                     cv2.imwrite("visualization/pred_clusters/{}_{}.png".format(rendered_clusterings, cluster_matched),
                                 pred_img, [cv2.IMWRITE_PNG_COMPRESSION, 9])
                     cv2.imwrite("visualization/gt_clusters/{}_{}.png".format(rendered_clusterings,
@@ -612,10 +698,10 @@ def query_on_floors(query_floors):
                 # Perform place recognition using ground truth clusterings. This works exactly the same way as above
                 # with the only difference of using ground truth clusters instead of predicted clusters.
                 gt_frame_matches = []
-                for i, gt_cluster in enumerate(frame.gt_clusters):
+                for i, gt_cluster in enumerate(query_frame.gt_clusters):
                     dist, nearest = gt_tree.query(gt_cluster.embedding.reshape(-1, 1).T, k=k*2+1)
                     # Warning, the nearest one is of course the very same cluster.
-                    nearest_data = [gt_data[nearest[0][j]] for j in range(1, k*2+1)]
+                    nearest_data = [gt_data[nearest[0][j]] for j in range(0, k*2+1)]
                     matched = False
                     cluster_matches = []
                     num_queries = 0
@@ -637,7 +723,7 @@ def query_on_floors(query_floors):
 
                     # Render ground truth matches.
                     if rendered_clusterings < max_render and RENDER:
-                        image_1 = frame.draw_frame(i, predicted=False)
+                        image_1 = query_frame.draw_frame(i, predicted=False, use_random_lighting=use_random_lighting)
                         image_2 = nearest_data[0][2].draw_frame(
                             nearest_data[0][2].gt_clusters.index(nearest_data[0][3]),
                             predicted=False)
@@ -653,22 +739,68 @@ def query_on_floors(query_floors):
                         matched_num_gt_frames += 1
 
                 # Perform place recognition with the SIFT bag-of-words approach.
-                if frame.sift_embedding is not None:
-                    k_sift = 1
-                    dist, ind = sift_tree.query(frame.sift_embedding.reshape(-1, 1).T, k=k_sift+1)
+                if query_frame.sift_embedding is not None:
+                    dist, ind = sift_tree.query(query_frame.sift_embedding.reshape(-1, 1).T, k=2)
                     # The nearest neighbor is chosen as the predicted scene.
-                    nearest_data = [sift_data[ind[0][j]] for j in range(1, k_sift+1)]
-                    sift_matches = []
+                    # If random lighting is used, the closest frame might be the same frame with normal lighting.
+                    # This is removed here.
+                    nearest_data = [sift_data[ind[0][j]] for j in range(0, 2)]
                     for data_point in nearest_data:
-                        sift_matches.append(query_floors.index(data_point[0]))
-                    most_common_sift = Counter(sift_matches).most_common(1)
-                    if query_floors[most_common_sift[0][0]] is floor:
+                        if data_point[2] is not frame:
+                            most_common_sift_floor = data_point[0]
+                            break
+
+                    assert(most_common_sift_floor is not None)
+                    if most_common_sift_floor is floor:
                         matched_num_sift_frames += 1
                     elif cluster_matched:
                         matched_num_only_cluster += 1
                     num_sift_frames += 1
 
+                if EVALUATE_NON_SIFT:
+                # Perform place recognition with the NetVLAD global descriptor approach.
+                    if query_frame.netvlad_embedding is not None:
+                        dist, ind = netvlad_tree.query(query_frame.netvlad_embedding, k=2)
+                        # The nearest neighbor is chosen as the predicted scene.
+                        nearest_data = [sift_data[ind[0][j]] for j in range(0, 2)]
+                        for data_point in nearest_data:
+                            if data_point[2] is not frame:
+                                # if RENDER:
+                                most_common_netvlad_floor = data_point[0]
+
+                                break
+
+                        assert(most_common_netvlad_floor is not None)
+                        if most_common_netvlad_floor is floor:
+                            matched_num_netvlad_frames += 1
+                        num_netvlad_frames += 1
+                    else:
+                        print("NetVLAD is none.")
+
+                    # Perform place recognition with the Superpoint bag-of-words approach.
+                    if query_frame.superpoint_embedding is not None:
+                        dist, ind = superpoint_tree.query(query_frame.superpoint_embedding.reshape(-1, 1).T, k=2)
+                        # The nearest neighbor is chosen as the predicted scene.
+                        nearest_data = [sift_data[ind[0][j]] for j in range(1, 2)]
+                        for data_point in nearest_data:
+                            if data_point[2] is not frame:
+                                most_common_superpoint_floor = data_point[0]
+                                break
+
+                        assert(most_common_superpoint_floor is not None)
+                        if most_common_superpoint_floor is floor:
+                            matched_num_superpoint_frames += 1
+                        num_superpoint_frames += 1
+
                 tot_num_frames += 1
+
+                print("{:5.2f} completed. Ours: {:5.2f}, Ours, GTC: {:5.2f}, SIFT + BoW: {:5.2f}, NetVLAD: {:5.2f},"
+                      " Superpoint + BoW: {:5.2f}".format(tot_num_frames / sift_embeddings.shape[0],
+                                                          matched_num_frames / tot_num_frames,
+                                                          matched_num_gt_frames / tot_num_frames,
+                                                          matched_num_sift_frames / tot_num_frames,
+                                                          matched_num_netvlad_frames / tot_num_frames,
+                                                          matched_num_superpoint_frames / tot_num_frames))
 
     print("==================================================")
     print("Fully predicted:")
@@ -677,7 +809,6 @@ def query_on_floors(query_floors):
     print("Ratio of correctly matched clusters: {}".format(matched_num_clusters / tot_num_clusters))
     print(" ")
     print("Correctly matched frames: {}/{}".format(matched_num_frames, tot_num_frames))
-    # print("Number of empty frames: {}".format(empty_num_frames))
     print("Ratio of correctly matched frames: {}".format(matched_num_frames / tot_num_frames))
     print("==================================================")
     print("Predictions with ground truth clusters:")
@@ -688,12 +819,23 @@ def query_on_floors(query_floors):
     print("Correctly matched frames: {}/{}".format(matched_num_gt_frames, tot_num_frames))
     print("Ratio of correctly matched frames: {}".format(matched_num_gt_frames / tot_num_frames))
     print("==================================================")
-    print("Predictions sift image similarity:")
+    print("Predictions with SIFT image similarity:")
     print(" ")
     print("Correctly matched frames: {}/{}".format(matched_num_sift_frames, tot_num_frames))
     print("Ratio of correctly matched frames: {}".format(matched_num_sift_frames / tot_num_frames))
     print("Number of frames not detected by SIFT but by line clustering: {}".format(matched_num_only_cluster))
     print("==================================================")
+    if EVALUATE_NON_SIFT:
+        print("Predictions with NetVLAD descriptor:")
+        print(" ")
+        print("Correctly matched frames: {}/{}".format(matched_num_netvlad_frames, tot_num_frames))
+        print("Ratio of correctly matched frames: {}".format(matched_num_netvlad_frames / tot_num_frames))
+        print("==================================================")
+        print("Predictions with Superpoint + BoW descriptor:")
+        print(" ")
+        print("Correctly matched frames: {}/{}".format(matched_num_superpoint_frames, tot_num_frames))
+        print("Ratio of correctly matched frames: {}".format(matched_num_superpoint_frames / tot_num_frames))
+        print("==================================================")
 
 
 if __name__ == '__main__':
@@ -705,10 +847,12 @@ if __name__ == '__main__':
 
     # The path to the saved weights of the cluster description model.
     embedding_model_path = \
-        "/clustering_and_description/logs/description_100620_1644/weights_only.27.hdf5"
+        "logs/description_031020_1946/weights.40.hdf5"
+        # "logs/description_100620_1644/weights_only.27.hdf5"
     # The path to the saved weights of the clustering model.
     cluster_model_path = \
-        "/clustering_and_description/logs/cluster_110620_2345/weights_only.26.hdf5"
+        "logs/cluster_110620_2345/weights.38.hdf5"
+        # "logs/cluster_110620_2345/weights_only.26.hdf5"
     # The path to the pickled precomputed map (sift histograms and cluster descriptors) for all frames in the map.
     PICKLE_PATH = "/nvme/line_ws/val_map"
     # The path to the preprocessed dataset directory containing the line files for the frames of the scenes used for
@@ -734,6 +878,10 @@ if __name__ == '__main__':
     # The background class ids used for ground truth clustering. All background lines are put into one cluster.
     BG_CLASSES = [0, 1, 2, 20, 22]
 
+    # Evaluate non-sift baselines (requires installation of netvlad and superpoint and the computation of the
+    # corresponding descriptors.)
+    EVALUATE_NON_SIFT = False
+
     # INTERIORNET:
     if dataset_name == "interiornet":
         PICKLE_PATH = "/nvme/line_ws/val_map"
@@ -741,10 +889,15 @@ if __name__ == '__main__':
         DATASET_PATH = "/nvme/datasets/interiornet"
         SIFT_VOCABULARY_PATH = "/nvme/line_ws/val_map/sift_vocabulary"
 
-        MAX_NUM_FLOORS = 10000
+        EVALUATE_RANDOM_LIGHTING = True
+
+        NETVLAD_DESCRIPTOR_PATH = "netvlad/interiornet_descriptors"
+        SUPERPOINT_DESCRIPTOR_PATH = "superpoint/interiornet_descriptors"
+
+        MAX_NUM_FLOORS = 1000
         MIN_FRAMES_PER_SCENE = 0
         MAX_FRAMES_PER_SCENE = 100
-        SIFT_VOCABULARY_DIM = 800
+        SIFT_VOCABULARY_DIM = 4096
         K_NN = 8
         MIN_CLUSTER_LINES_FOR_DESCRIPTION = 4
         BG_CLASSES = [0, 1, 2, 20, 22]
@@ -755,6 +908,11 @@ if __name__ == '__main__':
         MAP_DIR = "/nvme/line_ws/all_data_diml"
         DATASET_PATH = "/nvme/datasets/diml_depth/HD7"
         SIFT_VOCABULARY_PATH = "/nvme/line_ws/all_data_diml/sift_vocabulary"
+
+        EVALUATE_RANDOM_LIGHTING = False
+
+        NETVLAD_DESCRIPTOR_PATH = "netvlad/diml_descriptors"
+        SUPERPOINT_DESCRIPTOR_PATH = "superpoint/diml_descriptors"
 
         MAX_NUM_FLOORS = 10000
         MIN_FRAMES_PER_SCENE = 8
@@ -770,6 +928,11 @@ if __name__ == '__main__':
         MAP_DIR = PICKLE_PATH
         DATASET_PATH = "/nvme/datasets/nyu_v2/HD7"
         SIFT_VOCABULARY_PATH = "/nvme/line_nyu/all_data_4_or_more/sift_vocabulary"
+
+        EVALUATE_RANDOM_LIGHTING = False
+
+        NETVLAD_DESCRIPTOR_PATH = "netvlad/nyu_descriptors"
+        SUPERPOINT_DESCRIPTOR_PATH = "superpoint/nyu_descriptors"
 
         MAX_NUM_FLOORS = 10000
         MIN_FRAMES_PER_SCENE = 5
@@ -815,6 +978,11 @@ if __name__ == '__main__':
         with open(PICKLE_PATH, 'rb') as f:
             # If the precomputed map already exists, use that one.
             query_floors = pickle.load(f)
+
+        if EVALUATE_RANDOM_LIGHTING:
+            with open(PICKLE_PATH + "_random", 'rb') as f:
+                # If the precomputed map already exists, use that one.
+                query_floors_random = pickle.load(f)
     else:
         print("Loading data.")
         print("Using end to end clustering.")
@@ -844,17 +1012,43 @@ if __name__ == '__main__':
                                            min_cluster_line_count=min_cluster_line_count,
                                            max_cluster_line_count=max_cluster_line_count)
 
+        if EVALUATE_RANDOM_LIGHTING:
+            random_lighting_data = datagenerator_framewise.LineDataSequence(MAP_DIR + "_random",
+                                                                            batch_size,
+                                                                            BG_CLASSES,
+                                                                            data_augmentation=False,
+                                                                            img_shape=img_shape,
+                                                                            min_line_count=min_frame_line_count,
+                                                                            max_line_count=max_frame_line_count,
+                                                                            max_cluster_count=max_clusters,
+                                                                            training_mode=False)
+
+            NETVLAD_DESCRIPTOR_PATH = NETVLAD_DESCRIPTOR_PATH + "_random"
+            SUPERPOINT_DESCRIPTOR_PATH = SUPERPOINT_DESCRIPTOR_PATH + "_random"
+
+            query_floors_random = get_full_embeddings(line_model, embedding_model, random_lighting_data,
+                                                      min_cluster_line_count=min_cluster_line_count,
+                                                      max_cluster_line_count=max_cluster_line_count,
+                                                      use_random_lighting=True)
+
+            with open(PICKLE_PATH + "_random", 'wb') as f:
+                pickle.dump(query_floors_random, f)
+
         # Save map for later use.
         with open(PICKLE_PATH, 'wb') as f:
             pickle.dump(query_floors, f)
 
+    if EVALUATE_RANDOM_LIGHTING:
+        # Tests to merge the floors.
+        merge_maps_lighting(query_floors, query_floors_random)
+
     print("Starting query.")
 
     # Set seed for reproducibility during query.
-    np.random.seed(128)
+    np.random.seed(123)
 
     # Start place recognition experiments.
-    query_on_floors(query_floors)
+    query_on_floors(query_floors, use_random_lighting=EVALUATE_RANDOM_LIGHTING)
 
 
 

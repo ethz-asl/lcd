@@ -24,10 +24,16 @@ saver = tf.train.Saver()
 sess = tf.InteractiveSession(config=config)
 saver.restore(sess, nets.defaultCheckpoint())
 
-RANDOM_LIGHTING = True
+RANDOM_LIGHTING = False
 
-data_path = "/nvme/datasets/interiornet"
-pickle_path = "interiornet_descriptors"
+# data_path = "/nvme/datasets/interiornet"
+# pickle_path = "interiornet_descriptors"
+
+# data_path = "/nvme/datasets/diml_depth/HD7"
+# pickle_path = "diml_descriptors"
+
+data_path = "/nvme/datasets/nyu_v2/HD7"
+pickle_path = "nyu_descriptors"
 
 if RANDOM_LIGHTING:
     pickle_path = pickle_path + "_random"

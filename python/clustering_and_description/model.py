@@ -246,7 +246,8 @@ def get_global_attention_layer(input_number, one_input_count=1, idx=0,
     for i in range(n_multi_heads):
         # More layers can be added here.
         # For the keys, bias should actually be added. This should be changed in the future.
-        keys = kl.TimeDistributed(kl.Dense(key_size, use_bias=use_bias))(model_input)
+        # keys = kl.TimeDistributed(kl.Dense(key_size, use_bias=use_bias))(model_input)
+        keys = kl.TimeDistributed(kl.Dense(key_size))(model_input)
         keys = kl.TimeDistributed(kl.BatchNormalization())(keys)
         queries = kl.TimeDistributed(kl.Dense(key_size, use_bias=use_bias))(one_input)
         queries = kl.TimeDistributed(kl.BatchNormalization())(queries)
@@ -257,7 +258,8 @@ def get_global_attention_layer(input_number, one_input_count=1, idx=0,
     for i in range(n_add_heads):
         # More layers can be added here.
         # For the keys, bias should actually be added. This should be changed in the future.
-        keys = kl.TimeDistributed(kl.Dense(key_size, use_bias=use_bias))(model_input)
+        # keys = kl.TimeDistributed(kl.Dense(key_size, use_bias=use_bias))(model_input)
+        keys = kl.TimeDistributed(kl.Dense(key_size))(model_input)
         keys = kl.TimeDistributed(kl.BatchNormalization())(keys)
         queries = kl.TimeDistributed(kl.Dense(key_size, use_bias=use_bias))(one_input)
         queries = kl.TimeDistributed(kl.BatchNormalization())(queries)

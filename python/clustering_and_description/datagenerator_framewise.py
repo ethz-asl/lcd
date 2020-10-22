@@ -120,7 +120,7 @@ class Scene:
     A class to store the data of a scene.
     """
     def __init__(self, path, bg_classes, min_line_count, max_clusters, img_shape,
-                 min_line_count_cluster=5):
+                 min_line_count_cluster=5, use_random_lighting=False):
         """
         Initializes a Scene object.
         :param path: The path to the scene directory with the preprocessed frame line files.
@@ -135,6 +135,15 @@ class Scene:
         # Find all files located in the scene directory.
         self.frame_paths = [os.path.join(path, name) for name in os.listdir(path)
                             if os.path.isfile(os.path.join(path, name))]
+        if use_random_lighting:
+            random_path = os.path.join("/", *path.split('/')[:-2], path.split('/')[-2] + "_random", self.name)
+            # print(random_path)
+            if os.path.exists(random_path):
+                self.frame_paths += [os.path.join(random_path, name) for name in os.listdir(random_path)
+                                     if os.path.isfile(os.path.join(random_path, name))]
+                print("Found random lighting.")
+            else:
+                print("Random lighting does not exist for scene {}".format(path))
         self.frame_paths.sort(key=lambda x: int(x.split('_')[-1]))
         self.frame_count = len(self.frame_paths)
         self.bg_classes = bg_classes
@@ -320,7 +329,7 @@ def get_non_bg_mask(classes, bg_classes):
 
 
 def load_scenes(files_dir, bg_classes, min_line_count, max_line_count, max_clusters, img_shape,
-                min_line_count_cluster=5):
+                min_line_count_cluster=5, use_random_lighting=False):
     """
     Loads all scenes of the dataset either from the line files or from a precomputed pickle file.
     When loading the scenes for the first time, this pickle file will be created.
@@ -345,7 +354,7 @@ def load_scenes(files_dir, bg_classes, min_line_count, max_line_count, max_clust
                        if os.path.isdir(os.path.join(files_dir, name))]
         scene_paths.sort()
         scenes = [Scene(path, bg_classes, min_line_count, max_clusters, img_shape,
-                        min_line_count_cluster=min_line_count_cluster)
+                        min_line_count_cluster=min_line_count_cluster, use_random_lighting=use_random_lighting)
                   for path in scene_paths]
         with open(pickle_file_path, 'wb') as f:
             pickle.dump(scenes, f)
@@ -403,11 +412,12 @@ class LineDataSequence(Sequence):
         self.max_cluster_count = max_cluster_count
         self.batch_size = batch_size
         if training_mode:
+            # In training mode, the number of clusters should not exceed the network's max number of clusters.
             max_scene_cluster_count = max_cluster_count
         else:
             max_scene_cluster_count = 100000
         self.scenes = load_scenes(files_dir, bg_classes, min_line_count, max_line_count, max_scene_cluster_count,
-                                  img_shape)
+                                  img_shape, use_random_lighting=True)
         self.training_plan = create_training_plan(self.scenes)
         self.frame_count = len(self.training_plan)
         self.frame_indices = np.arange(self.frame_count, dtype=int)
@@ -625,7 +635,7 @@ class ClusterDataSequence(Sequence):
         self.max_line_count = max_line_count
         self.batch_size = batch_size
         self.scenes = load_scenes(files_dir, bg_classes, min_line_count, max_line_count, 1000, img_shape,
-                                  min_line_count_cluster=min_line_count)
+                                  min_line_count_cluster=min_line_count, use_random_lighting=True)
         if training_mode:
             min_num_clusters = 2
         else:

@@ -55,7 +55,7 @@ def train_descriptor(past_path=None, past_epoch=None):
     image_weight_path = "./weights/image_weights.hdf5"
 
     load_past = past_path is not None
-    log_path = past_epoch
+    log_path = past_path
 
     # Load the model from scratch or load a past model checkpoint.
     if not load_past:
@@ -118,11 +118,11 @@ if __name__ == '__main__':
     parser.add_argument(
         "--epoch",
         default=None,
-        help="Path where to write the txt files with the splitting.")
+        help="The number of the last epoch.")
     args = parser.parse_args()
 
     model_checkpoint = args.model_checkpoint_dir
-    epoch = args.epoch
+    epoch = int(args.epoch)
 
     if model_checkpoint is not None and epoch is None:
         print("ERROR: Epoch needs to be specified if a model checkpoint is to be loaded.")

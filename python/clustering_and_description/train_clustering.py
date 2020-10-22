@@ -152,8 +152,6 @@ def train_clustering(pretrain_images=False, past_path=None, past_epoch=None):
                    verbose=1,
                    max_queue_size=16,
                    workers=4,
-                   steps_per_epoch=10,
-                   validation_steps=10,
                    epochs=num_epochs,
                    initial_epoch=initial_epoch,
                    use_multiprocessing=True,
@@ -181,7 +179,7 @@ if __name__ == '__main__':
 
     pretrain = args.pretrain
     model_checkpoint = args.model_checkpoint_dir
-    epoch = args.epoch
+    epoch = int(args.epoch)
 
     if pretrain:
         if model_checkpoint is not None or epoch is not None:

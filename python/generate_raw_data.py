@@ -5,7 +5,7 @@ import os
 
 import rospy
 from std_msgs.msg import String
-sys.path.insert(0, "../interiornet_to_rosbag/nodes")
+sys.path.insert(0, "../../interiornet_to_rosbag/nodes")
 import interiornet_to_rosbag
 import get_virtual_camera_images
 
