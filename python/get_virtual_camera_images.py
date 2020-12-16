@@ -259,7 +259,7 @@ def get_process_line_function(output_path, data_lines, frame_id, real_camera, pc
                 pcl_from_line_view = cloud_utils.pcl_transform(pcl, T)
             # Set the resolution according to line pixel density to prevent aliasing.
             img_width = min(max_image_width, int(line_length_pixels * 1.5))
-            img_height = int(max_image_width / 1.5)
+            img_height = int(img_width / 1.5)
             # Obtain the RGB and depth virtual camera images by reprojecting the
             # point cloud on the image plane, under the view of the virtual
             # camera.
