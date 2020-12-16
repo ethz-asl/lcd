@@ -30,6 +30,17 @@ The following 'auxiliary' packages are also part of the repository:
 2. [line_detection_python](line_detection_python): Currently-unused (and not up-to-date) C++-to-Python bindings of the package `line_detection`.
 3. [line_matching](line_matching): Deprecated package to match lines extracted in one frame to lines extracted in another frame. 
 
+## BibTeX Citation
+```txt
+@misc{taubner2020lcd,
+      title={LCD -- Line Clustering and Description for Place Recognition}, 
+      author={Felix Taubner and Florian Tschopp and Tonci Novkovic and Roland Siegwart and Fadri Furrer},
+      year={2020},
+      eprint={2010.10867},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV}
+}
+```
 
 ## Build instructions for ROS packages
 You may need to install `python_catkin_tools` and `autoconf`:
